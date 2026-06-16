@@ -8,12 +8,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const { id } = await params
 
     const participants = await prisma.tournamentParticipant.findMany({
       where: { tournamentId: id },
@@ -37,31 +38,106 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     
     if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
+    const { id } = await params
     const { playerIds } = await request.json()
 
-    const participants = await prisma.tournamentParticipant.createMany({
-      data: playerIds.map((playerId: string, index: number) => ({
-        tournamentId: id,
-        playerId,
-        seed: index + 1
-      })),
-      skipDuplicates: true
+    if (!playerIds || playerIds.length === 0) {
+      return NextResponse.json({ error: "Player IDs required" }, { status: 400 })
+    }
+
+    // Get current participants count for seeding
+    const currentParticipants = await prisma.tournamentParticipant.count({
+      where: { tournamentId: id }
     })
 
-    return NextResponse.json({ success: true, count: participants.count })
+    // Create participants
+    const participants = await Promise.all(
+      playerIds.map((playerId: string, index: number) =>
+        prisma.tournamentParticipant.create({
+          data: {
+            tournamentId: id,
+            playerId,
+            seed: currentParticipants + index + 1
+          }
+        })
+      )
+    )
+
+    return NextResponse.json(participants)
   } catch (error) {
-    console.error("Error adding players:", error)
-    return NextResponse.json({ error: "Failed to add players" }, { status: 500 })
+    console.error("Error adding participants:", error)
+    return NextResponse.json(
+      { error: "Failed to add participants" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const { id } = await params
+    const { participantId } = await request.json()
+
+    if (!participantId) {
+      return NextResponse.json({ error: "Participant ID required" }, { status: 400 })
+    }
+
+    // Check if tournament has matches already
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: {
+        matches: {
+          where: {
+            OR: [
+              { homePlayerId: { not: null } },
+              { awayPlayerId: { not: null } }
+            ]
+          }
+        }
+      }
+    })
+
+    if (tournament?.matches && tournament.matches.length > 0) {
+      return NextResponse.json(
+        { error: "Cannot remove player. Tournament has already started." },
+        { status: 400 }
+      )
+    }
+
+    // Delete the participant
+    await prisma.tournamentParticipant.delete({
+      where: { id: participantId }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error removing player:", error)
+    return NextResponse.json(
+      { error: "Failed to remove player" },
+      { status: 500 }
+    )
   }
 }

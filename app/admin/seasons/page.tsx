@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Plus, Edit, Trash2, Calendar, Trophy, X, CheckCircle, AlertCircle, ArrowRight } from "lucide-react"
+import { Plus, Edit, Trash2, Calendar, Trophy, X, CheckCircle, AlertCircle, ArrowRight, Play, Pause, Users, Archive } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Season {
@@ -110,6 +110,17 @@ export default function AdminSeasonsPage() {
   }
 
   async function handleUpdateStatus(id: string, newStatus: string) {
+    // Confirm before changing to certain statuses
+    if (newStatus === "ARCHIVED") {
+      if (!confirm("Are you sure you want to archive this season? This will make it read-only.")) return
+    }
+    if (newStatus === "ENDED") {
+      if (!confirm("Are you sure you want to end this season? No more results can be submitted.")) return
+    }
+    if (newStatus === "LIVE") {
+      if (!confirm("Are you sure you want to start this season? Results can now be submitted.")) return
+    }
+
     const res = await fetch(`/api/seasons/${id}/status`, { 
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -196,23 +207,23 @@ export default function AdminSeasonsPage() {
                     </span>
                   </div>
                   
-                  {/* Status Update Buttons */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {statusOptions.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleUpdateStatus(season.id, opt.value)}
-                        disabled={season.status === opt.value}
-                        className={`px-2 py-1 rounded-lg text-xs transition-all ${
-                          season.status === opt.value
-                            ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                            : "bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+{/* Status Update Buttons */}
+<div className="mt-3 flex flex-wrap gap-2">
+  {statusOptions.map((opt) => (
+    <button
+      key={opt.value}
+      onClick={() => handleUpdateStatus(season.id, opt.value)}
+      disabled={season.status === opt.value}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+        season.status === opt.value
+          ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+          : "bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white"
+      }`}
+    >
+      {opt.label}
+    </button>
+  ))}
+</div>
                 </div>
                 <div className="flex gap-2">
                   <button

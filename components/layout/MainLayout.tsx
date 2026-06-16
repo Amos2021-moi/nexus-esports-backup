@@ -6,7 +6,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { 
   LayoutDashboard, User, Shield, Calendar, Trophy, Users, Award, Newspaper,
-  LogOut, Menu, X, ChevronRight, Bell, Search, Sun, Moon, Activity, Sparkles, TrendingUp, MessageCircle, Settings
+  LogOut, Menu, X, ChevronRight, Bell, Search, Sun, Moon, Activity, Sparkles, 
+  TrendingUp, MessageCircle, Settings
 } from "lucide-react"
 import NotificationBell from "@/components/ui/NotificationBell"
 
@@ -19,6 +20,7 @@ const playerMenu = [
   { name: "Statistics", href: "/dashboard/statistics", icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/10" },
   { name: "Awards", href: "/dashboard/awards", icon: Award, color: "text-orange-400", bg: "bg-orange-500/10" },
   { name: "Community", href: "/dashboard/community", icon: MessageCircle, color: "text-pink-400", bg: "bg-pink-500/10" },
+  { name: "Tournaments", href: "/tournaments", icon: Trophy, color: "text-amber-400", bg: "bg-amber-500/10" },
   { name: "Settings", href: "/dashboard/settings/account", icon: Settings, color: "text-gray-400", bg: "bg-gray-500/10" },
 ]
 
@@ -43,7 +45,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     setIsClient(true)
-    // Load theme preference from localStorage
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme === 'light') {
       setIsDarkMode(false)
@@ -96,7 +97,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Mobile overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
@@ -104,7 +104,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         />
       )}
 
-      {/* Mobile menu button */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="fixed left-4 top-4 z-50 rounded-xl bg-gray-800/80 backdrop-blur-sm p-3 text-white shadow-xl lg:hidden border border-white/10 hover:bg-gray-700 transition-all"
@@ -112,13 +111,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
       </button>
 
-      {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 z-50 h-screen w-80 transform bg-gray-900/95 backdrop-blur-md transition-transform duration-300 ease-in-out shadow-2xl border-r border-white/10 flex flex-col ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
-        {/* Logo Section */}
         <div className="flex-shrink-0 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/30 to-purple-600/30" />
           <div className="relative flex h-24 items-center justify-center border-b border-white/10">
@@ -134,9 +131,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Profile Card */}
           <div className="mx-4 mt-5 p-4 rounded-2xl bg-gradient-to-r from-white/5 to-white/2 border border-white/10">
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -157,7 +152,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
 
-          {/* Navigation */}
           <div className="mt-6 px-4">
             <p className="text-xs font-semibold text-gray-500 mb-3 px-3 uppercase tracking-wider flex items-center gap-2">
               <span className="h-px w-4 bg-gray-600"></span>
@@ -187,7 +181,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <div className="h-8" />
         </div>
 
-        {/* Footer */}
         <div className="flex-shrink-0 border-t border-white/10 bg-gray-900/95">
           <div className="p-4">
             <button
@@ -201,7 +194,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="lg:ml-80 min-h-screen">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-gray-900/80 backdrop-blur-md">
           <div className="flex h-16 items-center justify-between px-6">
@@ -222,7 +214,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 />
               </div>
               
-              {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg hover:bg-white/10 transition-colors"
@@ -231,7 +222,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 {isDarkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-gray-400" />}
               </button>
               
-              {/* Notification Bell */}
               <NotificationBell />
               
               <div className="h-6 w-px bg-white/10 hidden md:block"></div>

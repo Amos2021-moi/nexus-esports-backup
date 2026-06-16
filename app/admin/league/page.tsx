@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Plus, Users, Calendar, RefreshCw } from "lucide-react"
+import { Plus, Users, Calendar, RefreshCw, X, Trash2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Player {
@@ -120,6 +120,30 @@ export default function AdminLeaguePage() {
     } else {
       const error = await response.json()
       toast.error(error.error || "Failed to add player")
+    }
+  }
+
+  async function removePlayerFromSeason(entryId: string) {
+    if (!confirm("Are you sure you want to remove this player from the season? This will delete their stats.")) return
+
+    try {
+      const response = await fetch("/api/league/entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ entryId }),
+      })
+
+      if (response.ok) {
+        toast.success("Player removed from season")
+        fetchEntries(selectedSeason)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || "Failed to remove player")
+      }
+    } catch (error) {
+      console.error("Error removing player:", error)
+      toast.error("Failed to remove player")
     }
   }
 
@@ -251,6 +275,7 @@ export default function AdminLeaguePage() {
                   <th className="text-center py-3 text-gray-400 font-medium">D</th>
                   <th className="text-center py-3 text-gray-400 font-medium">L</th>
                   <th className="text-center py-3 text-gray-400 font-medium">Pts</th>
+                  <th className="text-center py-3 text-gray-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
@@ -264,6 +289,15 @@ export default function AdminLeaguePage() {
                     <td className="py-3 text-center text-yellow-400">{entry.draws}</td>
                     <td className="py-3 text-center text-red-400">{entry.losses}</td>
                     <td className="py-3 text-center text-white font-bold">{entry.points}</td>
+                    <td className="py-3 text-center">
+                      <button
+                        onClick={() => removePlayerFromSeason(entry.id)}
+                        className="text-red-400 hover:text-red-300 transition-all p-1"
+                        title="Remove player from season"
+                      >
+                        <X size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
