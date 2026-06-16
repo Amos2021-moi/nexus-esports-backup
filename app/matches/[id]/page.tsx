@@ -229,9 +229,11 @@ export default function MatchCenterPage() {
               <div className="mt-2">
                 {match.status === "COMPLETED" && hasResult && (
                   <span className="text-sm text-green-400">
-                    {match.homeScore > match.awayScore ? `${homeName} won` : 
-                     match.awayScore > match.homeScore ? `${awayName} won` : 
-                     "Draw"}
+                    {match.homeScore !== null && match.awayScore !== null ? (
+  match.homeScore > match.awayScore ? `${homeName} won` :
+  match.awayScore > match.homeScore ? `${awayName} won` :
+  "Draw"
+) : "Result pending"}
                   </span>
                 )}
               </div>

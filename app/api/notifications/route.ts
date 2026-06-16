@@ -12,7 +12,7 @@ export async function GET() {
     }
 
     // Use exact model name - check your schema (Notification or notification)
-    const notifications = await prisma.Notification.findMany({
+    const notifications = await prisma.notification.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
       take: 20
@@ -36,7 +36,7 @@ export async function PUT(request: Request) {
     const { notificationId } = await request.json()
 
     // Use exact model name here too
-    await prisma.Notification.update({
+    await prisma.notification.update({
       where: { id: notificationId },
       data: { read: true }
     })

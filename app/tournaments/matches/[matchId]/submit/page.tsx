@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Trophy, Upload, Camera, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react"
+import { Trophy, Calendar, Users, ArrowLeft, CheckCircle, Camera, AlertCircle,  Clock, XCircle } from "lucide-react"
 import Link from "next/link"
 import toast from "react-hot-toast"
 
@@ -13,7 +13,7 @@ interface Match {
   matchNumber: number
   homePlayer: { name: string; profile: { username: string; profilePicture: string } }
   awayPlayer: { name: string; profile: { username: string; profilePicture: string } }
-  tournament: { name: string; type: string }
+  tournament: { id: string; name: string; type: string }
   result: { homeScore: number; awayScore: number; approved: boolean } | null
   status: string
 }

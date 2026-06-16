@@ -19,8 +19,8 @@ function generateSingleElimination(players: string[], tournamentId: string) {
         matchNumber: matchNumber++,
         bracket: "WINNERS",
         status: "PENDING",
-        homePlayerId: null,  // Add this field
-        awayPlayerId: null   // Add this field
+        homePlayerId: null as string | null,  // Add this field
+        awayPlayerId: null as string | null   // Add this field
       })
     }
   }

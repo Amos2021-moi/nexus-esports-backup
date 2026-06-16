@@ -17,7 +17,7 @@ interface Award {
   }
 }
 
-const awardIcons: Record<string, JSX.Element> = {
+const awardIcons: Record<string, React.ReactNode> = {
   "Champion": <Crown className="h-8 w-8 text-yellow-500" />,
   "Golden Boot": <Trophy className="h-8 w-8 text-orange-500" />,
   "Golden Glove": <Star className="h-8 w-8 text-blue-500" />,

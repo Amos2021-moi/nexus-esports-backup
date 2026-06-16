@@ -16,6 +16,7 @@ interface Participant {
   playerId: string
   seed: number
   player: Player
+   eliminated?: boolean
 }
 
 export default function ManageTournamentPage() {

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const { title, message, type } = await request.json()
 
     // Use the exact model name from your schema (Notification or notification)
-    const notification = await prisma.Notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: session.user.id,
         title,

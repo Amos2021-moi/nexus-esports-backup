@@ -15,7 +15,7 @@ interface Match {
   status: string
   homePlayer: { name: string; profile: { username: string; profilePicture: string } } | null
   awayPlayer: { name: string; profile: { username: string; profilePicture: string } } | null
-  winner: { name: string; profile: { username: string } } | null
+ winner: { name: string; profile: { username: string; profilePicture?: string | null } } | null
   result: { homeScore: number; awayScore: number; approved: boolean } | null
 }
 

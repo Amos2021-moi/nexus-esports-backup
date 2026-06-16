@@ -19,7 +19,7 @@ interface HallEntry {
   }
 }
 
-const categoryIcons: Record<string, JSX.Element> = {
+const categoryIcons: Record<string, React.ReactNode> = {
   "Champion": <Crown className="h-8 w-8 text-yellow-500" />,
   "Legend": <Star className="h-8 w-8 text-purple-500" />,
   "Golden Boot": <Trophy className="h-8 w-8 text-orange-500" />,

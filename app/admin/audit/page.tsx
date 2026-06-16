@@ -1,6 +1,6 @@
 "use client"
+import { useEffect, useState, type ReactNode } from "react"
 
-import { useEffect, useState } from "react"
 import { Activity, Shield, User, Calendar, FileText, Trash2, Edit, CheckCircle } from "lucide-react"
 
 interface AuditEntry {
@@ -11,9 +11,9 @@ interface AuditEntry {
   details: any
   createdAt: string
   user: { name: string; email: string }
-}
 
-const actionIcons: Record<string, JSX.Element> = {
+}const actionIcons: Record<string, React.ReactNode> = {
+
   "APPROVE_RESULT": <CheckCircle className="h-4 w-4 text-green-400" />,
   "EDIT_SEASON": <Edit className="h-4 w-4 text-blue-400" />,
   "DELETE_PLAYER": <Trash2 className="h-4 w-4 text-red-400" />,

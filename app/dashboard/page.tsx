@@ -88,7 +88,7 @@ export default function DashboardPage() {
           <p className="text-gray-300 mt-1">Ready for your next match? Check your fixtures below.</p>
           {/* Last Active Trust Badge */}
           <div className="mt-2">
-            <TrustBadge type="last-active" value={session?.user?.lastActive} />
+            <TrustBadge type="last-active" />
           </div>
         </div>
       </div>

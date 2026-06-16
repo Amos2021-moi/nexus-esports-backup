@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { Trophy, TrendingUp, Users, Calendar, Award, Crown, Star, ChevronLeft } from "lucide-react"
+import { Trophy, Users, Calendar, Award, CheckCircle, Medal, ChevronLeft, TrendingUp, Crown, Star } from "lucide-react"
 import Link from "next/link"
 
 interface TournamentStats {
