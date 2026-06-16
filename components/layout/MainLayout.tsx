@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { 
   LayoutDashboard, User, Shield, Calendar, Trophy, Users, Award, Newspaper,
-  LogOut, Menu, X, ChevronRight, Bell, Search, Sun, Moon, Activity, Sparkles, TrendingUp, MessageCircle
+  LogOut, Menu, X, ChevronRight, Bell, Search, Sun, Moon, Activity, Sparkles, TrendingUp, MessageCircle, Settings
 } from "lucide-react"
 import NotificationBell from "@/components/ui/NotificationBell"
 
@@ -19,6 +19,7 @@ const playerMenu = [
   { name: "Statistics", href: "/dashboard/statistics", icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/10" },
   { name: "Awards", href: "/dashboard/awards", icon: Award, color: "text-orange-400", bg: "bg-orange-500/10" },
   { name: "Community", href: "/dashboard/community", icon: MessageCircle, color: "text-pink-400", bg: "bg-pink-500/10" },
+  { name: "Settings", href: "/dashboard/settings/account", icon: Settings, color: "text-gray-400", bg: "bg-gray-500/10" },
 ]
 
 const adminMenu = [
@@ -30,6 +31,7 @@ const adminMenu = [
   { name: "Tournaments", href: "/admin/tournaments", icon: Trophy, color: "text-amber-400", bg: "bg-amber-500/10" },
   { name: "News", href: "/admin/news", icon: Newspaper, color: "text-pink-400", bg: "bg-pink-500/10" },
   { name: "Awards", href: "/admin/awards", icon: Award, color: "text-orange-400", bg: "bg-orange-500/10" },
+  { name: "Settings", href: "/admin/settings/league", icon: Settings, color: "text-gray-400", bg: "bg-gray-500/10" },
 ]
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
