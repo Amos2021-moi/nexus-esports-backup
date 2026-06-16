@@ -1,0 +1,13 @@
+﻿# Database
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nexus_esports"
+
+# NextAuth
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="pJEeXpNhREpax/n0pK2gQVmy3/HmGChehp+DfhIyvqc="
+
+# Cloudinary (optional)
+CLOUDINARY_CLOUD_NAME="dit5sywkm"
+CLOUDINARY_API_KEY="778845226911319"
+CLOUDINARY_API_SECRET="MVp1YvVLhxmaovRO5_ij51_O28I"
+
+ADMIN_EMAILS="admin@example.com,principal@school.com"
