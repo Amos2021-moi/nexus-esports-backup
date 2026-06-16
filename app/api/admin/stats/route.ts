@@ -1,47 +1,64 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
-    }
-    
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
-    }
+    // ✅ REMOVED: Authentication check - now public
+    // Now anyone can see these stats
 
-    const [totalPlayers, activeSeasons, totalFixtures, completedResults] = await Promise.all([
+    const [
+      totalPlayers,
+      totalFixtures,
+      completedResults,
+      totalTournaments,
+      totalAwards,
+      totalSeasons,
+      totalNews,
+      totalPosts,
+      totalComments,
+      totalLikes
+    ] = await Promise.all([
       prisma.user.count({ where: { role: "PLAYER" } }),
-      prisma.season.count({ where: { isActive: true } }),
       prisma.fixture.count(),
-      prisma.result.count({ where: { approved: true } })
+      prisma.result.count({ where: { approved: true } }),
+      prisma.tournament.count(),
+      prisma.award.count(),
+      prisma.season.count(),
+      prisma.news.count({ where: { published: true } }),
+      prisma.post.count(),
+      prisma.comment.count(),
+      prisma.like.count()
     ])
 
     const pendingResults = await prisma.result.count({ where: { approved: false } })
-    const totalAwards = await prisma.award.count()
 
     return NextResponse.json({
       totalPlayers,
-      activeSeasons,
       totalFixtures,
       completedResults,
       pendingResults,
-      totalAwards
+      totalTournaments,
+      totalAwards,
+      totalSeasons,
+      totalNews,
+      totalPosts,
+      totalComments,
+      totalLikes
     })
   } catch (error) {
-    console.error("Error fetching admin stats:", error)
+    console.error("Error fetching stats:", error)
     return NextResponse.json({
       totalPlayers: 0,
-      activeSeasons: 0,
       totalFixtures: 0,
       completedResults: 0,
       pendingResults: 0,
-      totalAwards: 0
+      totalTournaments: 0,
+      totalAwards: 0,
+      totalSeasons: 0,
+      totalNews: 0,
+      totalPosts: 0,
+      totalComments: 0,
+      totalLikes: 0
     })
   }
 }
