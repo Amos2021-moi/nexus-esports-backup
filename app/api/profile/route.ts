@@ -8,41 +8,34 @@ export async function GET() {
     const session = await getServerSession(authOptions)
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const profile = await prisma.profile.findUnique({
-      where: { userId: session.user.id },
-    })
-
+    // ✅ Get user with profile
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { email: true, name: true },
+      include: { profile: true }
     })
 
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    if (!user.profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
+
+    // ✅ Return profile with isVerified from User table
     return NextResponse.json({
-      username: profile?.username || "",
-      name: user?.name || "",
-      class: profile?.class || "",
-      bio: profile?.bio || "",
-      favoriteClub: profile?.favoriteClub || "",
-      preferredFormation: profile?.preferredFormation || "",
-      preferredPlaystyle: profile?.preferredPlaystyle || "",
-      profilePicture: profile?.profilePicture || "",
-      bannerImage: profile?.bannerImage || "",
-      whatsappNumber: profile?.whatsappNumber || "",          // ADD THIS
-      whatsappVisible: profile?.whatsappVisible ?? true,      // ADD THIS
-      email: user?.email || "",
-      totalWins: profile?.totalWins || 0,
-      totalDraws: profile?.totalDraws || 0,
-      totalLosses: profile?.totalLosses || 0,
-      totalPoints: profile?.totalPoints || 0,
-      goalsFor: profile?.goalsFor || 0,
-      goalsAgainst: profile?.goalsAgainst || 0,
+      ...user.profile,
+      isVerified: user.isVerified,
+      verifiedBadge: user.profile.verifiedBadge,
+      name: user.name,
+      email: user.email
     })
   } catch (error) {
     console.error("Error fetching profile:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 })
   }
 }
 
@@ -51,68 +44,63 @@ export async function PUT(request: Request) {
     const session = await getServerSession(authOptions)
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
-    const { 
-      username, 
+    const {
+      username,
       name,
-      class: className, 
-      bio, 
-      favoriteClub, 
-      preferredFormation, 
-      preferredPlaystyle, 
-      profilePicture, 
+      class: playerClass,
+      bio,
+      favoriteClub,
+      preferredFormation,
+      preferredPlaystyle,
+      profilePicture,
       bannerImage,
-      whatsappNumber,        // ADD THIS
-      whatsappVisible        // ADD THIS
+      whatsappNumber,
+      whatsappVisible
     } = body
 
-    // Update user name if provided
+    // Update profile
+    const profile = await prisma.profile.update({
+      where: { userId: session.user.id },
+      data: {
+        username,
+        class: playerClass,
+        bio,
+        favoriteClub,
+        preferredFormation,
+        preferredPlaystyle,
+        profilePicture,
+        bannerImage,
+        whatsappNumber,
+        whatsappVisible
+      }
+    })
+
+    // Update user name
     if (name) {
       await prisma.user.update({
         where: { id: session.user.id },
-        data: { name },
+        data: { name }
       })
     }
 
-    // Check if profile exists
-    let profile = await prisma.profile.findUnique({
-      where: { userId: session.user.id },
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { profile: true }
     })
 
-    if (!profile) {
-      profile = await prisma.profile.create({
-        data: {
-          userId: session.user.id,
-          username: username || session.user.email?.split('@')[0] || "player",
-        },
-      })
-    }
-
-    const updatedProfile = await prisma.profile.update({
-      where: { userId: session.user.id },
-      data: {
-        username: username !== undefined ? username : profile.username,
-        class: className !== undefined ? className : profile.class,
-        bio: bio !== undefined ? bio : profile.bio,
-        favoriteClub: favoriteClub !== undefined ? favoriteClub : profile.favoriteClub,
-        preferredFormation: preferredFormation !== undefined ? preferredFormation : profile.preferredFormation,
-        preferredPlaystyle: preferredPlaystyle !== undefined ? preferredPlaystyle : profile.preferredPlaystyle,
-        profilePicture: profilePicture !== undefined ? profilePicture : profile.profilePicture,
-        bannerImage: bannerImage !== undefined ? bannerImage : profile.bannerImage,
-        whatsappNumber: whatsappNumber !== undefined ? whatsappNumber : profile.whatsappNumber,
-        whatsappVisible: whatsappVisible !== undefined ? whatsappVisible : profile.whatsappVisible,
-      },
+    return NextResponse.json({
+      ...profile,
+      isVerified: user?.isVerified || false,
+      verifiedBadge: profile.verifiedBadge,
+      name: user?.name,
+      email: user?.email
     })
-
-    return NextResponse.json({ success: true, profile: updatedProfile })
   } catch (error) {
     console.error("Error updating profile:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
   }
 }

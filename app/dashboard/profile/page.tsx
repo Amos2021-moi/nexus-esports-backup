@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
-import { Camera, Edit2, Mail, Users, Trophy, Calendar, Award, MapPin, Shield, TrendingUp, Target, Activity, Phone } from "lucide-react"
+import { Camera, Edit2, Mail, Users, Trophy, Calendar, Award, MapPin, Shield, TrendingUp, Target, Activity, Phone, Star, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import TrustBadge from "@/components/ui/TrustBadge"
 
@@ -27,12 +27,17 @@ interface ProfileData {
   whatsappNumber: string
   whatsappVisible: boolean
   verifiedBadge: boolean
+  trustScore: number
+  isVerified: boolean
+  name: string
+  email: string
 }
 
 export default function ProfilePage() {
   const { data: session } = useSession()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [trustScore, setTrustScore] = useState<number>(0)
 
   useEffect(() => {
     async function fetchProfile() {
@@ -40,7 +45,6 @@ export default function ProfilePage() {
         const response = await fetch("/api/profile")
         const data = await response.json()
         
-        // Calculate additional stats
         const matchesPlayed = (data.totalWins || 0) + (data.totalDraws || 0) + (data.totalLosses || 0)
         const winRate = matchesPlayed > 0 ? Math.round(((data.totalWins || 0) / matchesPlayed) * 100) : 0
         const goalDifference = (data.goalsFor || 0) - (data.goalsAgainst || 0)
@@ -49,8 +53,20 @@ export default function ProfilePage() {
           ...data,
           matchesPlayed,
           winRate,
-          goalDifference
+          goalDifference,
+          trustScore: data.trustScore || 0,
+          isVerified: data.isVerified || false,
+          verifiedBadge: data.verifiedBadge || false
         })
+
+        // ✅ Also fetch trust score separately
+        if (session?.user?.id) {
+          const trustRes = await fetch(`/api/admin/trust-score?userId=${session.user.id}`)
+          if (trustRes.ok) {
+            const trustData = await trustRes.json()
+            setTrustScore(trustData.trustScore || 0)
+          }
+        }
       } catch (error) {
         console.error("Error fetching profile:", error)
       } finally {
@@ -70,6 +86,10 @@ export default function ProfilePage() {
       </div>
     )
   }
+
+  const displayTrustScore = profile?.trustScore || trustScore || 0
+  // ✅ Check both isVerified and verifiedBadge
+  const isVerified = profile?.isVerified || profile?.verifiedBadge || false
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -113,16 +133,30 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-white">{profile?.username}</h1>
-              {/* Trust Badge - Verified Player */}
-              {profile?.verifiedBadge && (
+              {/* ✅ Show Verified Badge */}
+              {isVerified && (
                 <TrustBadge type="verified" />
+              )}
+              {displayTrustScore >= 80 && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-xs">
+                  <Star size={12} />
+                  <span>High Trust</span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
               <Mail size={14} className="text-gray-500" />
-              <p className="text-gray-400 text-sm">{session?.user?.email}</p>
+              <p className="text-gray-400 text-sm">{profile?.email || session?.user?.email}</p>
             </div>
-            {/* WhatsApp Status */}
+            {/* Trust Score Display */}
+            <div className="flex items-center gap-2 mt-1">
+              <Shield size={14} className="text-indigo-400" />
+              <p className="text-gray-400 text-sm">
+                Trust Score: <span className={`font-semibold ${displayTrustScore >= 80 ? "text-green-400" : displayTrustScore >= 50 ? "text-yellow-400" : "text-white"}`}>
+                  {displayTrustScore}/100
+                </span>
+              </p>
+            </div>
             {profile?.whatsappNumber && profile?.whatsappVisible && (
               <div className="flex items-center gap-2 mt-1">
                 <Phone size={14} className="text-green-500" />
@@ -174,7 +208,6 @@ export default function ProfilePage() {
             Player Statistics
           </h2>
           
-          {/* Main Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div className="bg-blue-500/10 rounded-xl p-4 text-center border border-blue-500/20">
               <Activity className="h-6 w-6 text-blue-400 mx-auto mb-2" />
@@ -198,7 +231,6 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          {/* Detailed Stats Grid */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/20">
               <p className="text-xs text-gray-500">Wins</p>

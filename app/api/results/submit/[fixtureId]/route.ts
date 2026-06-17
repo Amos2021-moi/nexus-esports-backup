@@ -78,7 +78,7 @@ export async function POST(
       }
     })
 
-    // ✅ Create result with source: "LEAGUE"
+    // Create result with source: "LEAGUE"
     const result = await prisma.result.create({
       data: {
         fixtureId,
@@ -87,7 +87,7 @@ export async function POST(
         evidenceImage,
         submittedBy: session.user.id,
         approved: false,
-        source: "LEAGUE",  // ✅ ADDED
+        source: "LEAGUE",
       }
     })
 

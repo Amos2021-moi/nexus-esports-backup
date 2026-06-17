@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { updateTrustScore } from "@/lib/services/trust.service"
 
 interface ApproveResultParams {
   resultId: string
@@ -177,6 +178,15 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
         }
       }
     })
+
+    // 8. Update trust scores for both players
+    try {
+      await updateTrustScore(fixture.homePlayerId)
+      await updateTrustScore(fixture.awayPlayerId)
+    } catch (trustError) {
+      // Log but don't fail the approval if trust update fails
+      console.error("Error updating trust scores:", trustError)
+    }
 
     return { 
       success: true, 

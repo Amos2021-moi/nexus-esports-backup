@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 project_files.txt
 .vercel
+
+# Environment files (keep secrets safe)
+.env
+.env.production
+.env.*.local
+
+# Keep example file
+!.env.example

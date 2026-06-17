@@ -3,62 +3,129 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const users = await prisma.user.findMany({
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get("userId")
+
+    // If userId provided, get specific user's trust score
+    if (userId) {
+      const profile = await prisma.profile.findUnique({
+        where: { userId },
+        select: {
+          trustScore: true,
+          verifiedBadge: true,
+          username: true,
+          user: {
+            select: {
+              name: true,
+              email: true
+            }
+          }
+        }
+      })
+
+      if (!profile) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+
+      return NextResponse.json({
+        trustScore: profile.trustScore,
+        verifiedBadge: profile.verifiedBadge,
+        username: profile.username,
+        name: profile.user.name,
+        email: profile.user.email
+      })
+    }
+
+    // Get all users' trust scores (admin view)
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const profiles = await prisma.profile.findMany({
       include: {
-        profile: true,
-        leagueEntries: true,
-        submittedResults: {
-          where: { approved: true }
+        user: {
+          select: {
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      },
+      orderBy: { trustScore: 'desc' }
+    })
+
+    return NextResponse.json(profiles)
+  } catch (error) {
+    console.error("Error fetching trust scores:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch trust scores" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { userId, trustScore } = body
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID required" }, { status: 400 })
+    }
+
+    if (trustScore === undefined || trustScore < 0 || trustScore > 100) {
+      return NextResponse.json(
+        { error: "Trust score must be between 0 and 100" },
+        { status: 400 }
+      )
+    }
+
+    const profile = await prisma.profile.update({
+      where: { userId },
+      data: { trustScore }
+    })
+
+    // Log to audit
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "UPDATE_TRUST_SCORE",
+        targetType: "PROFILE",
+        targetId: profile.id,
+        details: {
+          userId,
+          trustScore
         }
       }
     })
 
-    const trustScores = users.map(user => {
-      let score = 50 // Base score
-      
-      // +10 for verified
-      if (user.isVerified) score += 10
-      
-      // +5 for profile picture
-      if (user.profile?.profilePicture) score += 5
-      
-      // +5 for WhatsApp
-      if (user.profile?.whatsappNumber) score += 5
-      
-      // +10 for completed matches
-      const matches = user.leagueEntries.reduce((sum, e) => sum + e.played, 0)
-      if (matches > 10) score += 10
-      else if (matches > 5) score += 5
-      
-      // +10 for approved results
-      if (user.submittedResults.length > 5) score += 10
-      else if (user.submittedResults.length > 2) score += 5
-      
-      // Cap at 100
-      score = Math.min(score, 100)
-      
-      return {
-        userId: user.id,
-        name: user.name || user.email,
-        username: user.profile?.username,
-        trustScore: score,
-        isVerified: user.isVerified,
-        matches: matches,
-        approvedResults: user.submittedResults.length
-      }
+    return NextResponse.json({
+      success: true,
+      trustScore: profile.trustScore
     })
-
-    return NextResponse.json(trustScores)
   } catch (error) {
-    console.error("Error calculating trust scores:", error)
-    return NextResponse.json([])
+    console.error("Error updating trust score:", error)
+    return NextResponse.json(
+      { error: "Failed to update trust score" },
+      { status: 500 }
+    )
   }
 }
