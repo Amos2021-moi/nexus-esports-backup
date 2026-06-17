@@ -20,9 +20,12 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    // ✅ Only fetch on client-side
+    if (typeof window !== 'undefined') {
+      fetchNotifications()
+      const interval = setInterval(fetchNotifications, 30000)
+      return () => clearInterval(interval)
+    }
   }, [])
 
   async function fetchNotifications() {
