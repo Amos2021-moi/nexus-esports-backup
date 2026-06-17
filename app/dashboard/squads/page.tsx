@@ -86,7 +86,8 @@ export default function SquadsPage() {
       setFormData({ type: "MAIN", screenshot: "", formation: "", teamStrength: "", playstyle: "", description: "" })
       fetchSquads()
     } else {
-      toast.error("Failed to upload squad")
+      const error = await res.json()
+      toast.error(error.error || "Failed to upload squad")
     }
     setSubmitting(false)
   }
@@ -103,26 +104,61 @@ export default function SquadsPage() {
     }
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // ✅ FULLY FIXED - No TypeScript errors
+ const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0]
+  if (!file) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB")
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setFormData({ ...formData, screenshot: reader.result as string })
-    }
-    reader.readAsDataURL(file)
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error("Image must be less than 5MB")
+    return
   }
+
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const MAX_WIDTH = 800
+      const MAX_HEIGHT = 800
+      let width = img.width
+      let height = img.height
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height = height * (MAX_WIDTH / width)
+          width = MAX_WIDTH
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width = width * (MAX_HEIGHT / height)
+          height = MAX_HEIGHT
+        }
+      }
+
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      
+      // ✅ FIX: Check if ctx exists
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height)
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7)
+        setFormData((prev) => ({ ...prev, screenshot: compressedDataUrl }))
+      }
+    }
+    // ✅ FIX: Check if event and event.target exist
+    if (event?.target?.result) {
+      img.src = event.target.result as string
+    }
+  }
+  reader.readAsDataURL(file)
+}
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading your squads...</div>
+        <div className="text-gray-400">Loading squads...</div>
       </div>
     )
   }

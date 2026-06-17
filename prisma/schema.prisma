@@ -103,8 +103,29 @@ model Season {
   fixtures      Fixture[]
   awards        Award[]
   hallOfFame    HallOfFame[]
-  tournaments   Tournament[]
+  tournaments   Tournament[]  // ✅ This requires Tournament model
 }
+
+// ✅ ADD THIS MODEL HERE (after Season, before TournamentMatch)
+model Tournament {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  seasonId    String?
+  type        TournamentType   @default(SINGLE_ELIM)
+  status      TournamentStatus @default(PENDING)
+  startDate   DateTime
+  endDate     DateTime
+  maxPlayers  Int              @default(8)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  season       Season?                    @relation(fields: [seasonId], references: [id])
+  participants TournamentParticipant[]
+  matches      TournamentMatch[]
+}
+
+// Then TournamentMatch and TournamentParticipant come after
 
 model Fixture {
   id            String   @id @default(cuid())
@@ -130,18 +151,22 @@ model Fixture {
 
 model Result {
   id            String   @id @default(cuid())
-  fixtureId     String   @unique
+  fixtureId     String?  @unique
   homeScore     Int
   awayScore     Int
   evidenceImage String?
   submittedBy   String
   approved      Boolean  @default(false)
+  source        String   @default("LEAGUE")  // ✅ "LEAGUE" or "TOURNAMENT"
   createdAt     DateTime @default(now())
 
-  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  fixture Fixture? @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [submittedBy], references: [id])
-  tournamentMatch TournamentMatch?  // ADD THIS LINE
+  
+  tournamentMatch   TournamentMatch? @relation(fields: [tournamentMatchId], references: [id])
+  tournamentMatchId String?          @unique
 }
+
 
 model LeagueEntry {
   id             String   @id @default(cuid())
@@ -270,38 +295,6 @@ model AuditLog {
   user User @relation(fields: [userId], references: [id])
 }
 
-model Tournament {
-  id          String           @id @default(cuid())
-  name        String
-  description String?
-  seasonId    String?
-  type        TournamentType   @default(SINGLE_ELIM)
-  status      TournamentStatus @default(PENDING)
-  startDate   DateTime
-  endDate     DateTime
-  maxPlayers  Int              @default(8)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  season       Season?                    @relation(fields: [seasonId], references: [id])
-  participants TournamentParticipant[]
-  matches      TournamentMatch[]
-}
-
-model TournamentParticipant {
-  id           String   @id @default(cuid())
-  tournamentId String
-  playerId     String
-  seed         Int?
-  eliminated   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id])
-  player     User       @relation(fields: [playerId], references: [id])
-
-  @@unique([tournamentId, playerId])
-}
-
 model TournamentMatch {
   id           String   @id @default(cuid())
   tournamentId String
@@ -323,8 +316,24 @@ model TournamentMatch {
   homePlayer User?                    @relation("HomeMatches", fields: [homePlayerId], references: [id])
   awayPlayer User?                    @relation("AwayMatches", fields: [awayPlayerId], references: [id])
   winner     User?                    @relation("WinnerMatches", fields: [winnerId], references: [id])
-  result     Result?                  @relation(fields: [resultId], references: [id])
+  result     Result?                  // ✅ NO @relation with fields/references here
 }
+
+
+model TournamentParticipant {
+  id           String   @id @default(cuid())
+  tournamentId String
+  playerId     String
+  seed         Int?
+  eliminated   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  player     User       @relation(fields: [playerId], references: [id])
+
+  @@unique([tournamentId, playerId])
+}
+
 model Notification {
   id        String   @id @default(cuid())
   userId    String

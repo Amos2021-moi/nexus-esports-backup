@@ -118,13 +118,16 @@ export async function GET() {
     if (approvedResults.length > 0) {
       let totalTime = 0
       for (const result of approvedResults) {
-        const fixture = await prisma.fixture.findUnique({
-          where: { id: result.fixtureId }
-        })
-        if (fixture?.approvedAt && result.createdAt) {
-          totalTime += fixture.approvedAt.getTime() - result.createdAt.getTime()
-        }
-      }
+  // ✅ Skip tournament results (no fixtureId)
+  if (!result.fixtureId) continue
+  
+  const fixture = await prisma.fixture.findUnique({
+    where: { id: result.fixtureId as string }
+  })
+  if (fixture?.approvedAt && result.createdAt) {
+    totalTime += fixture.approvedAt.getTime() - result.createdAt.getTime()
+  }
+}
       avgApprovalTime = Math.round(totalTime / approvedResults.length / (1000 * 60 * 60))
     }
 

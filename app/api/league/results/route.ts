@@ -10,35 +10,26 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
 
-    // ✅ Get all results - use a simple query that works with or without source
+    // ✅ Only LEAGUE results
     const results = await prisma.result.findMany({
+      where: { source: "LEAGUE" },
       include: {
         fixture: {
           include: {
             homePlayer: { include: { profile: true } },
-            awayPlayer: { include: { profile: true } }
+            awayPlayer: { include: { profile: true } },
+            season: true
           }
         },
-        user: { include: { profile: true } },
-        tournamentMatch: {
-          include: {
-            homePlayer: { include: { profile: true } },
-            awayPlayer: { include: { profile: true } },
-            tournament: true
-          }
-        }
+        user: { include: { profile: true } }
       },
       orderBy: { createdAt: 'desc' }
     })
 
     return NextResponse.json(results)
   } catch (error) {
-    console.error("Error fetching results:", error)
+    console.error("Error fetching league results:", error)
     return NextResponse.json([])
   }
 }

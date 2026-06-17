@@ -59,44 +59,45 @@ export async function GET() {
     }
 
     // Get recent result
-    const recentResult = await prisma.result.findFirst({
-      where: {
-        fixture: {
-          OR: [
-            { homePlayerId: userId },
-            { awayPlayerId: userId }
-          ]
-        },
-        approved: true
-      },
+    // Get recent result (only league results)
+const recentResult = await prisma.result.findFirst({
+  where: {
+    source: "LEAGUE",  // ✅ Only league results
+    approved: true,
+    fixture: {
+      OR: [
+        { homePlayerId: userId },
+        { awayPlayerId: userId }
+      ]
+    }
+  },
+  include: {
+    fixture: {
       include: {
-        fixture: {
-          include: {
-            homePlayer: { include: { profile: true } },
-            awayPlayer: { include: { profile: true } }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    let recentResultData = null
-    if (recentResult) {
-      const isHome = recentResult.fixture.homePlayerId === userId
-      const opponent = isHome
-        ? (recentResult.fixture.awayPlayer.profile?.username || recentResult.fixture.awayPlayer.name)
-        : (recentResult.fixture.homePlayer.profile?.username || recentResult.fixture.homePlayer.name)
-      const myScore = isHome ? recentResult.homeScore : recentResult.awayScore
-      const opponentScore = isHome ? recentResult.awayScore : recentResult.homeScore
-      const result = myScore > opponentScore ? "W" : myScore < opponentScore ? "L" : "D"
-      
-      recentResultData = {
-        opponent,
-        score: `${myScore} - ${opponentScore}`,
-        result
+        homePlayer: { include: { profile: true } },
+        awayPlayer: { include: { profile: true } }
       }
     }
+  },
+  orderBy: { createdAt: 'desc' }
+})
 
+let recentResultData = null
+if (recentResult && recentResult.fixture) {  // ✅ Check if fixture exists
+  const isHome = recentResult.fixture.homePlayerId === userId
+  const opponent = isHome
+    ? (recentResult.fixture.awayPlayer.profile?.username || recentResult.fixture.awayPlayer.name)
+    : (recentResult.fixture.homePlayer.profile?.username || recentResult.fixture.homePlayer.name)
+  const myScore = isHome ? recentResult.homeScore : recentResult.awayScore
+  const opponentScore = isHome ? recentResult.awayScore : recentResult.homeScore
+  const result = myScore > opponentScore ? "W" : myScore < opponentScore ? "L" : "D"
+  
+  recentResultData = {
+    opponent,
+    score: `${myScore} - ${opponentScore}`,
+    result
+  }
+}
     const totalMatches = userEntry?.played || 0
     const wins = userEntry?.wins || 0
     const draws = userEntry?.draws || 0

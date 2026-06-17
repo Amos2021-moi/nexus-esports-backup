@@ -37,17 +37,19 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
     const fixture = result.fixture
     const seasonId = fixture.seasonId
 
-    // 1. Update fixture with scores
-    await prisma.fixture.update({
-      where: { id: result.fixtureId },
-      data: {
-        homeScore: result.homeScore,
-        awayScore: result.awayScore,
-        status: "COMPLETED",
-        approvedBy: adminId,
-        approvedAt: new Date()
-      }
-    })
+    // 1. Update fixture with scores (skip tournament results)
+    if (result.fixtureId) {
+      await prisma.fixture.update({
+        where: { id: result.fixtureId },
+        data: {
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          status: "COMPLETED",
+          approvedBy: adminId,
+          approvedAt: new Date()
+        }
+      })
+    }
 
     // 2. Mark result as approved
     await prisma.result.update({
@@ -219,17 +221,19 @@ export async function rejectMatch({ resultId, adminId }: RejectResultParams) {
     const homePlayerName = fixture.homePlayer.profile?.username || fixture.homePlayer.name
     const awayPlayerName = fixture.awayPlayer.profile?.username || fixture.awayPlayer.name
 
-    // 1. Reset fixture
-    await prisma.fixture.update({
-      where: { id: result.fixtureId },
-      data: {
-        homeScore: null,
-        awayScore: null,
-        status: "SCHEDULED",
-        submittedBy: null,
-        submittedAt: null
-      }
-    })
+    // 1. Reset fixture (skip tournament results)
+    if (result.fixtureId) {
+      await prisma.fixture.update({
+        where: { id: result.fixtureId },
+        data: {
+          homeScore: null,
+          awayScore: null,
+          status: "SCHEDULED",
+          submittedBy: null,
+          submittedAt: null
+        }
+      })
+    }
 
     // 2. Delete the result
     await prisma.result.delete({
@@ -242,42 +246,21 @@ export async function rejectMatch({ resultId, adminId }: RejectResultParams) {
         {
           userId: fixture.homePlayerId,
           title: "❌ Result Rejected",
-          message: `Your match result vs ${awayPlayerName} was rejected. Please resubmit with valid evidence.`,
+          message: `Your match vs ${awayPlayerName} has been rejected. Please resubmit with correct evidence.`,
           type: "RESULT_APPROVED",
           link: `/dashboard/fixtures`
         },
         {
           userId: fixture.awayPlayerId,
           title: "❌ Result Rejected",
-          message: `The match result vs ${homePlayerName} was rejected. Please contact admin for details.`,
+          message: `Your match vs ${homePlayerName} has been rejected. Please resubmit with correct evidence.`,
           type: "RESULT_APPROVED",
           link: `/dashboard/fixtures`
         }
       ]
     })
 
-    // 4. Log to audit
-    await prisma.auditLog.create({
-      data: {
-        userId: adminId,
-        action: "REJECT_RESULT",
-        targetType: "RESULT",
-        targetId: resultId,
-        details: {
-          fixtureId: result.fixtureId,
-          homeScore: result.homeScore,
-          awayScore: result.awayScore,
-          homePlayerId: fixture.homePlayerId,
-          awayPlayerId: fixture.awayPlayerId,
-          reason: "Evidence insufficient or invalid"
-        }
-      }
-    })
-
-    return { 
-      success: true, 
-      message: "Result rejected successfully!"
-    }
+    return { success: true }
   } catch (error) {
     console.error("Error in rejectMatch:", error)
     throw error

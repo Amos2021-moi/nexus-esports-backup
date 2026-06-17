@@ -11,14 +11,20 @@ export async function GET() {
       return NextResponse.json([])
     }
 
-    // Use exact model name - check your schema (Notification or notification)
-    const notifications = await prisma.notification.findMany({
+    // ✅ Add timeout to database query
+    const notificationsPromise = prisma.notification.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
       take: 20
     })
 
-    return NextResponse.json(notifications)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Database timeout")), 10000)
+    )
+
+    const notifications = await Promise.race([notificationsPromise, timeoutPromise]) as any
+
+    return NextResponse.json(notifications || [])
   } catch (error) {
     console.error("Error fetching notifications:", error)
     return NextResponse.json([])
@@ -35,7 +41,6 @@ export async function PUT(request: Request) {
 
     const { notificationId } = await request.json()
 
-    // Use exact model name here too
     await prisma.notification.update({
       where: { id: notificationId },
       data: { read: true }

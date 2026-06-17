@@ -7,7 +7,7 @@ import Link from "next/link"
 import { 
   LayoutDashboard, User, Shield, Calendar, Trophy, Users, Award, Newspaper,
   LogOut, Menu, X, ChevronRight, Bell, Search, Sun, Moon, Activity, Sparkles, 
-  TrendingUp, MessageCircle, Settings
+  TrendingUp, MessageCircle, Settings, FileText
 } from "lucide-react"
 import NotificationBell from "@/components/ui/NotificationBell"
 
@@ -29,8 +29,10 @@ const adminMenu = [
   { name: "Players", href: "/admin/players", icon: Users, color: "text-blue-400", bg: "bg-blue-500/10" },
   { name: "Seasons", href: "/admin/seasons", icon: Trophy, color: "text-yellow-400", bg: "bg-yellow-500/10" },
   { name: "League", href: "/admin/league", icon: Calendar, color: "text-green-400", bg: "bg-green-500/10" },
-  { name: "Results", href: "/admin/results", icon: Calendar, color: "text-purple-400", bg: "bg-purple-500/10" },
   { name: "Tournaments", href: "/admin/tournaments", icon: Trophy, color: "text-amber-400", bg: "bg-amber-500/10" },
+  { name: "Results", href: "/admin/results", icon: Calendar, color: "text-purple-400", bg: "bg-purple-500/10" },
+  { name: "Analytics", href: "/admin/analytics", icon: Activity, color: "text-cyan-400", bg: "bg-cyan-500/10" },
+  { name: "Audit Logs", href: "/admin/audit", icon: FileText, color: "text-red-400", bg: "bg-red-500/10" },
   { name: "News", href: "/admin/news", icon: Newspaper, color: "text-pink-400", bg: "bg-pink-500/10" },
   { name: "Awards", href: "/admin/awards", icon: Award, color: "text-orange-400", bg: "bg-orange-500/10" },
   { name: "Settings", href: "/admin/settings/league", icon: Settings, color: "text-gray-400", bg: "bg-gray-500/10" },
@@ -89,11 +91,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   const isAdmin = session.user?.role === "ADMIN"
+  console.log("🔍 isAdmin:", isAdmin)
   const menuItems = isAdmin ? adminMenu : playerMenu
+  console.log("🔍 menuItems names:", menuItems.map(m => m.name))
   const dashboardName = isAdmin ? "Admin Panel" : "Player Dashboard"
-  const bgGradient = isAdmin 
-    ? "bg-gradient-to-b from-gray-900 to-gray-800" 
-    : "bg-gradient-to-b from-indigo-900 via-purple-900 to-pink-800"
 
   return (
     <div className="min-h-screen bg-gray-900">
