@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Heart, MessageCircle, Send, Image as ImageIcon, X, Trophy, Shield, Calendar } from "lucide-react"
+import { Heart, MessageCircle, Send, Image as ImageIcon, X, Trophy, Shield, Calendar, Trash2, Edit2, Flag, Pin, Filter } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Post {
@@ -12,6 +12,7 @@ interface Post {
   type: string
   likes: number
   createdAt: string
+  userId: string
   user: {
     name: string
     profile: { username: string } | null
@@ -36,10 +37,14 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [newPost, setNewPost] = useState("")
   const [newPostImage, setNewPostImage] = useState<string | null>(null)
+  const [newPostType, setNewPostType] = useState<string>("GENERAL")
   const [posting, setPosting] = useState(false)
   const [commenting, setCommenting] = useState<string | null>(null)
   const [commentText, setCommentText] = useState("")
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+  const [editingPost, setEditingPost] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState("")
+  const [filterType, setFilterType] = useState<string>("ALL")
 
   useEffect(() => {
     fetchPosts()
@@ -66,7 +71,7 @@ export default function CommunityPage() {
       body: JSON.stringify({
         content: newPost,
         image: newPostImage,
-        type: "GENERAL"
+        type: newPostType
       })
     })
 
@@ -74,6 +79,7 @@ export default function CommunityPage() {
       toast.success("Post shared!")
       setNewPost("")
       setNewPostImage(null)
+      setNewPostType("GENERAL")
       fetchPosts()
     } else {
       toast.error("Failed to post")
@@ -128,6 +134,55 @@ export default function CommunityPage() {
     }
   }
 
+  // ✅ Phase 1: Delete Post
+  async function handleDeletePost(postId: string) {
+    if (!confirm("Are you sure you want to delete this post?")) return
+
+    try {
+      const res = await fetch(`/api/community/posts?id=${postId}`, {
+        method: "DELETE"
+      })
+
+      if (res.ok) {
+        toast.success("Post deleted")
+        fetchPosts()
+      } else {
+        toast.error("Failed to delete post")
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error)
+      toast.error("Failed to delete post")
+    }
+  }
+
+  // ✅ Phase 2: Edit Post
+  async function handleEditPost(postId: string) {
+    if (!editContent.trim()) {
+      toast.error("Please enter some content")
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/community/posts/${postId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent })
+      })
+
+      if (res.ok) {
+        toast.success("Post updated!")
+        setEditingPost(null)
+        setEditContent("")
+        fetchPosts()
+      } else {
+        toast.error("Failed to update post")
+      }
+    } catch (error) {
+      console.error("Error editing post:", error)
+      toast.error("Failed to update post")
+    }
+  }
+
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -143,6 +198,11 @@ export default function CommunityPage() {
     }
     reader.readAsDataURL(file)
   }
+
+  // Filter posts by type
+  const filteredPosts = filterType === "ALL" 
+    ? posts 
+    : posts.filter(post => post.type === filterType)
 
   if (loading) {
     return (
@@ -184,15 +244,26 @@ export default function CommunityPage() {
             </div>
           )}
           
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="cursor-pointer text-gray-400 hover:text-white transition-colors">
               <ImageIcon size={20} />
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
             </label>
+            
+            <select
+              value={newPostType}
+              onChange={(e) => setNewPostType(e.target.value)}
+              className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+            >
+              <option value="GENERAL">General</option>
+              <option value="SQUAD_SHARE">Squad Share</option>
+              <option value="ACHIEVEMENT">Achievement</option>
+            </select>
+
             <button
               type="submit"
               disabled={posting || !newPost.trim()}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all"
+              className="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all"
             >
               {posting ? "Posting..." : "Post"}
             </button>
@@ -200,45 +271,149 @@ export default function CommunityPage() {
         </form>
       </div>
 
+      {/* Category Filter - Phase 3 */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setFilterType("ALL")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            filterType === "ALL" 
+              ? "bg-indigo-600 text-white" 
+              : "bg-gray-700 text-gray-400 hover:text-white"
+          }`}
+        >
+          All
+        </button>
+        <button
+          onClick={() => setFilterType("GENERAL")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            filterType === "GENERAL" 
+              ? "bg-indigo-600 text-white" 
+              : "bg-gray-700 text-gray-400 hover:text-white"
+          }`}
+        >
+          General
+        </button>
+        <button
+          onClick={() => setFilterType("SQUAD_SHARE")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            filterType === "SQUAD_SHARE" 
+              ? "bg-indigo-600 text-white" 
+              : "bg-gray-700 text-gray-400 hover:text-white"
+          }`}
+        >
+          Squad Shares
+        </button>
+        <button
+          onClick={() => setFilterType("ACHIEVEMENT")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            filterType === "ACHIEVEMENT" 
+              ? "bg-indigo-600 text-white" 
+              : "bg-gray-700 text-gray-400 hover:text-white"
+          }`}
+        >
+          Achievements
+        </button>
+      </div>
+
       {/* Posts Feed */}
-      {posts.length === 0 ? (
+      {filteredPosts.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
           <MessageCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">No Posts Yet</h3>
           <p className="text-gray-400">Be the first to share something with the community!</p>
         </div>
       ) : (
-        posts.map((post) => {
+        filteredPosts.map((post) => {
           const username = post.user.profile?.username || post.user.name || "Player"
           const isLiked = likedPosts.has(post.id)
+          const isOwnPost = post.userId === session?.user?.id
+          const postTypeColors = {
+            GENERAL: "bg-blue-500/20 text-blue-400",
+            SQUAD_SHARE: "bg-purple-500/20 text-purple-400",
+            ACHIEVEMENT: "bg-yellow-500/20 text-yellow-400"
+          }
           
           return (
             <div key={post.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
               {/* Post Header */}
               <div className="p-4 border-b border-gray-700">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                    {username.charAt(0).toUpperCase()}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                      {username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">{username}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-500">
+                          {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
+                        </p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${postTypeColors[post.type as keyof typeof postTypeColors] || "bg-gray-500/20 text-gray-400"}`}>
+                          {post.type.replace("_", " ")}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-white">{username}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
-                    </p>
-                  </div>
+                  {/* ✅ Post Actions - Delete & Edit */}
+                  {isOwnPost && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingPost(post.id)
+                          setEditContent(post.content)
+                        }}
+                        className="text-gray-400 hover:text-blue-400 transition-all"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePost(post.id)}
+                        className="text-gray-400 hover:text-red-400 transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               
               {/* Post Content */}
               <div className="p-4">
-                <p className="text-gray-200 whitespace-pre-wrap">{post.content}</p>
-                {post.image && (
-                  <img src={post.image} alt="Post" className="mt-3 rounded-lg max-h-96 w-full object-contain" />
+                {editingPost === post.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={3}
+                      className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditPost(post.id)}
+                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingPost(null)}
+                        className="bg-gray-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-gray-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-200 whitespace-pre-wrap">{post.content}</p>
+                    {post.image && (
+                      <img src={post.image} alt="Post" className="mt-3 rounded-lg max-h-96 w-full object-contain" />
+                    )}
+                  </>
                 )}
               </div>
               
               {/* Post Actions */}
-              <div className="px-4 pb-3 flex gap-4 border-b border-gray-700">
+              <div className="px-4 pb-3 flex flex-wrap gap-4 border-b border-gray-700">
                 <button
                   onClick={() => handleLike(post.id)}
                   className={`flex items-center gap-2 text-sm transition-colors ${
@@ -254,6 +429,12 @@ export default function CommunityPage() {
                 >
                   <MessageCircle size={18} />
                   <span>{post._count.comments} comments</span>
+                </button>
+                <button
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-yellow-400 transition-colors"
+                >
+                  <Flag size={16} />
+                  <span>Report</span>
                 </button>
               </div>
               
@@ -280,7 +461,7 @@ export default function CommunityPage() {
               
               {/* Comments List */}
               {post.comments.length > 0 && (
-                <div className="p-4 space-y-3 bg-gray-750">
+                <div className="p-4 space-y-3 bg-gray-700/20">
                   {post.comments.map((comment) => (
                     <div key={comment.id} className="flex gap-2">
                       <div className="h-6 w-6 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs font-bold">

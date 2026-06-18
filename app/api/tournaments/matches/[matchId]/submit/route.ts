@@ -15,17 +15,8 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
     }
 
-    // ✅ Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
-
-    // Get match with a timeout
-    const matchPromise = prisma.tournamentMatch.findUnique({
+    // Get the match
+    const match = await prisma.tournamentMatch.findUnique({
       where: { id: matchId },
       include: {
         tournament: true,
@@ -38,23 +29,32 @@ export async function POST(
       }
     })
 
-    // ✅ Add timeout to database operations
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Database timeout")), 15000)
-    )
-
-    const match = await Promise.race([matchPromise, timeoutPromise]) as any
-
     if (!match) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
     }
 
+    // Check if user is part of this match
     if (match.homePlayerId !== session.user.id && match.awayPlayerId !== session.user.id) {
       return NextResponse.json({ error: "You are not part of this match" }, { status: 403 })
     }
 
+    // Check if match already has a result
     if (match.resultId) {
-      return NextResponse.json({ error: "Result already submitted for this match" }, { status: 400 })
+      return NextResponse.json({ 
+        error: "This match already has a result submitted. Waiting for admin approval." 
+      }, { status: 400 })
+    }
+
+    if (match.status === "PENDING") {
+      return NextResponse.json({ 
+        error: "This match already has a pending result. Please wait for admin approval." 
+      }, { status: 400 })
+    }
+
+    if (match.status === "COMPLETED") {
+      return NextResponse.json({ 
+        error: "This match has already been completed." 
+      }, { status: 400 })
     }
 
     const formData = await request.formData()
@@ -72,17 +72,12 @@ export async function POST(
 
     let evidenceImage = null
     if (evidenceFile && evidenceFile.size > 0) {
-      try {
-        const bytes = await evidenceFile.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        evidenceImage = buffer.toString("base64")
-      } catch (err) {
-        console.error("Error processing image:", err)
-        return NextResponse.json({ error: "Failed to process image" }, { status: 400 })
-      }
+      const bytes = await evidenceFile.arrayBuffer()
+      const buffer = Buffer.from(bytes)
+      evidenceImage = buffer.toString("base64")
     }
 
-    // ✅ Create result with source: "TOURNAMENT"
+    // Create result
     const result = await prisma.result.create({
       data: {
         homeScore,
@@ -95,6 +90,7 @@ export async function POST(
       }
     })
 
+    // Update match status to PENDING
     await prisma.tournamentMatch.update({
       where: { id: matchId },
       data: {
@@ -103,36 +99,30 @@ export async function POST(
       }
     })
 
+    // Notify the other player
+    const otherPlayerId = match.homePlayerId === session.user.id 
+      ? match.awayPlayerId 
+      : match.homePlayerId
+
+    if (otherPlayerId) {
+      await prisma.notification.create({
+        data: {
+          userId: otherPlayerId,
+          title: "📋 Tournament Result Submitted",
+          message: `${session.user.name || "A player"} has submitted a result for your tournament match. Waiting for admin approval.`,
+          type: "RESULT_APPROVED",
+          link: `/tournaments/${match.tournamentId}`
+        }
+      })
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: "Result submitted! Waiting for admin approval.",
       result 
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error submitting tournament result:", error)
-    
-    // ✅ Handle specific Prisma errors
-    if (error?.code === 'P1001') {
-      return NextResponse.json(
-        { error: "Database connection lost. Please try again." },
-        { status: 503 }
-      )
-    }
-    
-    if (error?.code === 'P1017') {
-      return NextResponse.json(
-        { error: "Database connection timed out. Please try again with a smaller image." },
-        { status: 504 }
-      )
-    }
-    
-    if (error?.code === 'P2024') {
-      return NextResponse.json(
-        { error: "Database connection pool exhausted. Please try again." },
-        { status: 503 }
-      )
-    }
-
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to submit result" },
       { status: 500 }

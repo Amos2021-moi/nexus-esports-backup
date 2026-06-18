@@ -3,34 +3,33 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const countOnly = searchParams.get("count") === "true"
-
-    if (countOnly) {
-      // ✅ Return only the count for the homepage notification
-      const count = await prisma.news.count({
-        where: { published: true }
-      })
-      return NextResponse.json({ count })
+    const session = await getServerSession(authOptions)
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Return full news list
     const news = await prisma.news.findMany({
-      where: { published: true },
       include: {
         author: {
           select: {
             name: true,
             email: true,
             profile: {
-              select: { username: true }
+              select: {
+                username: true
+              }
             }
           }
         }
       },
-      orderBy: { publishedAt: 'desc' }
+      orderBy: { createdAt: 'desc' }
     })
 
     return NextResponse.json(news)

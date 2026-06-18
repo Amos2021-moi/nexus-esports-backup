@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Trophy, Plus, Calendar, Users, Trash2, Edit, Play } from "lucide-react"
+import Link from "next/link"
+import { Trophy, Plus, Calendar, Users, Trash2, Edit, Play, Eye } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Tournament {
@@ -61,6 +62,17 @@ export default function AdminTournamentsPage() {
     }
   }
 
+  async function deleteTournament(id: string) {
+    if (!confirm("Are you sure you want to delete this tournament?")) return
+    const res = await fetch(`/api/tournaments/${id}`, { method: "DELETE" })
+    if (res.ok) {
+      toast.success("Tournament deleted")
+      fetchTournaments()
+    } else {
+      toast.error("Failed to delete")
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center py-8 text-gray-400">Loading tournaments...</div>
   }
@@ -114,18 +126,33 @@ export default function AdminTournamentsPage() {
                     </span>
                     <span className="text-gray-500 flex items-center gap-1">
                       <Users size={14} />
-                      {tournament.participants.length} / {tournament.maxPlayers} players
+                      {tournament.participants?.length || 0} / {tournament.maxPlayers} players
+                    </span>
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Trophy size={14} />
+                      {tournament.matches?.length || 0} matches
                     </span>
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <Link
+                    href={`/tournaments/${tournament.id}`}
+                    target="_blank"
+                    className="text-blue-400 hover:text-blue-300 p-2 transition-all"
+                    title="View Bracket"
+                  >
+                    <Eye size={18} />
+                  </Link>
                   <button
                     onClick={() => router.push(`/admin/tournaments/${tournament.id}/manage`)}
                     className="text-indigo-400 hover:text-indigo-300 p-2 transition-all"
                   >
                     <Users size={18} />
                   </button>
-                  <button className="text-red-400 hover:text-red-300 p-2 transition-all">
+                  <button
+                    onClick={() => deleteTournament(tournament.id)}
+                    className="text-red-400 hover:text-red-300 p-2 transition-all"
+                  >
                     <Trash2 size={18} />
                   </button>
                 </div>

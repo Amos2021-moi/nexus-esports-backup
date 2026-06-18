@@ -16,34 +16,64 @@ export default function ImageUpload({ onUpload, type, currentImage }: ImageUploa
   const [error, setError] = useState<string>("")
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0]
-  if (!file) return
+    const file = e.target.files?.[0]
+    if (!file) return
 
-  setError("")
-  setUploading(true)
+    setError("")
+    setUploading(true)
 
-  try {
-    // Compress image
-    const options = {
-      maxSizeMB: 0.5,
-      maxWidthOrHeight: type === "profile" ? 300 : 1200,
-      useWebWorker: true,
-    }
-    
-    const compressedFile = await imageCompression(file, options)
-    
-    // Convert to base64
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64String = reader.result as string
-      
+    try {
+      // ✅ Check if imageCompression is available
+      let imageData: string
+
+      try {
+        // Try to compress image
+        const options = {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: type === "profile" ? 300 : 1200,
+          useWebWorker: true,
+        }
+        
+        const compressedFile = await imageCompression(file, options)
+        
+        // Convert to base64
+        imageData = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            if (reader.result) {
+              resolve(reader.result as string)
+            } else {
+              reject(new Error("Failed to read file"))
+            }
+          }
+          reader.onerror = () => reject(new Error("File read error"))
+          reader.readAsDataURL(compressedFile)
+        })
+      } catch (compressionError) {
+        console.warn("Compression failed, using original file:", compressionError)
+        // If compression fails, use the original file
+        imageData = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            if (reader.result) {
+              resolve(reader.result as string)
+            } else {
+              reject(new Error("Failed to read file"))
+            }
+          }
+          reader.onerror = () => reject(new Error("File read error"))
+          reader.readAsDataURL(file)
+        })
+      }
+
+      // Upload to server
       const response = await fetch("/api/upload", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          image: base64String,
+          image: imageData,
           type: type,
         }),
       })
@@ -57,15 +87,14 @@ export default function ImageUpload({ onUpload, type, currentImage }: ImageUploa
       } else {
         setError(data.error || "Upload failed")
       }
+    } catch (error) {
+      console.error("Upload error:", error)
+      setError(error instanceof Error ? error.message : "Upload failed. Please try again.")
+    } finally {
       setUploading(false)
     }
-    reader.readAsDataURL(compressedFile)
-  } catch (error) {
-    console.error("Upload error:", error)
-    setError("Upload failed. Please try again.")
-    setUploading(false)
   }
-}
+
   return (
     <div className="relative">
       <label className="cursor-pointer">

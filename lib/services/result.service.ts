@@ -11,9 +11,179 @@ interface RejectResultParams {
   adminId: string
 }
 
+// ✅ Approve Tournament Match
+async function approveTournamentMatch({ result, adminId }: { result: any; adminId: string }) {
+  const match = result.tournamentMatch
+  
+  if (!match) throw new Error("Tournament match not found")
+  if (!match.homePlayerId || !match.awayPlayerId) throw new Error("Match players not found")
+
+  console.log("🔍 Approving Tournament Match:", match.id)
+  console.log("🔍 Home:", match.homePlayerId, "Away:", match.awayPlayerId)
+  console.log("🔍 Score:", result.homeScore, "-", result.awayScore)
+  console.log("🔍 Next Match ID:", match.nextMatchId)
+
+  // 1. Mark result as approved
+  await prisma.result.update({
+    where: { id: result.id },
+    data: { approved: true }
+  })
+
+  // 2. Determine winner
+  let winnerId: string | null = null
+  if (result.homeScore > result.awayScore) {
+    winnerId = match.homePlayerId
+  } else if (result.awayScore > result.homeScore) {
+    winnerId = match.awayPlayerId
+  }
+
+  console.log("🔍 Winner ID:", winnerId)
+
+  // 3. Update tournament match
+  await prisma.tournamentMatch.update({
+    where: { id: match.id },
+    data: {
+      status: "COMPLETED",
+      winnerId: winnerId
+    }
+  })
+
+  // ✅ 4. ADVANCE WINNER TO NEXT MATCH
+  if (match.nextMatchId && winnerId) {
+    console.log("🔍 Advancing winner to next match:", match.nextMatchId)
+    
+    const nextMatch = await prisma.tournamentMatch.findUnique({
+      where: { id: match.nextMatchId }
+    })
+
+    console.log("🔍 Next Match Data:", nextMatch)
+
+    if (nextMatch) {
+      const hasHomePlayer = nextMatch.homePlayerId !== null
+      const hasAwayPlayer = nextMatch.awayPlayerId !== null
+
+      console.log("🔍 Next Match - Home:", hasHomePlayer, "Away:", hasAwayPlayer)
+
+      if (hasHomePlayer && hasAwayPlayer) {
+        console.log("⚠️ Next match already has both players assigned!")
+      } else if (!hasHomePlayer) {
+        console.log("✅ Setting winner as HOME player for next match")
+        await prisma.tournamentMatch.update({
+          where: { id: nextMatch.id },
+          data: { homePlayerId: winnerId }
+        })
+      } else if (!hasAwayPlayer) {
+        console.log("✅ Setting winner as AWAY player for next match")
+        await prisma.tournamentMatch.update({
+          where: { id: nextMatch.id },
+          data: { awayPlayerId: winnerId }
+        })
+      }
+    } else {
+      console.log("⚠️ Next match not found for ID:", match.nextMatchId)
+    }
+  } else {
+    console.log("ℹ️ No next match or no winner to advance (this might be the final)")
+  }
+
+  // 5. Send notifications
+  const homeName = match.homePlayer?.profile?.username || match.homePlayer?.name || "Home"
+  const awayName = match.awayPlayer?.profile?.username || match.awayPlayer?.name || "Away"
+  const winnerName = winnerId === match.homePlayerId ? homeName : awayName
+
+  const notifications = []
+  if (match.homePlayerId) {
+    notifications.push({
+      userId: match.homePlayerId,
+      title: "✅ Tournament Result Approved",
+      message: `Your tournament match vs ${awayName} (${result.homeScore}-${result.awayScore}) has been approved. ${winnerName} advances!`,
+      type: "RESULT_APPROVED",
+      link: `/tournaments/${match.tournamentId}`
+    })
+  }
+  if (match.awayPlayerId) {
+    notifications.push({
+      userId: match.awayPlayerId,
+      title: "✅ Tournament Result Approved",
+      message: `Your tournament match vs ${homeName} (${result.homeScore}-${result.awayScore}) has been approved. ${winnerName} advances!`,
+      type: "RESULT_APPROVED",
+      link: `/tournaments/${match.tournamentId}`
+    })
+  }
+
+  if (notifications.length > 0) {
+    await prisma.notification.createMany({
+      data: notifications
+    })
+  }
+
+  // 6. Check if tournament is complete
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: match.tournamentId },
+    include: {
+      matches: {
+        where: { 
+          status: { not: "COMPLETED" },
+          AND: [
+            { homePlayerId: { not: null } },
+            { awayPlayerId: { not: null } }
+          ]
+        }
+      }
+    }
+  })
+
+  const remainingMatches = tournament?.matches || []
+  console.log("🔍 Remaining active matches:", remainingMatches.length)
+
+  if (tournament && remainingMatches.length === 0) {
+    console.log("🏆 Tournament Complete! All matches finished.")
+    await prisma.tournament.update({
+      where: { id: match.tournamentId },
+      data: { status: "COMPLETED" }
+    })
+
+    // Find champion (winner of the final match)
+    const finalMatch = await prisma.tournamentMatch.findFirst({
+      where: { 
+        tournamentId: match.tournamentId,
+        round: { 
+          equals: await prisma.tournamentMatch.aggregate({
+            where: { tournamentId: match.tournamentId },
+            _max: { round: true }
+          }).then(r => r._max.round || 1)
+        }
+      },
+      select: { winnerId: true }
+    })
+
+    if (finalMatch?.winnerId) {
+      const champion = await prisma.user.findUnique({
+        where: { id: finalMatch.winnerId },
+        include: { profile: true }
+      })
+
+      if (champion) {
+        await prisma.hallOfFame.create({
+          data: {
+            playerId: champion.id,
+            seasonId: tournament.seasonId || "default",
+            category: "CHAMPION",
+            reason: `Tournament Champion - ${tournament.name}`,
+            imageUrl: champion.profile?.profilePicture || null,
+            inductedAt: new Date()
+          }
+        })
+      }
+    }
+  }
+
+  return { success: true, message: "Tournament result approved!" }
+}
+
+// ✅ Approve League Match
 export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
   try {
-    // Get the result with fixture and season
     const result = await prisma.result.findUnique({
       where: { id: resultId },
       include: { 
@@ -27,18 +197,33 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
               include: { profile: true }
             }
           }
-        } 
+        },
+        tournamentMatch: {
+          include: {
+            tournament: true,
+            homePlayer: {
+              include: { profile: true }
+            },
+            awayPlayer: {
+              include: { profile: true }
+            }
+          }
+        }
       }
     })
 
     if (!result) throw new Error("Result not found")
     if (result.approved) throw new Error("Result already approved")
+
+    if (result.source === "TOURNAMENT") {
+      return await approveTournamentMatch({ result, adminId })
+    }
+
     if (!result.fixture) throw new Error("Fixture not found")
 
     const fixture = result.fixture
     const seasonId = fixture.seasonId
 
-    // 1. Update fixture with scores (skip tournament results)
     if (result.fixtureId) {
       await prisma.fixture.update({
         where: { id: result.fixtureId },
@@ -52,17 +237,14 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       })
     }
 
-    // 2. Mark result as approved
     await prisma.result.update({
       where: { id: resultId },
       data: { approved: true }
     })
 
-    // 3. Calculate points
     const homePoints = result.homeScore > result.awayScore ? 3 : result.homeScore === result.awayScore ? 1 : 0
     const awayPoints = result.awayScore > result.homeScore ? 3 : result.awayScore === result.homeScore ? 1 : 0
 
-    // 4. Update league table - Home Player
     const homeEntry = await prisma.leagueEntry.findUnique({
       where: {
         seasonId_playerId: {
@@ -111,7 +293,6 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       })
     }
 
-    // 5. Update player profiles (career stats)
     await prisma.profile.updateMany({
       where: { userId: fixture.homePlayerId },
       data: {
@@ -136,7 +317,6 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       }
     })
 
-    // 6. Send notifications to both players
     const winner = result.homeScore > result.awayScore ? fixture.homePlayer : result.awayScore > result.homeScore ? fixture.awayPlayer : null
     const winnerName = winner?.name || "No one (Draw)"
     const homePlayerName = fixture.homePlayer.profile?.username || fixture.homePlayer.name
@@ -161,7 +341,6 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       ]
     })
 
-    // 7. Log to audit
     await prisma.auditLog.create({
       data: {
         userId: adminId,
@@ -179,12 +358,10 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       }
     })
 
-    // 8. Update trust scores for both players
     try {
       await updateTrustScore(fixture.homePlayerId)
       await updateTrustScore(fixture.awayPlayerId)
     } catch (trustError) {
-      // Log but don't fail the approval if trust update fails
       console.error("Error updating trust scores:", trustError)
     }
 
@@ -205,6 +382,7 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
   }
 }
 
+// ✅ Reject Match
 export async function rejectMatch({ resultId, adminId }: RejectResultParams) {
   try {
     const result = await prisma.result.findUnique({
@@ -219,19 +397,77 @@ export async function rejectMatch({ resultId, adminId }: RejectResultParams) {
               include: { profile: true }
             }
           }
-        } 
+        },
+        tournamentMatch: {
+          include: {
+            homePlayer: {
+              include: { profile: true }
+            },
+            awayPlayer: {
+              include: { profile: true }
+            }
+          }
+        }
       }
     })
 
     if (!result) throw new Error("Result not found")
     if (result.approved) throw new Error("Result already approved")
+
+    if (result.source === "TOURNAMENT") {
+      const match = result.tournamentMatch
+      if (!match) throw new Error("Tournament match not found")
+
+      await prisma.tournamentMatch.update({
+        where: { id: match.id },
+        data: {
+          status: "SCHEDULED",
+          resultId: null
+        }
+      })
+
+      await prisma.result.delete({
+        where: { id: resultId }
+      })
+
+      const homeName = match.homePlayer?.profile?.username || match.homePlayer?.name || "Home"
+      const awayName = match.awayPlayer?.profile?.username || match.awayPlayer?.name || "Away"
+
+      const notifications = []
+      if (match.homePlayerId) {
+        notifications.push({
+          userId: match.homePlayerId,
+          title: "❌ Tournament Result Rejected",
+          message: `Your tournament match vs ${awayName} has been rejected. Please resubmit with correct evidence.`,
+          type: "RESULT_APPROVED",
+          link: `/tournaments/${match.tournamentId}`
+        })
+      }
+      if (match.awayPlayerId) {
+        notifications.push({
+          userId: match.awayPlayerId,
+          title: "❌ Tournament Result Rejected",
+          message: `Your tournament match vs ${homeName} has been rejected. Please resubmit with correct evidence.`,
+          type: "RESULT_APPROVED",
+          link: `/tournaments/${match.tournamentId}`
+        })
+      }
+
+      if (notifications.length > 0) {
+        await prisma.notification.createMany({
+          data: notifications
+        })
+      }
+
+      return { success: true }
+    }
+
     if (!result.fixture) throw new Error("Fixture not found")
 
     const fixture = result.fixture
     const homePlayerName = fixture.homePlayer.profile?.username || fixture.homePlayer.name
     const awayPlayerName = fixture.awayPlayer.profile?.username || fixture.awayPlayer.name
 
-    // 1. Reset fixture (skip tournament results)
     if (result.fixtureId) {
       await prisma.fixture.update({
         where: { id: result.fixtureId },
@@ -245,12 +481,10 @@ export async function rejectMatch({ resultId, adminId }: RejectResultParams) {
       })
     }
 
-    // 2. Delete the result
     await prisma.result.delete({
       where: { id: resultId }
     })
 
-    // 3. Notify players
     await prisma.notification.createMany({
       data: [
         {

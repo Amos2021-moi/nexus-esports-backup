@@ -10,6 +10,7 @@ import {
   Globe, MapPin, Phone, Menu, X, Sun, Moon, Search, Bell,
   UserPlus, LogIn, Home, Info, HelpCircle, ExternalLink
 } from "lucide-react"
+import NewsBadge from "@/components/NewsBadge"
 
 export default function HomePage() {
   const { data: session } = useSession()
@@ -33,7 +34,6 @@ export default function HomePage() {
 
   async function fetchStats() {
     try {
-      // ✅ Force fresh fetch - IGNORE CACHE
       const res = await fetch("/api/admin/stats", {
         cache: "no-store",
         headers: {
@@ -191,24 +191,25 @@ export default function HomePage() {
               </span>
             </div>
 
+            {/* ✅ Desktop Navigation with NewsBadge */}
             <div className="hidden md:flex items-center gap-8">
-  <Link href="/news" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-    <Bell size={14} />
-    News
-  </Link>
-  <Link href="/hall-of-fame" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-    <Award size={14} />
-    Hall of Fame
-  </Link>
-  <Link href="/tournaments" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-    <Trophy size={14} />
-    Tournaments
-  </Link>
-  <Link href="/standings" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
-    <TrendingUp size={14} />
-    Rankings
-  </Link>
-</div>
+              <Link href="/news" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1 group">
+                <NewsBadge />
+                News
+              </Link>
+              <Link href="/hall-of-fame" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+                <Award size={14} />
+                Hall of Fame
+              </Link>
+              <Link href="/tournaments" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+                <Trophy size={14} />
+                Tournaments
+              </Link>
+              <Link href="/standings" className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+                <TrendingUp size={14} />
+                Rankings
+              </Link>
+            </div>
 
             <div className="flex items-center gap-3">
               {session ? (

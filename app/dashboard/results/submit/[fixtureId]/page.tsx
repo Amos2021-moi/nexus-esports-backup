@@ -3,23 +3,28 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ArrowLeft, Camera, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, Camera, AlertCircle, CheckCircle, XCircle, Shield, Clock } from "lucide-react"
 import Link from "next/link"
 import toast from "react-hot-toast"
 
 interface Fixture {
   id: string
   homePlayer: { 
+    id: string
     name: string
     email: string
     profile: { username: string; profilePicture: string } | null 
   }
   awayPlayer: { 
+    id: string
     name: string
     email: string
     profile: { username: string; profilePicture: string } | null 
   }
   scheduledDate: string
+  status: string
+  submittedBy: string | null
+  submittedAt: string | null
 }
 
 export default function SubmitResultPage() {
@@ -34,6 +39,10 @@ export default function SubmitResultPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [lockedBy, setLockedBy] = useState<string | null>(null)
+
+  // ✅ Debug: Log the fixtureId from params
+  console.log("🔍 fixtureId from params:", fixtureId)
 
   useEffect(() => {
     if (fixtureId) {
@@ -44,6 +53,7 @@ export default function SubmitResultPage() {
   async function fetchFixture() {
     try {
       setLoading(true)
+      console.log("🔍 Fetching fixture with ID:", fixtureId)
       const res = await fetch(`/api/fixtures/${fixtureId}`)
       
       if (!res.ok) {
@@ -57,6 +67,15 @@ export default function SubmitResultPage() {
       }
       
       setFixture(data)
+      
+      if (data.status === "PENDING" && data.submittedBy) {
+        const submittedBy = data.homePlayer?.id === data.submittedBy 
+          ? data.homePlayer?.name 
+          : data.awayPlayer?.id === data.submittedBy 
+            ? data.awayPlayer?.name 
+            : "Someone"
+        setLockedBy(submittedBy || "Someone")
+      }
     } catch (err) {
       console.error("Fetch error:", err)
       setError(err instanceof Error ? err.message : "Failed to load fixture")
@@ -73,7 +92,6 @@ export default function SubmitResultPage() {
       return
     }
     
-    // Evidence is always required for now
     if (!evidence) {
       toast.error("Evidence screenshot is required. Please upload a screenshot.")
       return
@@ -87,23 +105,45 @@ export default function SubmitResultPage() {
     formData.append("awayScore", awayScore)
     if (evidence) formData.append("evidence", evidence)
 
+    // ✅ Debug: Log the fixtureId being used for submission
+    console.log("🔍 Submitting result for fixtureId:", fixtureId)
+
     try {
       const res = await fetch(`/api/results/submit/${fixtureId}`, {
         method: "POST",
         body: formData,
       })
 
-      const data = await res.json()
+      console.log("🔍 Response status:", res.status)
+
+      let data = {}
+      const contentType = res.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json()
+      } else {
+        const text = await res.text()
+        console.error("❌ API returned non-JSON:", text)
+        data = { error: "Server error. Please try again." }
+      }
 
       if (res.ok) {
         toast.success("Result submitted! Waiting for admin approval.")
         router.push("/dashboard/fixtures")
       } else {
-        toast.error(data.error || "Failed to submit result")
+        const errorMsg = (data as any).error || "Failed to submit result"
+        toast.error(errorMsg)
+        setError(errorMsg)
+        
+        if ((data as any).locked && (data as any).submittedBy) {
+          setLockedBy((data as any).submittedBy)
+        }
+        
+        await fetchFixture()
       }
     } catch (err) {
-      console.error("Submit error:", err)
+      console.error("❌ Submit error:", err)
       toast.error("Network error. Please try again.")
+      setError("Network error. Please check your connection and try again.")
     } finally {
       setSubmitting(false)
     }
@@ -133,7 +173,7 @@ export default function SubmitResultPage() {
     )
   }
 
-  if (error) {
+  if (error && !fixture) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="text-red-400">{error}</div>
@@ -169,6 +209,98 @@ export default function SubmitResultPage() {
                    fixture.awayPlayer?.name || 
                    "Away Player"
 
+  const isPartOfFixture = fixture.homePlayer?.id === session?.user?.id || 
+                          fixture.awayPlayer?.id === session?.user?.id
+
+  if (!isPartOfFixture) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="mb-6">
+          <Link href="/dashboard/fixtures" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft size={18} />
+            Back to Fixtures
+          </Link>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl border border-red-500/30 p-8 text-center">
+          <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Permission Denied</h2>
+          <p className="text-gray-400 mb-4">
+            You are not part of this fixture.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard/fixtures")}
+            className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
+          >
+            Back to Fixtures
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (fixture.status === "PENDING") {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="mb-6">
+          <Link href="/dashboard/fixtures" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft size={18} />
+            Back to Fixtures
+          </Link>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl border border-yellow-500/30 p-8 text-center">
+          <Clock className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Result Already Submitted</h2>
+          <p className="text-gray-400 mb-4">
+            This fixture already has a result waiting for admin approval.
+          </p>
+          {lockedBy && (
+            <p className="text-sm text-gray-500 mb-4">
+              Submitted by: <span className="text-white font-medium">{lockedBy}</span>
+            </p>
+          )}
+          <p className="text-xs text-gray-500">
+            Please wait for the admin to approve the result before taking any action.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard/fixtures")}
+            className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
+          >
+            Back to Fixtures
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (fixture.status === "COMPLETED") {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="mb-6">
+          <Link href="/dashboard/fixtures" className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft size={18} />
+            Back to Fixtures
+          </Link>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl border border-green-500/30 p-8 text-center">
+          <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Match Completed</h2>
+          <p className="text-gray-400 mb-4">
+            This fixture has already been completed and approved.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard/fixtures")}
+            className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
+          >
+            Back to Fixtures
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-6">
       <div className="mb-6">
@@ -198,6 +330,7 @@ export default function SubmitResultPage() {
                 )}
               </div>
               <p className="text-lg font-semibold text-white">{homeName}</p>
+              <p className="text-xs text-indigo-400">🏠 Home</p>
             </div>
             
             <div className="px-4">
@@ -221,6 +354,7 @@ export default function SubmitResultPage() {
                 )}
               </div>
               <p className="text-lg font-semibold text-white">{awayName}</p>
+              <p className="text-xs text-purple-400">✈️ Away</p>
             </div>
           </div>
           
@@ -316,6 +450,18 @@ export default function SubmitResultPage() {
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/20">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={18} className="text-red-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-red-400 font-medium">Error</p>
+                  <p className="text-xs text-gray-400 mt-1">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

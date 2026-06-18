@@ -19,6 +19,7 @@
     "chart.js": "^4.5.1",
     "cloudinary": "^2.10.0",
     "dotenv": "^17.4.2",
+    "framer-motion": "^12.40.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
     "next-auth": "^4.24.14",

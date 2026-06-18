@@ -12,7 +12,7 @@ export async function GET(
     const session = await getServerSession(authOptions)
     
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const fixture = await prisma.fixture.findUnique({
@@ -20,26 +20,22 @@ export async function GET(
       include: {
         homePlayer: {
           select: {
+            id: true,
             name: true,
-            profile: { 
-              select: { 
-                username: true,
-                profilePicture: true
-              } 
-            }
+            email: true,
+            profile: true
           }
         },
         awayPlayer: {
           select: {
+            id: true,
             name: true,
-            profile: { 
-              select: { 
-                username: true,
-                profilePicture: true
-              } 
-            }
+            email: true,
+            profile: true
           }
-        }
+        },
+        season: true,
+        result: true
       }
     })
 
@@ -47,14 +43,12 @@ export async function GET(
       return NextResponse.json({ error: "Fixture not found" }, { status: 404 })
     }
 
-    // Verify user is part of this fixture
-    if (fixture.homePlayerId !== session.user.id && fixture.awayPlayerId !== session.user.id) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
-
     return NextResponse.json(fixture)
   } catch (error) {
     console.error("Error fetching fixture:", error)
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Failed to fetch fixture" },
+      { status: 500 }
+    )
   }
 }

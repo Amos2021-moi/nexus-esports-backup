@@ -71,3 +71,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create post" }, { status: 500 })
   }
 }
+
+// ✅ DELETE method - Phase 1
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const postId = searchParams.get("id")
+
+    if (!postId) {
+      return NextResponse.json({ error: "Post ID required" }, { status: 400 })
+    }
+
+    // Check if post exists and belongs to user
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true }
+    })
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 })
+    }
+
+    if (post.userId !== session.user.id) {
+      return NextResponse.json({ error: "Unauthorized to delete this post" }, { status: 403 })
+    }
+
+    // Delete post (comments and likes will cascade due to onDelete: Cascade)
+    await prisma.post.delete({
+      where: { id: postId }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error deleting post:", error)
+    return NextResponse.json(
+      { error: "Failed to delete post" },
+      { status: 500 }
+    )
+  }
+}

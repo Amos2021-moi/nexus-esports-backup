@@ -15,8 +15,8 @@ interface Participant {
   id: string
   playerId: string
   seed: number
+  eliminated: boolean
   player: Player
-   eliminated?: boolean
 }
 
 export default function ManageTournamentPage() {
@@ -31,42 +31,93 @@ export default function ManageTournamentPage() {
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    fetchData()
+    console.log("🔍 Manage page mounted with ID:", id)
+    if (id) {
+      fetchData()
+    }
   }, [id])
 
   async function fetchData() {
-    const [tournamentRes, participantsRes, playersRes] = await Promise.all([
-      fetch(`/api/tournaments/${id}`),
-      fetch(`/api/tournaments/${id}/players`),
-      fetch("/api/players")
-    ])
-    
-    const tournamentData = await tournamentRes.json()
-    const participantsData = await participantsRes.json()
-    const playersData = await playersRes.json()
-    
-    setTournament(tournamentData)
-    setParticipants(Array.isArray(participantsData) ? participantsData : [])
-    setAvailablePlayers(Array.isArray(playersData) ? playersData.filter((p: any) => p.role === "PLAYER") : [])
-    setLoading(false)
+    try {
+      console.log("🔍 Fetching data for tournament ID:", id)
+      setLoading(true)
+      
+      // Fetch tournament
+      const tournamentRes = await fetch(`/api/tournaments/${id}`)
+      console.log("🔍 Tournament response status:", tournamentRes.status)
+      
+      if (!tournamentRes.ok) {
+        throw new Error(`HTTP ${tournamentRes.status}`)
+      }
+      
+      const tournamentData = await tournamentRes.json()
+      console.log("✅ Tournament data:", tournamentData)
+      setTournament(tournamentData)
+      
+      // Fetch participants
+      const participantsRes = await fetch(`/api/tournaments/${id}/players`)
+      const participantsData = await participantsRes.json()
+      setParticipants(Array.isArray(participantsData) ? participantsData : [])
+      
+      // Fetch available players
+      const playersRes = await fetch("/api/players")
+      const playersData = await playersRes.json()
+      setAvailablePlayers(Array.isArray(playersData) ? playersData.filter((p: any) => p.role === "PLAYER") : [])
+      
+    } catch (error) {
+      console.error("❌ Error fetching data:", error)
+      toast.error("Failed to load tournament data")
+      setTournament(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function addPlayer() {
     if (!selectedPlayer) return
     
-    const res = await fetch(`/api/tournaments/${id}/players`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerIds: [selectedPlayer] })
-    })
-    
-    if (res.ok) {
-      toast.success("Player added!")
-      setSelectedPlayer("")
-      setShowAddPlayer(false)
-      fetchData()
-    } else {
+    try {
+      const res = await fetch(`/api/tournaments/${id}/players`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerIds: [selectedPlayer] })
+      })
+      
+      if (res.ok) {
+        toast.success("Player added!")
+        setSelectedPlayer("")
+        setShowAddPlayer(false)
+        fetchData()
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to add player")
+      }
+    } catch (error) {
+      console.error("Error adding player:", error)
       toast.error("Failed to add player")
+    }
+  }
+
+  async function removePlayer(participantId: string) {
+    if (!confirm("Are you sure you want to remove this player from the tournament?")) return
+    
+    try {
+      const res = await fetch(`/api/tournaments/${id}/players`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId })
+      })
+      
+      if (res.ok) {
+        toast.success("Player removed from tournament")
+        fetchData()
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to remove player")
+      }
+    } catch (error) {
+      console.error("Error removing player:", error)
+      toast.error("Failed to remove player")
     }
   }
 
@@ -77,19 +128,52 @@ export default function ManageTournamentPage() {
     }
     
     setGenerating(true)
-    const res = await fetch(`/api/tournaments/${id}/bracket`, { method: "POST" })
-    
-    if (res.ok) {
-      toast.success("Bracket generated!")
-      router.push(`/tournaments/${id}`)
-    } else {
+    try {
+      const res = await fetch(`/api/tournaments/${id}/bracket`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      })
+      
+      if (res.ok) {
+        toast.success("Bracket generated!")
+        router.push(`/tournaments/${id}`)
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to generate bracket")
+      }
+    } catch (error) {
+      console.error("Error generating bracket:", error)
       toast.error("Failed to generate bracket")
+    } finally {
+      setGenerating(false)
     }
-    setGenerating(false)
   }
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-400">Loading...</div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-12 h-12 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-400">Loading tournament data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!tournament) {
+    return (
+      <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
+        <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-white mb-2">Tournament Not Found</h3>
+        <p className="text-gray-400">The tournament you're looking for doesn't exist.</p>
+        <button
+          onClick={() => router.push("/admin/tournaments")}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Back to Tournaments
+        </button>
+      </div>
+    )
   }
 
   const currentPlayers = participants.filter(p => !p.eliminated).length
@@ -97,13 +181,11 @@ export default function ManageTournamentPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">{tournament?.name}</h1>
+        <h1 className="text-2xl font-bold text-white">{tournament?.name || "Tournament"}</h1>
         <p className="text-gray-400 mt-1">Manage participants and generate bracket</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
           <Users className="h-5 w-5 text-blue-400 mb-2" />
@@ -122,7 +204,6 @@ export default function ManageTournamentPage() {
         </div>
       </div>
 
-      {/* Participants List */}
       <div className="bg-gray-800 rounded-xl border border-gray-700">
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
           <h2 className="text-lg font-semibold text-white">Participants</h2>
@@ -151,13 +232,19 @@ export default function ManageTournamentPage() {
                 {p.eliminated && (
                   <span className="text-xs text-red-400">Eliminated</span>
                 )}
+                <button
+                  onClick={() => removePlayer(p.id)}
+                  className="text-red-400 hover:text-red-300 transition-all p-1"
+                  title="Remove player"
+                >
+                  <X size={16} />
+                </button>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* Generate Bracket */}
       {canGenerate && participants.length >= 2 && (
         <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 rounded-xl border border-green-500/20 p-6">
           <h2 className="text-lg font-semibold text-white mb-2">Ready to Generate Bracket</h2>
@@ -174,7 +261,6 @@ export default function ManageTournamentPage() {
         </div>
       )}
 
-      {/* Add Player Modal */}
       {showAddPlayer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="bg-gray-800 rounded-xl w-full max-w-md p-6 border border-gray-700">

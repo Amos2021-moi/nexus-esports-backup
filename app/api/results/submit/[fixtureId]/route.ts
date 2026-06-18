@@ -27,22 +27,39 @@ export async function POST(
       return NextResponse.json({ error: "Fixture not found" }, { status: 404 })
     }
 
-    // Check Season Status - Only ALLOW if season is LIVE
-    if (fixture.season?.status !== "LIVE") {
-      let errorMessage = `Results can only be submitted when season is LIVE (current: ${fixture.season?.status || "UNKNOWN"})`
-      return NextResponse.json({ error: errorMessage }, { status: 403 })
+    // ✅ ALLOW BOTH home and away players to submit
+    if (fixture.homePlayerId !== session.user.id && fixture.awayPlayerId !== session.user.id) {
+      return NextResponse.json({ 
+        error: "You are not part of this fixture." 
+      }, { status: 403 })
     }
 
-    // Check if fixture already has a result or is pending/completed
-    if (fixture.status === "PENDING" || fixture.status === "COMPLETED") {
+    // Check Season Status - Only ALLOW if season is LIVE
+    if (fixture.season?.status !== "LIVE") {
       return NextResponse.json({ 
-        error: "Result already submitted for this fixture. Waiting for admin approval or already completed." 
+        error: `Results can only be submitted when season is LIVE (current: ${fixture.season?.status || "UNKNOWN"})` 
+      }, { status: 403 })
+    }
+
+    // ✅ Check if fixture already has a result (LOCKED)
+    if (fixture.status === "PENDING") {
+      const submittedBy = await prisma.user.findUnique({
+        where: { id: fixture.submittedBy || undefined },
+        select: { name: true }
+      })
+      const submittedByName = submittedBy?.name || "Someone"
+      
+      return NextResponse.json({ 
+        error: `This fixture already has a pending result submitted by ${submittedByName}. Waiting for admin approval.`,
+        locked: true,
+        submittedBy: submittedByName
       }, { status: 400 })
     }
 
-    // Verify user is part of this fixture
-    if (fixture.homePlayerId !== session.user.id && fixture.awayPlayerId !== session.user.id) {
-      return NextResponse.json({ error: "You are not part of this match" }, { status: 403 })
+    if (fixture.status === "COMPLETED") {
+      return NextResponse.json({ 
+        error: "This fixture has already been completed and approved." 
+      }, { status: 400 })
     }
 
     const formData = await request.formData()
@@ -88,6 +105,23 @@ export async function POST(
         submittedBy: session.user.id,
         approved: false,
         source: "LEAGUE",
+      }
+    })
+
+    // ✅ Notify the other player that result was submitted
+    const otherPlayerId = fixture.homePlayerId === session.user.id 
+      ? fixture.awayPlayerId 
+      : fixture.homePlayerId
+
+    const submitterName = session.user.name || "A player"
+
+    await prisma.notification.create({
+      data: {
+        userId: otherPlayerId,
+        title: "📋 Result Submitted",
+        message: `${submitterName} has submitted a result for your match. Waiting for admin approval.`,
+        type: "RESULT_APPROVED",
+        link: `/matches/${fixtureId}`
       }
     })
 
