@@ -15,18 +15,26 @@ const nextConfig = {
     },
   },
 
-  // ✅ Exclude heavy packages from all serverless functions
+  // ✅ Only exclude heavy backup libraries, NOT Prisma Client
   outputFileTracingExcludes: {
     '**/*': [
-      'node_modules/.prisma/client/**/*',
       'node_modules/jszip/**/*',
       'node_modules/@vercel/blob/**/*',
       'node_modules/archiver/**/*',
+      '**/backups/**/*',
     ],
   },
 
-  // ✅ Mark packages as external to prevent bundling
-  serverExternalPackages: ['@prisma/client', 'jszip', '@vercel/blob'],
+  // ✅ Ensure Prisma Client is included
+  outputFileTracingIncludes: {
+    '**/*': [
+      'node_modules/@prisma/client/**/*',
+      'node_modules/.prisma/client/**/*',
+    ],
+  },
+
+  // ✅ Don't externalize Prisma Client (let it be bundled)
+  serverExternalPackages: ['jszip', '@vercel/blob'],
 }
 
 module.exports = nextConfig

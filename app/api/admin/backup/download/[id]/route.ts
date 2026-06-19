@@ -12,12 +12,8 @@ export async function GET(
     const { id } = await params
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-    
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const backup = await prisma.backup.findUnique({
@@ -28,20 +24,32 @@ export async function GET(
       return NextResponse.json({ error: "Backup not found" }, { status: 404 })
     }
 
-    try {
-      await fs.access(backup.filePath)
-    } catch {
-      return NextResponse.json({ error: "Backup file not found" }, { status: 404 })
+    let fileBuffer: Buffer
+
+    // Check if it's a Vercel Blob URL or local path
+    if (backup.filePath.startsWith('http')) {
+      // Download from Vercel Blob
+      const response = await fetch(backup.filePath)
+      const arrayBuffer = await response.arrayBuffer()
+      fileBuffer = Buffer.from(arrayBuffer)
+    } else {
+      // Read from local file system
+      try {
+        await fs.access(backup.filePath)
+        fileBuffer = await fs.readFile(backup.filePath)
+      } catch {
+        return NextResponse.json({ error: "Backup file not found" }, { status: 404 })
+      }
     }
 
-    const file = await fs.readFile(backup.filePath)
     const fileName = `${backup.name}.zip`
 
-    return new NextResponse(file, {
+    // ✅ Convert Buffer to Uint8Array for NextResponse
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': file.length.toString()
+        'Content-Length': fileBuffer.length.toString()
       }
     })
   } catch (error) {

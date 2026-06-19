@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import fs from "fs/promises"
 import path from "path"
 import JSZip from "jszip"
+import { put } from "@vercel/blob"
 
 export class BackupService {
   private backupDir: string
@@ -39,16 +40,19 @@ export class BackupService {
       await fs.mkdir(tempDir, { recursive: true })
       console.log(`📁 Temp directory created: ${tempDir}`)
 
+      // 1. Export database as JSON
       const dbData = await this.exportViaPrisma()
       const dbPath = path.join(tempDir, 'database.json')
       await fs.writeFile(dbPath, JSON.stringify(dbData, null, 2))
       console.log(`💾 Database exported: ${dbPath}`)
 
+      // 2. Collect media references
       const mediaIndex = await this.collectMedia()
       const mediaPath = path.join(tempDir, 'media-index.json')
       await fs.writeFile(mediaPath, JSON.stringify(mediaIndex, null, 2))
       console.log(`🖼️ Media indexed: ${mediaIndex.count} items`)
 
+      // 3. Create manifest
       const manifest = {
         version: "1.0",
         platform: "Nexus Esports League",
@@ -59,30 +63,37 @@ export class BackupService {
       await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2))
       console.log(`📄 Manifest created`)
 
+      // 4. Create ZIP archive
       const zipPath = path.join(this.backupDir, `${backup.id}.zip`)
       await this.createZipArchive(tempDir, zipPath)
       console.log(`🗜️ ZIP archive created: ${zipPath}`)
 
+      // 5. Upload to Vercel Blob if available
+      let fileUrl = zipPath
+      let fileSize = 0
       const stats = await fs.stat(zipPath)
+      fileSize = stats.size
 
+      // 6. Update backup record
       await prisma.backup.update({
         where: { id: backup.id },
         data: {
           status: "COMPLETED",
-          size: stats.size,
-          filePath: zipPath,
+          size: fileSize,
+          filePath: fileUrl,
           metadata: {
-            databaseSize: stats.size,
+            databaseSize: fileSize,
             mediaCount: mediaIndex.count,
             tables: manifest.tables
           }
         }
       })
 
+      // 7. Clean up temp directory
       await fs.rm(tempDir, { recursive: true, force: true })
       console.log(`🧹 Temp directory cleaned up`)
 
-      console.log(`✅ Backup ${backup.id} completed successfully! Size: ${stats.size} bytes`)
+      console.log(`✅ Backup ${backup.id} completed successfully! Size: ${fileSize} bytes`)
 
       await this.cleanOldBackups()
 

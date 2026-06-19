@@ -108,14 +108,31 @@ export default function BackupSettingsPage() {
   }
 
   async function fetchSchedule() {
-    try {
-      const res = await fetch("/api/admin/backup/schedule")
-      const data = await res.json()
-      setSchedule(data)
-    } catch (error) {
-      console.error("Error fetching schedule:", error)
+  try {
+    const res = await fetch("/api/admin/backup/schedule")
+    
+    // ✅ Check if response is OK before parsing JSON
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     }
+    
+    const data = await res.json()
+    setSchedule(data)
+  } catch (error) {
+    console.error("Error fetching schedule:", error)
+    // ✅ Set default schedule on error
+    setSchedule({
+      enabled: true,
+      frequency: "DAILY",
+      time: "02:00",
+      keepDaily: 7,
+      keepWeekly: 4,
+      keepMonthly: 3,
+      lastRunAt: null,
+      nextRunAt: null
+    })
   }
+}
 
   // Add this to your component
 async function createBackup() {
