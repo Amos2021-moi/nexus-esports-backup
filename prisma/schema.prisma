@@ -425,17 +425,17 @@ model RestoreLog {
   startedAt   DateTime @default(now())
   completedAt DateTime?
   restoredBy  String
-  details     Json?    // Store restore details
+  details     Json?
 
-  backup      Backup   @relation(fields: [backupId], references: [id])
+  backup      Backup   @relation(fields: [backupId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [restoredBy], references: [id])
 }
 
 model BackupConfig {
   id          String   @id @default(cuid())
   enabled     Boolean  @default(true)
-  frequency   String   // "HOURLY", "DAILY", "WEEKLY", "MONTHLY"
-  time        String   // "02:00" for daily
+  frequency   String   @default("DAILY") // "HOURLY", "DAILY", "WEEKLY", "MONTHLY"
+  time        String   @default("02:00") // For daily: "02:00"
   keepDaily   Int      @default(7)
   keepWeekly  Int      @default(4)
   keepMonthly Int      @default(3)

@@ -22,23 +22,35 @@ export async function DELETE(
     }
 
     const backup = await prisma.backup.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        restoreLogs: true
+      }
     })
 
     if (!backup) {
       return NextResponse.json({ error: "Backup not found" }, { status: 404 })
     }
 
+    // ✅ Delete restore logs first
+    if (backup.restoreLogs && backup.restoreLogs.length > 0) {
+      await prisma.restoreLog.deleteMany({
+        where: { backupId: id }
+      })
+      console.log(`🧹 Deleted ${backup.restoreLogs.length} restore logs for backup ${id}`)
+    }
+
+    // Delete file if exists
     if (backup.filePath) {
       try {
         await fs.unlink(backup.filePath)
-        const tempDir = path.join(process.cwd(), 'backups', backup.id)
-        await fs.rm(tempDir, { recursive: true, force: true })
+        console.log(`🗑️ Deleted backup file: ${backup.filePath}`)
       } catch (error) {
-        console.error(`Failed to delete backup files:`, error)
+        console.error(`Failed to delete backup file:`, error)
       }
     }
 
+    // ✅ Now delete the backup
     await prisma.backup.delete({
       where: { id }
     })
