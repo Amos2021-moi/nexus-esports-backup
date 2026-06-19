@@ -117,31 +117,57 @@ export default function BackupSettingsPage() {
     }
   }
 
-  async function createBackup() {
-    if (!confirm("Create a new backup snapshot? This may take a few minutes.")) return
+  // Add this to your component
+async function createBackup() {
+  if (!confirm("Create a new backup snapshot? This may take a few minutes.")) return
 
-    setCreating(true)
+  setCreating(true)
+  try {
+    const res = await fetch("/api/admin/backup/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "MANUAL" })
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      toast.success("Backup queued! It will be processed in the background.")
+      
+      // ✅ Poll for status
+      pollBackupStatus(data.backupId)
+      
+      fetchData()
+    } else {
+      const error = await res.json()
+      toast.error(error.error || "Failed to create backup")
+    }
+  } catch (error) {
+    console.error("Error creating backup:", error)
+    toast.error("Failed to create backup")
+  } finally {
+    setCreating(false)
+  }
+}
+
+async function pollBackupStatus(backupId: string) {
+  const interval = setInterval(async () => {
     try {
-      const res = await fetch("/api/admin/backup/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "MANUAL" })
-      })
-
-      if (res.ok) {
-        toast.success("Backup created successfully!")
+      const res = await fetch(`/api/admin/backup/status?id=${backupId}`)
+      const data = await res.json()
+      
+      if (data.status === "COMPLETED") {
+        clearInterval(interval)
+        toast.success("Backup completed successfully!")
         fetchData()
-      } else {
-        const error = await res.json()
-        toast.error(error.error || "Failed to create backup")
+      } else if (data.status === "FAILED") {
+        clearInterval(interval)
+        toast.error("Backup failed. Check logs for details.")
       }
     } catch (error) {
-      console.error("Error creating backup:", error)
-      toast.error("Failed to create backup")
-    } finally {
-      setCreating(false)
+      console.error("Error polling status:", error)
     }
-  }
+  }, 3000) // Check every 3 seconds
+}
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
