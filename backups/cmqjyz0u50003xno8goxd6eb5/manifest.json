@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "platform": "Nexus Esports League",
+  "createdAt": "2026-06-18T20:45:59.083Z",
+  "tables": [
+    "User",
+    "Profile",
+    "Fixture",
+    "Result",
+    "Tournament",
+    "Season",
+    "Award",
+    "News",
+    "LeagueEntry",
+    "Squad"
+  ]
+}

@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { 
   Settings, Trophy, Server, Shield, Bell, 
-  ChevronRight, Home, Users, Award, Calendar
+  ChevronRight, Home, Users, Award, Calendar, 
+  HardDrive, Database, FileArchive  // ✅ Add Backup icons
 } from "lucide-react"
 
 const tabs = [
@@ -15,6 +16,8 @@ const tabs = [
   { name: "System", href: "/admin/settings/system", icon: Server },
   { name: "Moderation", href: "/admin/settings/moderation", icon: Shield },
   { name: "Notifications", href: "/admin/settings/notifications", icon: Bell },
+  // ✅ ADD BACKUP TAB
+  { name: "Backup", href: "/admin/settings/backup", icon: HardDrive },
 ]
 
 export default function AdminSettingsLayout({
@@ -26,7 +29,6 @@ export default function AdminSettingsLayout({
   const router = useRouter()
   const pathname = usePathname()
 
-  // Role check - redirect if not admin
   useEffect(() => {
     if (status === "loading") return
     
