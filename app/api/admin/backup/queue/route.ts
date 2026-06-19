@@ -17,7 +17,6 @@ export async function POST(request: Request) {
 
     const { type = "MANUAL" } = await request.json()
 
-    // ✅ Create backup record
     const backup = await prisma.backup.create({
       data: {
         name: `backup_${new Date().toISOString().replace(/[:.]/g, '_')}`,
@@ -29,26 +28,26 @@ export async function POST(request: Request) {
       }
     })
 
-    // ✅ Trigger background job via Vercel's waitUntil
-    // This runs in the background after the response is sent
-    const response = NextResponse.json({
+    // ✅ Run backup in background
+    setTimeout(async () => {
+      try {
+        const { backupWorker } = await import('@/lib/services/backup.worker')
+        await backupWorker.performBackup(backup.id, session.user.id)
+      } catch (error) {
+        console.error('Background backup failed:', error)
+        await prisma.backup.update({
+          where: { id: backup.id },
+          data: { status: "FAILED" }
+        })
+      }
+    }, 100)
+
+    return NextResponse.json({
       success: true,
       message: "Backup queued successfully",
       backupId: backup.id,
       status: "PENDING"
     })
-
-    // ✅ Schedule the actual backup to run in the background
-    // Using setTimeout to run after response is sent
-    setTimeout(async () => {
-      try {
-        await performBackup(backup.id, session.user.id)
-      } catch (error) {
-        console.error('Background backup failed:', error)
-      }
-    }, 100)
-
-    return response
   } catch (error) {
     console.error("Error queuing backup:", error)
     return NextResponse.json(
@@ -56,11 +55,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
-// ✅ Heavy backup function (runs in background)
-async function performBackup(backupId: string, userId: string) {
-  // Dynamic import to keep the API route lightweight
-  const { backupWorker } = await import('@/lib/services/backup.worker')
-  await backupWorker.performBackup(backupId, userId)
 }

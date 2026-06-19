@@ -2,7 +2,15 @@ import { prisma } from "@/lib/prisma"
 import fs from "fs/promises"
 import path from "path"
 import JSZip from "jszip"
-import { put } from "@vercel/blob"
+
+// ✅ Dynamically import Vercel Blob (only if available)
+let put: any = null
+try {
+  const blob = await import('@vercel/blob')
+  put = blob.put
+} catch (error) {
+  console.log('ℹ️ Vercel Blob not available, using local storage')
+}
 
 export class BackupWorker {
   private backupDir: string
@@ -23,10 +31,12 @@ export class BackupWorker {
       const tempDir = path.join(this.backupDir, backupId)
       await fs.mkdir(tempDir, { recursive: true })
 
+      // Export database as JSON
       const dbData = await this.exportViaPrisma()
       const dbPath = path.join(tempDir, 'database.json')
       await fs.writeFile(dbPath, JSON.stringify(dbData, null, 2))
 
+      // Create manifest
       const manifest = {
         version: "1.0",
         platform: "Nexus Esports League",
@@ -36,7 +46,7 @@ export class BackupWorker {
       const manifestPath = path.join(tempDir, 'manifest.json')
       await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2))
 
-      // Create ZIP archive
+      // Create ZIP
       const zip = new JSZip()
       const files = await fs.readdir(tempDir)
       for (const file of files) {
@@ -46,28 +56,39 @@ export class BackupWorker {
       }
 
       const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
-
-      // ✅ Get the size before uploading
       const zipSize = zipBuffer.length
 
-      // Upload to Vercel Blob
-      const blob = await put(
-        `backups/${backupId}.zip`,
-        zipBuffer,
-        {
-          access: 'private',
-          addRandomSuffix: false,
-          contentType: 'application/zip',
-        }
-      )
+      let filePath: string
 
-      // ✅ Use zipSize instead of blob.size
+      // ✅ Try Vercel Blob first (production), fallback to local
+      if (put && process.env.BLOB_READ_WRITE_TOKEN) {
+        try {
+          const blob = await put(
+            `backups/${backupId}.zip`,
+            zipBuffer,
+            {
+              access: 'private',
+              addRandomSuffix: false,
+              contentType: 'application/zip',
+            }
+          )
+          filePath = blob.url
+          console.log(`✅ Backup stored in Vercel Blob: ${filePath}`)
+        } catch (blobError) {
+          console.error('❌ Vercel Blob upload failed, falling back to local:', blobError)
+          filePath = await this.saveLocal(zipBuffer, backupId)
+        }
+      } else {
+        // ✅ Fallback to local storage
+        filePath = await this.saveLocal(zipBuffer, backupId)
+      }
+
       await prisma.backup.update({
         where: { id: backupId },
         data: {
           status: "COMPLETED",
           size: zipSize,
-          filePath: blob.url,
+          filePath: filePath,
         }
       })
 
@@ -83,6 +104,13 @@ export class BackupWorker {
       })
       throw error
     }
+  }
+
+  private async saveLocal(zipBuffer: Buffer, backupId: string): Promise<string> {
+    const zipPath = path.join(this.backupDir, `${backupId}.zip`)
+    await fs.writeFile(zipPath, zipBuffer)
+    console.log(`✅ Backup stored locally: ${zipPath}`)
+    return zipPath
   }
 
   private async exportViaPrisma() {

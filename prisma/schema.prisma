@@ -403,25 +403,26 @@ model Setting {
 model Backup {
   id          String   @id @default(cuid())
   name        String
-  type        String   // "MANUAL", "AUTO", "EMERGENCY"
-  status      String   // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
-  size        Int?     // ✅ Size in bytes (optional, set after backup completes)
-  createdAt   DateTime @default(now())
-  createdBy   String
+  type        String   @default("MANUAL") // MANUAL, AUTO, UPLOADED
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  size        Int      @default(0)
   filePath    String?
   version     String   @default("1.0")
   metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
   restoredAt  DateTime?
   restoredBy  String?
 
-  user        User     @relation(fields: [createdBy], references: [id])
+  user        User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   restoreLogs RestoreLog[]
 }
 
 model RestoreLog {
   id          String   @id @default(cuid())
   backupId    String
-  status      String   // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
   startedAt   DateTime @default(now())
   completedAt DateTime?
   restoredBy  String
@@ -434,8 +435,8 @@ model RestoreLog {
 model BackupConfig {
   id          String   @id @default(cuid())
   enabled     Boolean  @default(true)
-  frequency   String   @default("DAILY") // "HOURLY", "DAILY", "WEEKLY", "MONTHLY"
-  time        String   @default("02:00") // For daily: "02:00"
+  frequency   String   @default("DAILY") // HOURLY, DAILY, WEEKLY, MONTHLY
+  time        String   @default("02:00")
   keepDaily   Int      @default(7)
   keepWeekly  Int      @default(4)
   keepMonthly Int      @default(3)
