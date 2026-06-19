@@ -49,3 +49,8 @@ project_files.txt
 
 # Keep example file
 !.env.example
+
+.vercel
+.env*
+
+/backups
