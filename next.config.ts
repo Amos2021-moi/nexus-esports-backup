@@ -7,11 +7,8 @@ const nextConfig = {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   },
 
-  // ✅ Turbopack configuration (replaces webpack)
-  turbopack: {
-    // Empty config to silence the warning
-    // We don't need any custom rules for archiver
-  },
+  // ✅ Turbopack configuration
+  turbopack: {},
 
   // ✅ Server actions configuration
   experimental: {
@@ -19,6 +16,9 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
   },
+
+  // ✅ Exclude heavy packages from serverless functions
+  serverExternalPackages: ['@prisma/client', 'jszip'],
 }
 
 module.exports = nextConfig

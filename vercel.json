@@ -2,19 +2,19 @@
   "functions": {
     "app/api/admin/backup/**/*.ts": {
       "maxDuration": 60,
-      "memory": 1024
+      "excludeFiles": "node_modules/.prisma/client/**/*"
     },
     "app/api/admin/backup/create/route.ts": {
       "maxDuration": 120,
-      "memory": 2048
+      "excludeFiles": "node_modules/.prisma/client/**/*"
     },
     "app/api/admin/backup/upload/route.ts": {
       "maxDuration": 120,
-      "memory": 2048
+      "excludeFiles": "node_modules/.prisma/client/**/*"
     },
     "app/api/admin/backup/restore/route.ts": {
       "maxDuration": 120,
-      "memory": 2048
+      "excludeFiles": "node_modules/.prisma/client/**/*"
     }
   }
 }
