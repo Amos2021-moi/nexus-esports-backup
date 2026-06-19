@@ -39,6 +39,9 @@ model User {
   verifiedAt     DateTime?
   verifiedBy     String?
   settings    Setting[]
+    // ✅ ADD THESE TWO LINES:
+  backups     Backup[]
+  restoreLogs RestoreLog[]
 }
 
 model Profile {
@@ -395,4 +398,48 @@ model Setting {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, category, key])
+}
+
+model Backup {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // "MANUAL", "AUTO", "EMERGENCY"
+  status      String   // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  size        Int?     // ✅ Size in bytes (optional, set after backup completes)
+  createdAt   DateTime @default(now())
+  createdBy   String
+  filePath    String?
+  version     String   @default("1.0")
+  metadata    Json?
+  restoredAt  DateTime?
+  restoredBy  String?
+
+  user        User     @relation(fields: [createdBy], references: [id])
+  restoreLogs RestoreLog[]
+}
+
+model RestoreLog {
+  id          String   @id @default(cuid())
+  backupId    String
+  status      String   // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  restoredBy  String
+  details     Json?    // Store restore details
+
+  backup      Backup   @relation(fields: [backupId], references: [id])
+  user        User     @relation(fields: [restoredBy], references: [id])
+}
+
+model BackupConfig {
+  id          String   @id @default(cuid())
+  enabled     Boolean  @default(true)
+  frequency   String   // "HOURLY", "DAILY", "WEEKLY", "MONTHLY"
+  time        String   // "02:00" for daily
+  keepDaily   Int      @default(7)
+  keepWeekly  Int      @default(4)
+  keepMonthly Int      @default(3)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  updatedAt   DateTime @updatedAt
 }

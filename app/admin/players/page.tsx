@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Search, Shield, User, MoreVertical, CheckCircle, XCircle, Eye, Star, RefreshCw } from "lucide-react"
+import Link from "next/link"
+import { Search, Shield, User, MoreVertical, CheckCircle, XCircle, Eye, Star, Users, ChevronRight, RefreshCw } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Player {
@@ -18,6 +19,7 @@ interface Player {
     totalPoints: number
     trustScore: number
     verifiedBadge: boolean
+    profilePicture: string | null
   } | null
 }
 
@@ -171,7 +173,7 @@ export default function AdminPlayers() {
         <div className="flex gap-2">
           <button
             onClick={updateAllTrustScores}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all text-sm"
           >
             <RefreshCw size={16} />
             Update All Trust Scores
@@ -224,90 +226,124 @@ export default function AdminPlayers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {filteredPlayers.map((player) => (
-                <tr key={player.id} className="hover:bg-gray-700/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
-                        <User size={14} className="text-white" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-white">{player.name || "-"}</p>
+              {filteredPlayers.map((player) => {
+                const username = player.profile?.username || player.name || "Unknown"
+                const initial = username.charAt(0).toUpperCase()
+                const profilePic = player.profile?.profilePicture
+                const trustScore = player.profile?.trustScore || 0
+
+                return (
+                  <tr key={player.id} className="hover:bg-gray-700/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <Link 
+                        href={`/players/${player.id}`}
+                        className="flex items-center space-x-3 group"
+                      >
+                        {/* ✅ Profile Picture */}
+                        <div className="flex-shrink-0">
+                          {profilePic ? (
+                            <img 
+                              src={profilePic} 
+                              alt={username}
+                              className="h-10 w-10 rounded-full object-cover border-2 border-gray-600 group-hover:border-indigo-500 transition-all"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                              {initial}
+                            </div>
+                          )}
                           {player.isVerified && (
-                            <CheckCircle size={14} className="text-green-400" />
+                            <div className="absolute -top-0.5 -right-0.5 bg-blue-500 rounded-full p-0.5 border-2 border-gray-800">
+                              <Shield className="h-3 w-3 text-white" />
+                            </div>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400">{player.profile?.username || "No username"}</p>
+                        <div className="relative">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-white group-hover:text-indigo-400 transition-colors">
+                              {username}
+                            </p>
+                            {player.isVerified && (
+                              <CheckCircle size={14} className="text-green-400" />
+                            )}
+                            {trustScore >= 80 && (
+                              <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400">{player.email}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-500 opacity-0 group-hover:opacity-100 transition-all" />
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-300">{player.email}</td>
+                    <td className="px-6 py-4 text-sm text-white font-semibold">{player.profile?.totalPoints || 0}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-semibold ${trustScore >= 80 ? "text-green-400" : trustScore >= 50 ? "text-yellow-400" : "text-gray-400"}`}>
+                          {trustScore}
+                        </span>
+                        {trustScore >= 80 && (
+                          <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                        )}
+                        <button
+                          onClick={() => updateTrustScore(player.id)}
+                          disabled={updatingTrust === player.id}
+                          className="text-gray-400 hover:text-indigo-400 transition-all"
+                          title="Recalculate trust score"
+                        >
+                          {updatingTrust === player.id ? (
+                            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <RefreshCw size={14} />
+                          )}
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-300">{player.email}</td>
-                  <td className="px-6 py-4 text-sm text-white font-semibold">{player.profile?.totalPoints || 0}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-semibold ${(player.profile?.trustScore || 0) >= 80 ? "text-green-400" : (player.profile?.trustScore || 0) >= 50 ? "text-yellow-400" : "text-gray-400"}`}>
-                        {player.profile?.trustScore || 0}
-                      </span>
-                      {(player.profile?.trustScore || 0) >= 80 && (
-                        <Star size={14} className="text-yellow-400" />
-                      )}
-                      <button
-                        onClick={() => updateTrustScore(player.id)}
-                        disabled={updatingTrust === player.id}
-                        className="text-gray-400 hover:text-indigo-400 transition-all"
-                        title="Recalculate trust score"
-                      >
-                        {updatingTrust === player.id ? (
-                          <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <RefreshCw size={14} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          player.role === "ADMIN" 
+                            ? "bg-red-500/20 text-red-400" 
+                            : player.isVerified 
+                              ? "bg-green-500/20 text-green-400" 
+                              : "bg-yellow-500/20 text-yellow-400"
+                        }`}>
+                          {player.role === "ADMIN" ? "Admin" : player.isVerified ? "Verified" : "Pending"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {player.role !== "ADMIN" && (
+                          <button
+                            onClick={() => toggleVerification(player.id, player.isVerified)}
+                            disabled={verifying === player.id}
+                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-sm transition-all ${
+                              player.isVerified
+                                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                : "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                            }`}
+                          >
+                            {verifying === player.id ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : player.isVerified ? (
+                              <>
+                                <XCircle size={14} />
+                                Unverify
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={14} />
+                                Verify
+                              </>
+                            )}
+                          </button>
                         )}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        player.role === "ADMIN" 
-                          ? "bg-red-500/20 text-red-400" 
-                          : player.isVerified 
-                            ? "bg-green-500/20 text-green-400" 
-                            : "bg-yellow-500/20 text-yellow-400"
-                      }`}>
-                        {player.role === "ADMIN" ? "Admin" : player.isVerified ? "Verified" : "Pending"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {player.role !== "ADMIN" && (
-                      <button
-                        onClick={() => toggleVerification(player.id, player.isVerified)}
-                        disabled={verifying === player.id}
-                        className={`flex items-center gap-1 px-3 py-1 rounded-lg text-sm transition-all ${
-                          player.isVerified
-                            ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                            : "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                        }`}
-                      >
-                        {verifying === player.id ? (
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : player.isVerified ? (
-                          <>
-                            <XCircle size={14} />
-                            Unverify
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle size={14} />
-                            Verify
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
