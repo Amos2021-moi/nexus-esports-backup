@@ -15,22 +15,18 @@ export class BackupWorker {
     try {
       console.log(`📦 Starting backup worker for ${backupId}`)
 
-      // Update status to PROCESSING
       await prisma.backup.update({
         where: { id: backupId },
         data: { status: "PROCESSING" }
       })
 
-      // Create temp directory
       const tempDir = path.join(this.backupDir, backupId)
       await fs.mkdir(tempDir, { recursive: true })
 
-      // Export database as JSON
       const dbData = await this.exportViaPrisma()
       const dbPath = path.join(tempDir, 'database.json')
       await fs.writeFile(dbPath, JSON.stringify(dbData, null, 2))
 
-      // Create manifest
       const manifest = {
         version: "1.0",
         platform: "Nexus Esports League",
@@ -51,6 +47,9 @@ export class BackupWorker {
 
       const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
+      // ✅ Get the size before uploading
+      const zipSize = zipBuffer.length
+
       // Upload to Vercel Blob
       const blob = await put(
         `backups/${backupId}.zip`,
@@ -62,20 +61,19 @@ export class BackupWorker {
         }
       )
 
-      // Update backup record
+      // ✅ Use zipSize instead of blob.size
       await prisma.backup.update({
         where: { id: backupId },
         data: {
           status: "COMPLETED",
-          size: blob.size,
+          size: zipSize,
           filePath: blob.url,
         }
       })
 
-      // Clean up temp directory
       await fs.rm(tempDir, { recursive: true, force: true })
 
-      console.log(`✅ Backup ${backupId} completed successfully!`)
+      console.log(`✅ Backup ${backupId} completed successfully! Size: ${zipSize} bytes`)
 
     } catch (error) {
       console.error('❌ Backup worker failed:', error)
