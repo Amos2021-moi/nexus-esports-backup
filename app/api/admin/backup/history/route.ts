@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { backupService } from "@/lib/services/backup.service"
+import { prisma } from "@/lib/prisma"
 
 export async function GET() {
   try {
@@ -15,9 +15,29 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const history = await backupService.getBackupHistory()
+    // ✅ Minimal query - only what's needed
+    const backups = await prisma.backup.findMany({
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        status: true,
+        size: true,
+        createdAt: true,
+        createdBy: true,
+        filePath: true,
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    })
 
-    return NextResponse.json(history)
+    return NextResponse.json(backups)
   } catch (error) {
     console.error("Error fetching backup history:", error)
     return NextResponse.json(
