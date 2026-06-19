@@ -1,0 +1,33 @@
+{
+  "functions": {
+    "app/api/admin/backup/**/*.ts": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "excludeFiles": [
+        "node_modules/.prisma/client/**/*.so",
+        "node_modules/.prisma/client/**/*.node",
+        "node_modules/jszip/**/*",
+        "node_modules/archiver/**/*"
+      ]
+    },
+    "app/api/admin/backup/create/route.ts": {
+      "maxDuration": 120,
+      "memory": 2048,
+      "excludeFiles": [
+        "node_modules/.prisma/client/**/*.so",
+        "node_modules/.prisma/client/**/*.node",
+        "node_modules/jszip/**/*",
+        "node_modules/archiver/**/*"
+      ]
+    },
+    "app/api/admin/backup/upload/route.ts": {
+      "maxDuration": 120,
+      "memory": 2048,
+      "excludeFiles": [
+        "node_modules/.prisma/client/**/*.so",
+        "node_modules/.prisma/client/**/*.node",
+        "node_modules/jszip/**/*"
+      ]
+    }
+  }
+}
