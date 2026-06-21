@@ -54,3 +54,21 @@ project_files.txt
 .env*
 
 /backups
+# Next.js
+.next
+.next/dev
+.next/cache
+
+# Development
+*.local
+.DS_Store
+
+# Prisma
+prisma/*.db
+prisma/*.sqlite
+
+# Backups
+backups/
+
+# Large packages
+node_modules/

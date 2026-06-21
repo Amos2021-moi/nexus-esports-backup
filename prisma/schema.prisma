@@ -484,3 +484,14 @@ model Report {
   reporter      User?    @relation("ReportReporter", fields: [reporterId], references: [id])
   reportedUser  User     @relation("ReportReportedUser", fields: [reportedUserId], references: [id])
 }
+model ScheduledMaintenance {
+  id            String   @id @default(cuid())
+  scheduledAt   DateTime
+  duration      Int      @default(30) // minutes
+  message       String?  @db.Text
+  isActive      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  triggeredAt   DateTime?
+  completedAt   DateTime?
+}

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Save, Loader2, Settings, Server, Upload, Archive, AlertTriangle, Shield, Globe, UserPlus, Power, Database } from "lucide-react"
+import { Save, Loader2, Settings, Server, Upload, Archive, AlertTriangle, Shield, Globe, UserPlus, Power, Database, Clock } from "lucide-react"
 import toast from "react-hot-toast"
+import ClearDataModal from "@/components/ui/ClearDataModal"
 
 interface SystemSettings {
   registrationOpen: boolean
@@ -28,16 +29,28 @@ export default function AdminSystemSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showClearModal, setShowClearModal] = useState(false)
+
+  // Scheduled maintenance states
+  const [scheduledMaintenance, setScheduledMaintenance] = useState<{
+    scheduledAt: string
+    duration: number
+    message: string
+  } | null>(null)
+  const [scheduleDate, setScheduleDate] = useState("")
+  const [scheduleDuration, setScheduleDuration] = useState(30)
+  const [scheduleMessage, setScheduleMessage] = useState("")
+  const [scheduling, setScheduling] = useState(false)
 
   // Role check - redirect if not admin
   useEffect(() => {
     if (status === "loading") return
-    
+
     if (!session) {
       router.push("/auth/signin")
       return
     }
-    
+
     if (session.user?.role !== "ADMIN") {
       router.push("/dashboard")
       return
@@ -47,6 +60,7 @@ export default function AdminSystemSettingsPage() {
   useEffect(() => {
     if (session?.user?.role === "ADMIN") {
       fetchSettings()
+      fetchScheduledMaintenance()
     }
   }, [session])
 
@@ -70,6 +84,23 @@ export default function AdminSystemSettingsPage() {
     }
   }
 
+  async function fetchScheduledMaintenance() {
+    try {
+      const res = await fetch("/api/admin/maintenance/schedule")
+      if (res.ok) {
+        const data = await res.json()
+        if (data) {
+          setScheduledMaintenance(data)
+          setScheduleDate(new Date(data.scheduledAt).toISOString().slice(0, 16))
+          setScheduleDuration(data.duration)
+          setScheduleMessage(data.message || "")
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching scheduled maintenance:", error)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -88,8 +119,7 @@ export default function AdminSystemSettingsPage() {
       }
 
       toast.success("System settings updated!")
-      
-      // If maintenance mode was toggled, show warning
+
       if (settings.maintenanceMode) {
         toast.error("Maintenance mode is now active. Only admins can access the site.")
       }
@@ -103,6 +133,59 @@ export default function AdminSystemSettingsPage() {
 
   const handleChange = (key: keyof SystemSettings, value: any) => {
     setSettings({ ...settings, [key]: value })
+  }
+
+  async function handleScheduleMaintenance(e: React.FormEvent) {
+    e.preventDefault()
+    if (!scheduleDate) {
+      toast.error("Please select a date and time")
+      return
+    }
+
+    setScheduling(true)
+    try {
+      const res = await fetch("/api/admin/maintenance/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt: scheduleDate,
+          duration: scheduleDuration,
+          message: scheduleMessage
+        })
+      })
+
+      if (res.ok) {
+        toast.success("Maintenance scheduled successfully!")
+        fetchScheduledMaintenance()
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to schedule")
+      }
+    } catch (error) {
+      toast.error("Failed to schedule maintenance")
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  async function handleCancelScheduledMaintenance() {
+    if (!confirm("Cancel the scheduled maintenance?")) return
+
+    try {
+      const res = await fetch("/api/admin/maintenance/schedule", {
+        method: "DELETE"
+      })
+
+      if (res.ok) {
+        toast.success("Maintenance cancelled")
+        setScheduledMaintenance(null)
+        setScheduleDate("")
+        setScheduleDuration(30)
+        setScheduleMessage("")
+      }
+    } catch (error) {
+      toast.error("Failed to cancel")
+    }
   }
 
   if (status === "loading" || loading) {
@@ -131,7 +214,6 @@ export default function AdminSystemSettingsPage() {
           </div>
           <p className="text-gray-400 text-sm">Control platform-wide system behavior</p>
         </div>
-
         {/* Registration */}
         <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">
           <div>
@@ -174,6 +256,99 @@ export default function AdminSystemSettingsPage() {
               settings.maintenanceMode ? "translate-x-6" : "translate-x-1"
             }`} />
           </button>
+        </div>
+
+        {/* Scheduled Maintenance */}
+        <div className="border-t border-gray-800 pt-6 mt-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-yellow-400" />
+            Scheduled Maintenance
+          </h3>
+          
+          {scheduledMaintenance ? (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white font-medium">
+                    Maintenance scheduled for:
+                    <span className="text-yellow-400 ml-2">
+                      {new Date(scheduledMaintenance.scheduledAt).toLocaleString()}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Duration: {scheduledMaintenance.duration} minutes
+                  </p>
+                  {scheduledMaintenance.message && (
+                    <p className="text-sm text-gray-400 mt-1">
+                      Message: {scheduledMaintenance.message}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    ⚠️ Maintenance will automatically start at the scheduled time
+                  </p>
+                </div>
+                <button
+                  onClick={handleCancelScheduledMaintenance}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            // ✅ FIXED: Changed from <form> to <div> to avoid nested form
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Duration (minutes)
+                  </label>
+                  <select
+                    value={scheduleDuration}
+                    onChange={(e) => setScheduleDuration(parseInt(e.target.value))}
+                    className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none transition-all"
+                  >
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={45}>45 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={120}>2 hours</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Message (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={scheduleMessage}
+                  onChange={(e) => setScheduleMessage(e.target.value)}
+                  placeholder="e.g., We're upgrading the database..."
+                  className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none transition-all"
+                />
+              </div>
+              <button
+                onClick={handleScheduleMaintenance}
+                disabled={scheduling}
+                className="px-6 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
+              >
+                {scheduling ? "Scheduling..." : "Schedule Maintenance"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Uploads Enabled */}
@@ -272,6 +447,32 @@ export default function AdminSystemSettingsPage() {
           </div>
         )}
 
+        {/* Danger Zone - Clear All Data */}
+        <div className="border-t border-red-500/20 pt-6 mt-6">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <h3 className="text-lg font-semibold text-red-400">Danger Zone</h3>
+          </div>
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-white font-medium">Clear All Data</p>
+                <p className="text-sm text-gray-400">
+                  Permanently delete all platform data. This action cannot be undone.
+                  <br />
+                  <span className="text-xs text-gray-500">A backup will be created before deletion.</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowClearModal(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all whitespace-nowrap"
+              >
+                Clear All Data
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Save Button */}
         <div className="flex gap-4 pt-4 border-t border-gray-800">
           <button
@@ -293,6 +494,15 @@ export default function AdminSystemSettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* Clear Data Modal */}
+      <ClearDataModal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onSuccess={() => {
+          toast.success("Data cleared successfully!")
+        }}
+      />
     </div>
   )
 }
