@@ -12,7 +12,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     
-    // ✅ Credentials Provider (your existing one)
+    // ✅ Credentials Provider
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -38,6 +38,20 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // ✅ Check if this email should be admin
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',')?.map(e => e.trim()) || []
+        const isAdmin = adminEmails.includes(user.email.toLowerCase())
+
+        // ✅ Update role if needed
+        if (isAdmin && user.role !== "ADMIN") {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: "ADMIN" }
+          })
+          user.role = "ADMIN"
+          console.log(`👑 User promoted to admin on login: ${user.email}`)
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -56,13 +70,17 @@ export const authOptions: NextAuthOptions = {
           where: { email: user.email! }
         })
 
+        // ✅ Check if this email should be admin
+        const adminEmails = process.env.ADMIN_EMAILS?.split(',')?.map(e => e.trim()) || []
+        const isAdmin = adminEmails.includes(user.email!.toLowerCase())
+
         if (!existingUser) {
           // Create new user with Google data
           const newUser = await prisma.user.create({
             data: {
               email: user.email!,
               name: user.name || "Google User",
-              role: "PLAYER",
+              role: isAdmin ? "ADMIN" : "PLAYER",
               emailVerified: true,
               emailNotificationsEnabled: true,
             }
@@ -77,11 +95,26 @@ export const authOptions: NextAuthOptions = {
           })
 
           user.id = newUser.id
-          user.role = "PLAYER"
+          user.role = newUser.role
+
+          if (isAdmin) {
+            console.log(`👑 Admin account created via Google: ${user.email}`)
+          }
         } else {
+          // ✅ Update role if this user should be admin
+          if (isAdmin && existingUser.role !== "ADMIN") {
+            await prisma.user.update({
+              where: { id: existingUser.id },
+              data: { role: "ADMIN" }
+            })
+            existingUser.role = "ADMIN"
+            console.log(`👑 User promoted to admin via Google: ${user.email}`)
+          }
+
           user.id = existingUser.id
           user.role = existingUser.role
           
+          // Update name if changed
           if (user.name && user.name !== existingUser.name) {
             await prisma.user.update({
               where: { id: existingUser.id },

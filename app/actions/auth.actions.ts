@@ -32,25 +32,35 @@ export async function registerUser(formData: FormData) {
     throw new Error("Username already taken")
   }
 
+  // ✅ Check if this email is an admin email
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',')?.map(e => e.trim()) || []
+  const isAdmin = adminEmails.includes(email.toLowerCase())
+
   // Hash password
   const hashedPassword = await bcrypt.hash(password, 10)
 
-  // Create user (without transaction)
+  // Create user
   const newUser = await prisma.user.create({
     data: {
       email,
       password: hashedPassword,
       name,
+      role: isAdmin ? "ADMIN" : "PLAYER", // ✅ Auto-assign admin role
     }
   })
 
-  // Create profile separately
+  // Create profile
   await prisma.profile.create({
     data: {
       userId: newUser.id,
       username,
     }
   })
+
+  // ✅ If this is an admin, log it
+  if (isAdmin) {
+    console.log(`👑 Admin account created: ${email}`)
+  }
 
   redirect("/auth/signin?registered=true")
 }
