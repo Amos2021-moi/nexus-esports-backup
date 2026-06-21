@@ -17,41 +17,44 @@ export async function POST(request: Request) {
 
     const { type = "MANUAL" } = await request.json()
 
+    // ✅ Create backup record
     const backup = await prisma.backup.create({
       data: {
         name: `backup_${new Date().toISOString().replace(/[:.]/g, '_')}`,
         type,
-        status: "PENDING",
+        status: "PROCESSING", // ✅ Start as PROCESSING immediately
         createdBy: session.user.id,
         version: "1.0",
         size: 0,
       }
     })
 
-    // ✅ Run backup in background
-    setTimeout(async () => {
-      try {
-        const { backupWorker } = await import('@/lib/services/backup.worker')
-        await backupWorker.performBackup(backup.id, session.user.id)
-      } catch (error) {
-        console.error('Background backup failed:', error)
-        await prisma.backup.update({
-          where: { id: backup.id },
-          data: { status: "FAILED" }
-        })
-      }
-    }, 100)
-
-    return NextResponse.json({
-      success: true,
-      message: "Backup queued successfully",
-      backupId: backup.id,
-      status: "PENDING"
-    })
+    // ✅ Run backup synchronously (not in background)
+    try {
+      const { backupWorker } = await import('@/lib/services/backup.worker')
+      await backupWorker.performBackup(backup.id, session.user.id)
+      
+      return NextResponse.json({
+        success: true,
+        message: "Backup completed successfully",
+        backupId: backup.id,
+        status: "COMPLETED"
+      })
+    } catch (error) {
+      console.error('Backup failed:', error)
+      await prisma.backup.update({
+        where: { id: backup.id },
+        data: { status: "FAILED" }
+      })
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Backup failed" },
+        { status: 500 }
+      )
+    }
   } catch (error) {
-    console.error("Error queuing backup:", error)
+    console.error("Error creating backup:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to queue backup" },
+      { error: error instanceof Error ? error.message : "Failed to create backup" },
       { status: 500 }
     )
   }

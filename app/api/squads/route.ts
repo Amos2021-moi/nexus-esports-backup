@@ -3,17 +3,54 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+// ✅ Helper: Get moderation settings
+async function getModerationSettings() {
+  const settings = await prisma.setting.findMany({
+    where: {
+      category: "moderation"
+    }
+  })
+
+  const result: Record<string, any> = {
+    postApproval: false,
+    commentFiltering: true,
+    squadApproval: false,
+    playerReports: true,
+    autoBanThreshold: 5,
+    requireVerification: false,
+    allowGuestReporting: true
+  }
+
+  settings.forEach(s => {
+    if (s.key in result) {
+      result[s.key] = JSON.parse(s.value)
+    }
+  })
+
+  return result
+}
+
 // ✅ GET handler
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // ✅ Get moderation settings
+    const moderation = await getModerationSettings()
+
+    // ✅ If squad approval is enabled, only show approved squads
+    const whereClause: any = { userId: session.user.id }
+    
+    if (moderation.squadApproval) {
+      whereClause.status = "APPROVED"
+    }
+
     const squads = await prisma.squad.findMany({
-      where: { userId: session.user.id },
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     })
 
@@ -28,17 +65,20 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
     }
 
-    // ✅ Check if user exists, if not create profile
+    // ✅ Get moderation settings
+    const moderation = await getModerationSettings()
+
+    // Check if user exists, if not create profile
     let user = await prisma.user.findUnique({
       where: { id: session.user.id }
     })
 
-    // ✅ If user doesn't exist, create them
+    // If user doesn't exist, create them
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -48,7 +88,7 @@ export async function POST(request: Request) {
           role: "PLAYER",
         }
       })
-      
+
       // Also create profile
       await prisma.profile.create({
         data: {
@@ -72,6 +112,9 @@ export async function POST(request: Request) {
     if (strength < 1000) strength = 1000
     if (strength > 4000) strength = 4000
 
+    // ✅ Determine squad status based on squad approval setting
+    const status = moderation.squadApproval ? "PENDING" : "APPROVED"
+
     const squad = await prisma.squad.create({
       data: {
         userId: user.id,
@@ -82,13 +125,34 @@ export async function POST(request: Request) {
         playstyle: playstyle || "",
         description: description || "",
         isActive: false,
+        status: status,
       },
     })
+
+    // ✅ If squad is pending approval, notify admins
+    if (status === "PENDING") {
+      const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true }
+      })
+
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map(admin => ({
+            userId: admin.id,
+            title: "🛡️ New Squad Pending Approval",
+            message: `A new squad by ${session.user.name || "a player"} needs your review.`,
+            type: "MODERATION",
+            link: `/admin/squads`
+          }))
+        })
+      }
+    }
 
     return NextResponse.json(squad, { status: 201 })
   } catch (error: unknown) {
     console.error("Error creating squad:", error)
-    
+
     const errorMessage = error instanceof Error ? error.message : "Failed to create squad"
     return NextResponse.json(
       { error: errorMessage },
@@ -101,7 +165,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

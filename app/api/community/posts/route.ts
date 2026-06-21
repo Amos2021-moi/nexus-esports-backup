@@ -3,6 +3,33 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+// ✅ Helper: Get moderation settings
+async function getModerationSettings() {
+  const settings = await prisma.setting.findMany({
+    where: {
+      category: "moderation"
+    }
+  })
+
+  const result: Record<string, any> = {
+    postApproval: false,
+    commentFiltering: true,
+    squadApproval: false,
+    playerReports: true,
+    autoBanThreshold: 5,
+    requireVerification: false,
+    allowGuestReporting: true
+  }
+
+  settings.forEach(s => {
+    if (s.key in result) {
+      result[s.key] = JSON.parse(s.value)
+    }
+  })
+
+  return result
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -10,7 +37,19 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // ✅ Get moderation settings
+    const moderation = await getModerationSettings()
+
+    // ✅ Build where clause
+    const whereClause: any = {}
+    
+    // ✅ If post approval is enabled, only show approved posts
+    if (moderation.postApproval) {
+      whereClause.status = "APPROVED"
+    }
+
     const posts = await prisma.post.findMany({
+      where: whereClause,
       include: {
         user: {
           include: { profile: true }
@@ -45,18 +84,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // ✅ Get moderation settings
+    const moderation = await getModerationSettings()
+
+    // ✅ Check if user is verified (if required)
+    if (moderation.requireVerification) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { emailVerified: true }
+      })
+
+      if (!user?.emailVerified) {
+        return NextResponse.json({ 
+          error: "Email verification required to post. Please verify your email first." 
+        }, { status: 403 })
+      }
+    }
+
     const { content, image, type } = await request.json()
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
+    // ✅ Determine post status based on post approval setting
+    const status = moderation.postApproval ? "PENDING" : "APPROVED"
+
     const post = await prisma.post.create({
       data: {
         userId: session.user.id,
         content: content.trim(),
         image: image || null,
-        type: type || "GENERAL"
+        type: type || "GENERAL",
+        status: status
       },
       include: {
         user: {
@@ -65,6 +125,28 @@ export async function POST(request: Request) {
       }
     })
 
+    // ✅ If post is pending approval, notify admins
+    if (status === "PENDING") {
+      // Find admin users
+      const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true }
+      })
+
+      // Create notifications for admins
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map(admin => ({
+            userId: admin.id,
+            title: "📝 New Post Pending Approval",
+            message: `A new post by ${session.user.name || "a player"} needs your review.`,
+            type: "MODERATION",
+            link: `/admin/community`
+          }))
+        })
+      }
+    }
+
     return NextResponse.json(post)
   } catch (error) {
     console.error("Error:", error)
@@ -72,7 +154,7 @@ export async function POST(request: Request) {
   }
 }
 
-// ✅ DELETE method - Phase 1
+// ✅ DELETE method
 export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions)

@@ -11,11 +11,15 @@ export async function POST(
     const { fixtureId } = await params
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { proposedTime, message } = await request.json()
+
+    if (!proposedTime) {
+      return NextResponse.json({ error: "Proposed time is required" }, { status: 400 })
+    }
 
     const fixture = await prisma.fixture.findUnique({
       where: { id: fixtureId },
@@ -29,45 +33,68 @@ export async function POST(
       return NextResponse.json({ error: "Fixture not found" }, { status: 404 })
     }
 
-    const isHome = fixture.homePlayerId === session.user.id
-    const opponent = isHome ? fixture.awayPlayer : fixture.homePlayer
-    const opponentWhatsApp = opponent.profile?.whatsappNumber
-    const opponentWhatsAppVisible = opponent.profile?.whatsappVisible
+    // Check if user is part of this fixture
+    const isHomePlayer = fixture.homePlayerId === session.user.id
+    const isAwayPlayer = fixture.awayPlayerId === session.user.id
 
-    if (!opponentWhatsApp || !opponentWhatsAppVisible) {
-      return NextResponse.json({ error: "Opponent hasn't set WhatsApp" }, { status: 400 })
+    if (!isHomePlayer && !isAwayPlayer) {
+      return NextResponse.json(
+        { error: "You are not part of this fixture" },
+        { status: 403 }
+      )
     }
 
-    // Clean WhatsApp number
-    let cleanNumber = opponentWhatsApp.replace(/\s/g, "")
-    if (!cleanNumber.startsWith("+")) {
-      cleanNumber = "+" + cleanNumber
-    }
-
-    const homeName = fixture.homePlayer.profile?.username || fixture.homePlayer.name
-    const awayName = fixture.awayPlayer.profile?.username || fixture.awayPlayer.name
+    // Determine opponent
+    const opponentId = isHomePlayer ? fixture.awayPlayerId : fixture.homePlayerId
     const proposerName = session.user.name || "Player"
 
-    const whatsappMessage = `🎮 *Match Time Suggestion* 🎮
+    // ✅ Update fixture with proposed date (using existing scheduledDate field)
+    await prisma.fixture.update({
+      where: { id: fixtureId },
+      data: {
+        scheduledDate: new Date(proposedTime),
+      }
+    })
 
-${proposerName} proposed a time for your match:
+    // Get opponent's WhatsApp number
+    const opponent = await prisma.user.findUnique({
+      where: { id: opponentId },
+      include: { profile: true }
+    })
 
-🏆 *Match:* ${homeName} vs ${awayName}
-📅 *Proposed Date:* ${new Date(proposedTime).toLocaleDateString()}
-🕐 *Proposed Time:* ${new Date(proposedTime).toLocaleTimeString()}
+    const whatsappNumber = opponent?.profile?.whatsappNumber
+    const whatsappVisible = opponent?.profile?.whatsappVisible
 
-💬 *Message:* ${message || "Let me know if this works for you!"}
+    // Create notification for opponent
+    await prisma.notification.create({
+      data: {
+        userId: opponentId,
+        title: "📅 Match Time Proposed",
+        message: `${proposerName} proposed a match time for your fixture. Please check and respond.`,
+        type: "NEW_FIXTURE",
+        link: `/dashboard/fixtures`
+      }
+    })
 
-Reply to confirm or suggest another time.
+    // Generate WhatsApp URL if number is visible
+    let whatsappUrl = null
+    if (whatsappVisible && whatsappNumber) {
+      const cleanNumber = whatsappNumber.replace(/\D/g, '')
+      const date = new Date(proposedTime).toLocaleString()
+      const whatsappMessage = `Hi, I proposed ${date} for our match. Please check the app to confirm. ${message ? '\n\n' + message : ''}`
+      whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(whatsappMessage)}`
+    }
 
-After playing, remember to submit the result on the Nexus Esports platform!`
-
-  const encodedMessage = encodeURIComponent(whatsappMessage)
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodedMessage}`
-
-  return NextResponse.json({ whatsappUrl })
+    return NextResponse.json({
+      success: true,
+      message: "Match time proposed successfully",
+      whatsappUrl
+    })
   } catch (error) {
-    console.error("Error suggesting time:", error)
-    return NextResponse.json({ error: "Failed to suggest time" }, { status: 500 })
+    console.error("Error proposing match time:", error)
+    return NextResponse.json(
+      { error: "Failed to propose match time" },
+      { status: 500 }
+    )
   }
 }

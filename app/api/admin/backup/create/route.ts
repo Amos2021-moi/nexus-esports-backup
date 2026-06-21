@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { put } from "@vercel/blob"
+import { backupWorker } from "@/lib/services/backup.worker"
 
 export async function POST(request: Request) {
   try {
@@ -16,10 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { type = "MANUAL" } = body
+    const { type = "MANUAL" } = await request.json()
 
-    // Create backup record
+    // ✅ Create and run backup immediately
+    const { prisma } = await import('@/lib/prisma')
+    
     const backup = await prisma.backup.create({
       data: {
         name: `backup_${new Date().toISOString().replace(/[:.]/g, '_')}`,
@@ -31,33 +31,12 @@ export async function POST(request: Request) {
       }
     })
 
-    // Generate backup data
-    const backupData = {
-      id: backup.id,
-      createdAt: backup.createdAt,
-      type: backup.type,
-      // Include minimal data
-    }
-
-    // Store in Vercel Blob (not in the function)
-    const blob = await put(`backups/${backup.id}.json`, JSON.stringify(backupData), {
-      access: 'private',
-      addRandomSuffix: false,
-    })
-
-    // Update backup with blob URL
-    await prisma.backup.update({
-      where: { id: backup.id },
-      data: {
-        status: "COMPLETED",
-        size: Buffer.from(JSON.stringify(backupData)).length,
-        filePath: blob.url,
-      }
-    })
+    // ✅ Run backup synchronously
+    await backupWorker.performBackup(backup.id, session.user.id)
 
     return NextResponse.json({
       success: true,
-      message: "Backup created successfully",
+      message: "Backup completed successfully",
       backup
     })
   } catch (error) {

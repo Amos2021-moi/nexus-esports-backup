@@ -25,35 +25,57 @@ export async function GET(
     }
 
     let fileBuffer: Buffer
+    const fileName = `${backup.name}.zip`
 
-    // Check if it's a Vercel Blob URL or local path
-    if (backup.filePath.startsWith('http')) {
-      // Download from Vercel Blob
-      const response = await fetch(backup.filePath)
-      const arrayBuffer = await response.arrayBuffer()
-      fileBuffer = Buffer.from(arrayBuffer)
+    // ✅ Check if it's a Vercel Blob URL or local path
+    if (backup.filePath.startsWith('http://') || backup.filePath.startsWith('https://')) {
+      // ✅ Download from Vercel Blob
+      try {
+        const headers: Record<string, string> = {}
+        if (process.env.BLOB_READ_WRITE_TOKEN) {
+          headers['Authorization'] = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+        }
+
+        const response = await fetch(backup.filePath, { headers })
+        if (!response.ok) {
+          throw new Error(`Failed to fetch blob: ${response.status}`)
+        }
+        const arrayBuffer = await response.arrayBuffer()
+        fileBuffer = Buffer.from(arrayBuffer)
+        console.log(`✅ Downloaded from Blob: ${fileBuffer.length} bytes`)
+      } catch (error) {
+        console.error('❌ Error downloading from Blob:', error)
+        return NextResponse.json(
+          { error: "Failed to download backup file" },
+          { status: 500 }
+        )
+      }
     } else {
-      // Read from local file system
+      // ✅ Read from local file system
       try {
         await fs.access(backup.filePath)
         fileBuffer = await fs.readFile(backup.filePath)
-      } catch {
+        console.log(`✅ Read from local file: ${fileBuffer.length} bytes`)
+      } catch (error) {
+        console.error('❌ Error reading local file:', error)
         return NextResponse.json({ error: "Backup file not found" }, { status: 404 })
       }
     }
 
-    const fileName = `${backup.name}.zip`
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return NextResponse.json({ error: "Backup file is empty" }, { status: 500 })
+    }
 
-    // ✅ Convert Buffer to Uint8Array for NextResponse
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': fileBuffer.length.toString()
+        'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     })
   } catch (error) {
-    console.error("Error downloading backup:", error)
+    console.error("❌ Error downloading backup:", error)
     return NextResponse.json(
       { error: "Failed to download backup" },
       { status: 500 }

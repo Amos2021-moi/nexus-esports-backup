@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { Calendar, CheckCircle, Clock, Trophy, AlertCircle, Lock, Eye, MessageCircle, Send, Calendar as CalendarIcon, ArrowRight } from "lucide-react"
+import { Calendar, CheckCircle, Clock, Trophy, AlertCircle, Lock, Eye, MessageCircle, Send, Calendar as CalendarIcon, ArrowRight, Download, FileText } from "lucide-react"
 import WhatsAppButton from "@/components/ui/WhatsAppButton"
 import EvidenceViewer from "@/components/ui/EvidenceViewer"
 import TrustBadge from "@/components/ui/TrustBadge"
 import toast from "react-hot-toast"
+import { Skeleton, SkeletonMatchCard } from "@/components/ui/Skeleton"
 
 interface Fixture {
   id: string
@@ -160,9 +161,11 @@ export default function FixturesPage() {
   const [fixtures, setFixtures] = useState<Fixture[]>([])
   const [loading, setLoading] = useState(true)
   const [showTimeModal, setShowTimeModal] = useState<string | null>(null)
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false)
 
   useEffect(() => {
     fetchFixtures()
+    fetchCalendarSyncPreference()
   }, [])
 
   async function fetchFixtures() {
@@ -179,30 +182,58 @@ export default function FixturesPage() {
     }
   }
 
+  // ✅ Fetch calendar sync preference
+  async function fetchCalendarSyncPreference() {
+    try {
+      const res = await fetch("/api/settings?category=competition&key=fixtureCalendarSync")
+      if (res.ok) {
+        const data = await res.json()
+        setCalendarSyncEnabled(data.fixtureCalendarSync || false)
+      }
+    } catch (error) {
+      console.error("Error fetching calendar sync preference:", error)
+    }
+  }
+
+  // ✅ Download calendar file for a fixture
+  async function downloadCalendar(fixtureId: string) {
+    try {
+      toast.loading("Generating calendar file...")
+      const res = await fetch(`/api/fixtures/${fixtureId}/calendar`)
+      const data = await res.json()
+      toast.dismiss()
+
+      if (data.ics) {
+        const blob = new Blob([data.ics], { type: 'text/calendar' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `match-${fixtureId}.ics`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        toast.success("Calendar file downloaded! Add it to your calendar app.")
+      } else {
+        toast.error("Failed to generate calendar file")
+      }
+    } catch (error) {
+      toast.dismiss()
+      console.error("Error downloading calendar:", error)
+      toast.error("Failed to download calendar")
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">My Fixtures</h1>
-          <p className="text-gray-400 mt-1">Loading your matches...</p>
+          <Skeleton variant="text" className="w-48 h-8" />
+          <Skeleton variant="text" className="w-64 h-4 mt-1" />
         </div>
         <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-gray-800 rounded-xl border border-gray-700 p-6 animate-pulse">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex-1 text-center">
-                  <div className="h-12 w-12 bg-gray-700 rounded-full mx-auto mb-2"></div>
-                  <div className="h-5 w-24 bg-gray-700 rounded mx-auto"></div>
-                </div>
-                <div className="px-4">
-                  <div className="h-8 w-16 bg-gray-700 rounded"></div>
-                </div>
-                <div className="flex-1 text-center">
-                  <div className="h-12 w-12 bg-gray-700 rounded-full mx-auto mb-2"></div>
-                  <div className="h-5 w-24 bg-gray-700 rounded mx-auto"></div>
-                </div>
-              </div>
-            </div>
+          {[...Array(3)].map((_, i) => (
+            <SkeletonMatchCard key={i} />
           ))}
         </div>
       </div>
@@ -411,6 +442,27 @@ export default function FixturesPage() {
                 </div>
               )}
               
+              {/* ✅ Calendar Sync - Download Button */}
+              {fixture.status === "SCHEDULED" && calendarSyncEnabled && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    onClick={() => downloadCalendar(fixture.id)}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-all border border-blue-500/20"
+                  >
+                    <Download size={14} />
+                    <FileText size={14} />
+                    Add to Calendar (.ics)
+                  </button>
+                </div>
+              )}
+
+              {/* Calendar Sync Banner - Show if enabled */}
+              {calendarSyncEnabled && fixture.status === "SCHEDULED" && (
+                <div className="mt-2 text-center">
+                  <span className="text-xs text-gray-500">📅 Calendar sync enabled</span>
+                </div>
+              )}
+
               {/* WhatsApp Button */}
               {seasonDisplay.canWhatsApp && fixture.status === "SCHEDULED" && !hasResult && (
                 <div className="mt-4 pt-4 border-t border-gray-700 space-y-3">

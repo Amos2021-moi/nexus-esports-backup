@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import LeagueTable from "@/components/league/LeagueTable"
 import Link from "next/link"
-import { Trophy, Calendar, TrendingUp, Archive } from "lucide-react"
+import { Trophy, Calendar, TrendingUp, Archive, EyeOff } from "lucide-react"
+import { SkeletonLeagueTable, Skeleton } from "@/components/ui/Skeleton"
 
 interface Season {
   id: string
@@ -16,6 +17,7 @@ export default function StandingsPage() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [selectedSeason, setSelectedSeason] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [privacySettings, setPrivacySettings] = useState<{ showStats: boolean }>({ showStats: true })
 
   useEffect(() => {
     async function fetchSeasons() {
@@ -39,12 +41,31 @@ export default function StandingsPage() {
     }
 
     fetchSeasons()
+    fetchPrivacySettings()
   }, [])
+
+  async function fetchPrivacySettings() {
+    try {
+      const res = await fetch("/api/settings?category=privacy")
+      if (res.ok) {
+        const data = await res.json()
+        setPrivacySettings({
+          showStats: data.showStats !== undefined ? data.showStats : true
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching privacy settings:", error)
+    }
+  }
 
   if (loading) {
     return (
-      <div className="flex justify-center py-8">
-        <div className="text-gray-400">Loading standings...</div>
+      <div className="space-y-6">
+        <div>
+          <Skeleton variant="text" className="w-48 h-8" />
+          <Skeleton variant="text" className="w-64 h-4 mt-1" />
+        </div>
+        <SkeletonLeagueTable />
       </div>
     )
   }
@@ -59,6 +80,22 @@ export default function StandingsPage() {
         </h1>
         <p className="text-gray-400 mt-1">Premier League style rankings</p>
       </div>
+
+      {/* ✅ Privacy Warning - Show if stats are hidden */}
+      {!privacySettings.showStats && (
+        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
+          <div className="flex items-start gap-3">
+            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+            <div>
+              <h3 className="text-yellow-400 font-semibold">Your Stats are Hidden</h3>
+              <p className="text-gray-300 text-sm">
+                Your player statistics are currently private. You can change this in your 
+                <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline ml-1">Privacy Settings</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Season Selector */}
       {seasons.length > 0 && (
@@ -86,11 +123,27 @@ export default function StandingsPage() {
         </div>
       )}
 
-      {/* League Table */}
+      {/* League Table - ✅ Show or hide based on privacy */}
       {selectedSeason ? (
-        <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700">
-          <LeagueTable seasonId={selectedSeason} />
-        </div>
+        privacySettings.showStats ? (
+          <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700">
+            <LeagueTable seasonId={selectedSeason} />
+          </div>
+        ) : (
+          <div className="bg-gray-800/30 rounded-xl p-12 text-center border border-gray-700">
+            <EyeOff className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Stats are Private</h3>
+            <p className="text-gray-400 max-w-md mx-auto">
+              Your player statistics are currently hidden. You can change this in your privacy settings.
+            </p>
+            <Link
+              href="/dashboard/settings/privacy"
+              className="inline-block mt-4 text-indigo-400 hover:text-indigo-300 transition-all"
+            >
+              Go to Privacy Settings →
+            </Link>
+          </div>
+        )
       ) : (
         <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400 border border-gray-700">
           No seasons available.

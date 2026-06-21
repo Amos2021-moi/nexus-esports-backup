@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { AuthProvider } from "./providers/AuthProvider"
 import { Toaster } from "react-hot-toast"
+import { MaintenanceCheck } from "@/components/MaintenanceCheck"
 
 export const metadata: Metadata = {
   title: "Nexus Esports League",
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          {children}
+          <MaintenanceCheck>
+            {children}
+          </MaintenanceCheck>
           <Toaster position="top-right" />
         </AuthProvider>
       </body>

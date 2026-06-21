@@ -220,3 +220,59 @@ a,
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
+
+/* ✅ Compact Mode */
+.compact-mode {
+  --spacing-base: 0.75rem;
+  --spacing-lg: 1rem;
+  --spacing-xl: 1.5rem;
+}
+
+.compact-mode .space-y-6 > * + * {
+  margin-top: 0.75rem !important;
+}
+
+.compact-mode .p-6 {
+  padding: 1rem !important;
+}
+
+.compact-mode .gap-6 {
+  gap: 1rem !important;
+}
+
+.compact-mode .text-2xl {
+  font-size: 1.25rem !important;
+}
+
+/* ✅ Reduce Motion */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+.reduce-motion .animate-pulse,
+.reduce-motion .animate-spin,
+.reduce-motion .animate-bounce {
+  animation: none !important;
+}
+
+/* ✅ Sidebar Style: Icon Only */
+[data-sidebar-style="icon"] .sidebar-text {
+  display: none !important;
+}
+
+[data-sidebar-style="icon"] .sidebar-icon {
+  margin-right: 0 !important;
+}
+
+/* ✅ Sidebar Style: Compact */
+[data-sidebar-style="compact"] .sidebar-text {
+  font-size: 0.875rem !important;
+}
+
+[data-sidebar-style="compact"] .sidebar-padding {
+  padding: 0.5rem !important;
+}

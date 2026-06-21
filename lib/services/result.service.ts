@@ -242,9 +242,27 @@ export async function approveMatch({ resultId, adminId }: ApproveResultParams) {
       data: { approved: true }
     })
 
-    const homePoints = result.homeScore > result.awayScore ? 3 : result.homeScore === result.awayScore ? 1 : 0
-    const awayPoints = result.awayScore > result.homeScore ? 3 : result.awayScore === result.homeScore ? 1 : 0
+    // ✅ Get league settings for points
+const leagueSettings = await prisma.setting.findMany({
+  where: {
+    category: "league",
+    key: {
+      in: ["pointsWin", "pointsDraw", "pointsLoss"]
+    }
+  }
+})
 
+const settingsMap: Record<string, number> = {}
+leagueSettings.forEach(s => {
+  settingsMap[s.key] = JSON.parse(s.value)
+})
+
+const pointsWin = settingsMap.pointsWin || 3
+const pointsDraw = settingsMap.pointsDraw || 1
+const pointsLoss = settingsMap.pointsLoss || 0
+
+const homePoints = result.homeScore > result.awayScore ? pointsWin : result.homeScore === result.awayScore ? pointsDraw : pointsLoss
+const awayPoints = result.awayScore > result.homeScore ? pointsWin : result.awayScore === result.homeScore ? pointsDraw : pointsLoss
     const homeEntry = await prisma.leagueEntry.findUnique({
       where: {
         seasonId_playerId: {

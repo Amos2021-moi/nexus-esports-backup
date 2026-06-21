@@ -42,6 +42,25 @@ model User {
     // ✅ ADD THESE TWO LINES:
   backups     Backup[]
   restoreLogs RestoreLog[]
+   // ✅ ADD THESE NEW FIELDS:
+  // Email Verification
+  emailVerified             Boolean   @default(false)
+  emailVerifiedAt           DateTime?
+  emailVerificationToken    String?   @unique
+  emailVerificationSentAt   DateTime?
+
+  // Password Reset
+  resetPasswordToken        String?   @unique
+  resetPasswordSentAt       DateTime?
+  resetPasswordExpiresAt    DateTime?
+
+  // Email Preferences
+  emailNotificationsEnabled Boolean   @default(false)
+  notificationPreferences   Json?
+  lastEmailSentAt           DateTime?
+  // ✅ Add these for reports
+  reportsAsReporter    Report[] @relation("ReportReporter")    // Reports this user made
+  reportsAsReported    Report[] @relation("ReportReportedUser") // Reports against this user
 }
 
 model Profile {
@@ -150,6 +169,11 @@ model Fixture {
   homePlayer User     @relation("HomeFixtures", fields: [homePlayerId], references: [id])
   awayPlayer User     @relation("AwayFixtures", fields: [awayPlayerId], references: [id])
   result     Result?
+   // ✅ Add these fields for time suggestions
+  proposedDate     DateTime?
+  proposedBy       String?
+  schedulingStatus String   @default("PENDING") // PENDING, PROPOSED, CONFIRMED, REJECTED
+  schedulingNotes  String?  @db.Text
 }
 
 model Result {
@@ -203,7 +227,7 @@ model Squad {
   description  String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
+ status       String     @default("APPROVED") // ✅ ADD THIS LINE
   user User @relation(fields: [userId], references: [id])
 }
 
@@ -212,6 +236,7 @@ model Post {
   userId    String
   content   String    @db.Text
   image     String?
+   status    String    @default("APPROVED")  // ✅ ADD THIS LINE
   type      PostType  @default(GENERAL)
   likes     Int       @default(0)
   createdAt DateTime  @default(now())
@@ -220,6 +245,7 @@ model Post {
   user     User      @relation(fields: [userId], references: [id])
   comments Comment[]
   likes_rel Like[]
+  reports  Report[]  // ✅ ADD THIS LINE
 }
 
 model Comment {
@@ -443,4 +469,18 @@ model BackupConfig {
   lastRunAt   DateTime?
   nextRunAt   DateTime?
   updatedAt   DateTime @updatedAt
+}
+model Report {
+  id            String   @id @default(cuid())
+  postId        String
+  reporterId    String?
+  reason        String   @db.Text
+  status        String   @default("PENDING") // PENDING, RESOLVED, DISMISSED
+  reportedUserId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  post          Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter      User?    @relation("ReportReporter", fields: [reporterId], references: [id])
+  reportedUser  User     @relation("ReportReportedUser", fields: [reportedUserId], references: [id])
 }
