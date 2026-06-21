@@ -155,27 +155,46 @@ export default function CompetitionSettingsPage() {
           </button>
         </div>
 
-        {/* Match Reminder Time */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            <span className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Match Reminder Time
-            </span>
-          </label>
-          <select
-            value={settings.matchReminderTime}
-            onChange={(e) => handleChange("matchReminderTime", e.target.value)}
-            className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
-          >
-            <option value="15m">15 minutes before</option>
-            <option value="30m">30 minutes before</option>
-            <option value="1h">1 hour before</option>
-            <option value="2h">2 hours before</option>
-            <option value="24h">24 hours before</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-2">When to send match reminders</p>
-        </div>
+        {/* Match Reminder Time - Updated description */}
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-2">
+    <span className="flex items-center gap-2">
+      <Clock className="h-4 w-4" />
+      Match Reminder Time
+    </span>
+  </label>
+  <select
+    value={settings.matchReminderTime}
+    onChange={(e) => handleChange("matchReminderTime", e.target.value)}
+    className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+  >
+    <option value="15m">15 minutes before</option>
+    <option value="30m">30 minutes before</option>
+    <option value="1h">1 hour before</option>
+    <option value="2h">2 hours before</option>
+    <option value="24h">24 hours before</option>
+  </select>
+  <p className="text-xs text-gray-500 mt-2">When to send match reminder emails</p>
+</div>
+
+{/* Fixture Calendar Sync - Updated description */}
+<div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">
+  <div>
+    <p className="text-white font-medium">Calendar Sync</p>
+    <p className="text-xs text-gray-400">Generate .ics calendar files when fixtures are created</p>
+  </div>
+  <button
+    type="button"
+    onClick={() => handleChange("fixtureCalendarSync", !settings.fixtureCalendarSync)}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${
+      settings.fixtureCalendarSync ? "bg-indigo-600" : "bg-gray-700"
+    }`}
+  >
+    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all ${
+      settings.fixtureCalendarSync ? "translate-x-6" : "translate-x-1"
+    }`} />
+  </button>
+</div>
 
         {/* Fixture Calendar Sync */}
         <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">

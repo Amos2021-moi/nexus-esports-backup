@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Shield, Plus, Trash2, Calendar, Trophy, X, Eye } from "lucide-react"
+import { Shield, Plus, Trash2, Calendar, Trophy, X, Eye, EyeOff, Lock } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Squad {
@@ -15,6 +15,7 @@ interface Squad {
   description: string
   isActive: boolean
   createdAt: string
+  userId: string
 }
 
 const squadTypes = [
@@ -42,6 +43,8 @@ export default function SquadsPage() {
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [privacySettings, setPrivacySettings] = useState<{ showSquad: boolean }>({ showSquad: true })
+  const [isOwnProfile, setIsOwnProfile] = useState(true)
   const [formData, setFormData] = useState({
     type: "MAIN",
     screenshot: "",
@@ -53,13 +56,33 @@ export default function SquadsPage() {
 
   useEffect(() => {
     fetchSquads()
+    fetchPrivacySettings()
   }, [])
 
   async function fetchSquads() {
-    const res = await fetch("/api/squads")
-    const data = await res.json()
-    setSquads(Array.isArray(data) ? data : [])
-    setLoading(false)
+    try {
+      const res = await fetch("/api/squads")
+      const data = await res.json()
+      setSquads(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error fetching squads:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function fetchPrivacySettings() {
+    try {
+      const res = await fetch("/api/settings?category=privacy")
+      if (res.ok) {
+        const data = await res.json()
+        setPrivacySettings({
+          showSquad: data.showSquad !== undefined ? data.showSquad : true
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching privacy settings:", error)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -74,86 +97,94 @@ export default function SquadsPage() {
     }
 
     setSubmitting(true)
-    const res = await fetch("/api/squads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    })
+    try {
+      const res = await fetch("/api/squads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
 
-    if (res.ok) {
-      toast.success("Squad uploaded successfully!")
-      setShowForm(false)
-      setFormData({ type: "MAIN", screenshot: "", formation: "", teamStrength: "", playstyle: "", description: "" })
-      fetchSquads()
-    } else {
-      const error = await res.json()
-      toast.error(error.error || "Failed to upload squad")
+      if (res.ok) {
+        toast.success("Squad uploaded successfully!")
+        setShowForm(false)
+        setFormData({ type: "MAIN", screenshot: "", formation: "", teamStrength: "", playstyle: "", description: "" })
+        fetchSquads()
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to upload squad")
+      }
+    } catch (error) {
+      toast.error("Failed to upload squad")
     }
     setSubmitting(false)
   }
 
   async function handleDelete(id: string) {
     if (confirm("Are you sure you want to remove this squad?")) {
-      const res = await fetch(`/api/squads?id=${id}`, { method: "DELETE" })
-      if (res.ok) {
-        toast.success("Squad removed")
-        fetchSquads()
-      } else {
+      try {
+        const res = await fetch(`/api/squads?id=${id}`, { method: "DELETE" })
+        if (res.ok) {
+          toast.success("Squad removed")
+          fetchSquads()
+        } else {
+          toast.error("Failed to remove")
+        }
+      } catch (error) {
         toast.error("Failed to remove")
       }
     }
   }
 
-  // ✅ FULLY FIXED - No TypeScript errors
- const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0]
-  if (!file) return
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
 
-  if (file.size > 5 * 1024 * 1024) {
-    toast.error("Image must be less than 5MB")
-    return
-  }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB")
+      return
+    }
 
-  const reader = new FileReader()
-  reader.onload = (event) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const MAX_WIDTH = 800
-      const MAX_HEIGHT = 800
-      let width = img.width
-      let height = img.height
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_WIDTH = 800
+        const MAX_HEIGHT = 800
+        let width = img.width
+        let height = img.height
 
-      if (width > height) {
-        if (width > MAX_WIDTH) {
-          height = height * (MAX_WIDTH / width)
-          width = MAX_WIDTH
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = height * (MAX_WIDTH / width)
+            width = MAX_WIDTH
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = width * (MAX_HEIGHT / height)
+            height = MAX_HEIGHT
+          }
         }
-      } else {
-        if (height > MAX_HEIGHT) {
-          width = width * (MAX_HEIGHT / height)
-          height = MAX_HEIGHT
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7)
+          setFormData((prev) => ({ ...prev, screenshot: compressedDataUrl }))
         }
       }
-
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      
-      // ✅ FIX: Check if ctx exists
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height)
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7)
-        setFormData((prev) => ({ ...prev, screenshot: compressedDataUrl }))
+      if (event?.target?.result) {
+        img.src = event.target.result as string
       }
     }
-    // ✅ FIX: Check if event and event.target exist
-    if (event?.target?.result) {
-      img.src = event.target.result as string
-    }
+    reader.readAsDataURL(file)
   }
-  reader.readAsDataURL(file)
-}
+
+  // ✅ Check if squads should be shown based on privacy
+  const canViewSquads = privacySettings.showSquad || isOwnProfile
 
   if (loading) {
     return (
@@ -180,6 +211,22 @@ export default function SquadsPage() {
         </button>
       </div>
 
+      {/* Privacy Warning - ✅ Show if squads are private */}
+      {!privacySettings.showSquad && (
+        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
+          <div className="flex items-start gap-3">
+            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+            <div>
+              <h3 className="text-yellow-400 font-semibold">Squads are Hidden</h3>
+              <p className="text-gray-300 text-sm">
+                Your squads are currently private. Other players cannot see your squads. 
+                You can change this in your <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline">Privacy Settings</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info Box */}
       <div className="bg-blue-500/10 rounded-xl border border-blue-500/20 p-4">
         <div className="flex items-start gap-3">
@@ -194,8 +241,17 @@ export default function SquadsPage() {
         </div>
       </div>
 
-      {/* Squad Grid */}
-      {squads.length === 0 ? (
+      {/* Squad Grid - ✅ Show or hide based on privacy */}
+      {!canViewSquads ? (
+        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
+          <EyeOff className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">Squads are Private</h3>
+          <p className="text-gray-400">This player has chosen to keep their squads private.</p>
+          <a href="/dashboard/settings/privacy" className="inline-block mt-4 text-indigo-400 hover:text-indigo-300">
+            Change Privacy Settings →
+          </a>
+        </div>
+      ) : squads.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
           <Shield className="h-16 w-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">No Squads Uploaded Yet</h3>
@@ -238,12 +294,15 @@ export default function SquadsPage() {
                         <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Active</span>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDelete(squad.id)}
-                      className="text-gray-500 hover:text-red-400 transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* ✅ Only show delete button for own squads */}
+                    {session?.user?.id === squad.userId && (
+                      <button
+                        onClick={() => handleDelete(squad.id)}
+                        className="text-gray-500 hover:text-red-400 transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -362,6 +421,7 @@ export default function SquadsPage() {
                   value={formData.teamStrength}
                   onChange={(e) => {
                     let val = parseInt(e.target.value)
+                    if (isNaN(val)) val = 1000
                     if (val < 1000) val = 1000
                     if (val > 4000) val = 4000
                     setFormData({ ...formData, teamStrength: val.toString() })

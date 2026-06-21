@@ -15,6 +15,24 @@ async function checkAdmin() {
   return session
 }
 
+// ✅ Helper to check if season is frozen
+async function checkSeasonFreeze(seasonId: string) {
+  // Get league settings
+  const freezeSetting = await prisma.setting.findFirst({
+    where: {
+      category: "league",
+      key: "seasonFreeze"
+    }
+  })
+
+  if (freezeSetting) {
+    const isFrozen = JSON.parse(freezeSetting.value)
+    if (isFrozen) {
+      throw new Error("Season is frozen. No changes can be made.")
+    }
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -58,8 +76,11 @@ export async function PUT(
 ) {
   try {
     await checkAdmin()
-
     const { id } = await params
+
+    // ✅ Check if season is frozen
+    await checkSeasonFreeze(id)
+
     const body = await request.json()
     const { name, startDate, endDate, isActive, status } = body
 
@@ -106,7 +127,6 @@ export async function DELETE(
 ) {
   try {
     await checkAdmin()
-
     const { id } = await params
 
     // Check if season exists
@@ -114,6 +134,9 @@ export async function DELETE(
     if (!season) {
       return NextResponse.json({ error: "Season not found" }, { status: 404 })
     }
+
+    // ✅ Check if season is frozen
+    await checkSeasonFreeze(id)
 
     // Delete related data first
     await prisma.fixture.deleteMany({ where: { seasonId: id } })

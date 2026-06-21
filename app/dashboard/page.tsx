@@ -2,9 +2,10 @@
 
 import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
-import { Trophy, Users, Calendar, Award, TrendingUp, Clock, CheckCircle, Target, Shield } from "lucide-react"
+import { Trophy, Users, Calendar, Award, TrendingUp, Clock, CheckCircle, Target, Shield, EyeOff } from "lucide-react"
 import Link from "next/link"
 import TrustBadge from "@/components/ui/TrustBadge"
+import { SkeletonStats, Skeleton } from "@/components/ui/Skeleton"
 
 interface DashboardData {
   matchesPlayed: number
@@ -35,9 +36,11 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showLastSeen, setShowLastSeen] = useState(true)
 
   useEffect(() => {
     fetchDashboardData()
+    fetchPrivacySettings()
   }, [])
 
   async function fetchDashboardData() {
@@ -52,21 +55,60 @@ export default function DashboardPage() {
     }
   }
 
+  async function fetchPrivacySettings() {
+    try {
+      const res = await fetch("/api/settings?category=privacy&key=showLastSeen")
+      if (res.ok) {
+        const data = await res.json()
+        setShowLastSeen(data.showLastSeen !== undefined ? data.showLastSeen : true)
+      }
+    } catch (error) {
+      console.error("Error fetching privacy:", error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="rounded-xl bg-gray-800 p-6 animate-pulse">
-          <div className="h-8 w-48 bg-gray-700 rounded mb-2"></div>
-          <div className="h-4 w-64 bg-gray-700 rounded"></div>
+        {/* Welcome Section Skeleton */}
+        <div className="rounded-2xl bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-pink-600/30 backdrop-blur-sm p-6 border border-white/10">
+          <Skeleton variant="text" className="w-64 h-8" />
+          <Skeleton variant="text" className="w-48 h-4 mt-2" />
+          <Skeleton variant="text" className="w-32 h-5 mt-2" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-gray-800 rounded-xl p-5 animate-pulse">
-              <div className="h-12 w-12 bg-gray-700 rounded-lg mb-3"></div>
-              <div className="h-8 w-16 bg-gray-700 rounded mb-2"></div>
-              <div className="h-4 w-24 bg-gray-700 rounded"></div>
+        
+        {/* Stats Grid Skeleton */}
+        <SkeletonStats />
+        
+        {/* Goal Stats Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <Skeleton variant="avatar" className="h-4 w-4" />
+                <Skeleton variant="text" className="w-20 h-3" />
+              </div>
+              <Skeleton variant="text" className="w-16 h-7" />
             </div>
           ))}
+        </div>
+        
+        {/* Fixture & Result Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton variant="card" className="h-48" />
+          <Skeleton variant="card" className="h-48" />
+        </div>
+        
+        {/* Standings Preview Skeleton */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800/50">
+            <Skeleton variant="text" className="w-40 h-6" />
+            <Skeleton variant="text" className="w-16 h-4" />
+          </div>
+          <div className="p-5 text-center">
+            <Skeleton variant="text" className="w-48 h-6 mx-auto" />
+            <Skeleton variant="text" className="w-32 h-4 mx-auto mt-4" />
+          </div>
         </div>
       </div>
     )
@@ -86,12 +128,37 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Welcome back, {session?.user?.name}! 👋</h1>
           <p className="text-gray-300 mt-1">Ready for your next match? Check your fixtures below.</p>
-          {/* Last Active Trust Badge */}
+          
+          {/* ✅ Last Active Trust Badge - Check privacy setting */}
           <div className="mt-2">
-            <TrustBadge type="last-active" />
+            {showLastSeen ? (
+              <TrustBadge type="last-active" value={(session?.user as any)?.lastActive} userId={session?.user?.id} />
+            ) : (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-500/10 text-gray-500 rounded-full text-xs">
+                <EyeOff size={10} />
+                <span>Last seen hidden</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ✅ Privacy Warning - Show if last seen is hidden */}
+      {!showLastSeen && (
+        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-3">
+          <div className="flex items-start gap-2">
+            <EyeOff className="h-4 w-4 text-yellow-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-yellow-400">
+                Your "last seen" status is currently hidden. 
+                <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline ml-1">
+                  Change privacy settings →
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

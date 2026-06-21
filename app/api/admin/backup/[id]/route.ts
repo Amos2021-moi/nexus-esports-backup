@@ -23,9 +23,7 @@ export async function DELETE(
 
     const backup = await prisma.backup.findUnique({
       where: { id },
-      include: {
-        restoreLogs: true
-      }
+      include: { restoreLogs: true }
     })
 
     if (!backup) {
@@ -37,20 +35,31 @@ export async function DELETE(
       await prisma.restoreLog.deleteMany({
         where: { backupId: id }
       })
-      console.log(`🧹 Deleted ${backup.restoreLogs.length} restore logs for backup ${id}`)
     }
 
-    // Delete file if exists
+    // ✅ Delete file if it exists
     if (backup.filePath) {
       try {
-        await fs.unlink(backup.filePath)
+        // Check if it's a Vercel Blob URL
+        if (backup.filePath.startsWith('http://') || backup.filePath.startsWith('https://')) {
+          // Vercel Blob - delete via fetch
+          const deleteResponse = await fetch(backup.filePath, {
+            method: 'DELETE',
+          })
+          if (!deleteResponse.ok) {
+            console.warn(`Failed to delete blob: ${backup.filePath}`)
+          }
+        } else {
+          // Local file
+          await fs.unlink(backup.filePath)
+        }
         console.log(`🗑️ Deleted backup file: ${backup.filePath}`)
       } catch (error) {
         console.error(`Failed to delete backup file:`, error)
       }
     }
 
-    // ✅ Now delete the backup
+    // ✅ Delete backup record
     await prisma.backup.delete({
       where: { id }
     })

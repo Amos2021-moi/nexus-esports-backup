@@ -22,6 +22,7 @@ export async function GET() {
           keepDaily: 7,
           keepWeekly: 4,
           keepMonthly: 3,
+          nextRunAt: calculateNextRun("02:00")
         }
       })
     }
@@ -59,6 +60,7 @@ export async function PUT(request: Request) {
           keepDaily: keepDaily || config.keepDaily,
           keepWeekly: keepWeekly || config.keepWeekly,
           keepMonthly: keepMonthly || config.keepMonthly,
+          nextRunAt: calculateNextRun(time || config.time),
           updatedAt: new Date()
         }
       })
@@ -70,7 +72,8 @@ export async function PUT(request: Request) {
           time: time || "02:00",
           keepDaily: keepDaily || 7,
           keepWeekly: keepWeekly || 4,
-          keepMonthly: keepMonthly || 3
+          keepMonthly: keepMonthly || 3,
+          nextRunAt: calculateNextRun(time || "02:00")
         }
       })
     }
@@ -87,4 +90,14 @@ export async function PUT(request: Request) {
       { status: 500 }
     )
   }
+}
+
+function calculateNextRun(time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number)
+  const next = new Date()
+  next.setHours(hours, minutes, 0, 0)
+  if (next <= new Date()) {
+    next.setDate(next.getDate() + 1)
+  }
+  return next
 }

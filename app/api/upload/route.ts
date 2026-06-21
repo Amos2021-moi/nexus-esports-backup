@@ -3,6 +3,23 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+// ✅ Helper to check if uploads are enabled
+async function checkUploadsEnabled() {
+  const uploadsSetting = await prisma.setting.findFirst({
+    where: {
+      category: "system",
+      key: "uploadsEnabled"
+    }
+  })
+
+  if (uploadsSetting) {
+    const isEnabled = JSON.parse(uploadsSetting.value)
+    if (!isEnabled) {
+      throw new Error("Uploads are currently disabled by the admin")
+    }
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -11,9 +28,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
     }
 
+    // ✅ Check if uploads are enabled
+    await checkUploadsEnabled()
+
     // Check content type
     const contentType = request.headers.get("content-type") || ""
-    
+
     let imageData: string
     let type: string
 
@@ -22,7 +42,7 @@ export async function POST(request: Request) {
       const formData = await request.formData()
       const file = formData.get("file") as File
       type = formData.get("type") as string || "profile"
-      
+
       if (!file) {
         return NextResponse.json({ error: "No file provided" }, { status: 400 })
       }
@@ -37,7 +57,7 @@ export async function POST(request: Request) {
       const body = await request.json()
       imageData = body.image
       type = body.type || "profile"
-      
+
       if (!imageData) {
         return NextResponse.json({ error: "No image data provided" }, { status: 400 })
       }
@@ -78,10 +98,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: imageData })
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Upload failed"
     console.error("Upload error:", error)
     return NextResponse.json(
-      { error: "Upload failed: " + (error instanceof Error ? error.message : "Unknown error") },
-      { status: 500 }
+      { error: message },
+      { status: error instanceof Error && message.includes("disabled") ? 403 : 500 }
     )
   }
 }

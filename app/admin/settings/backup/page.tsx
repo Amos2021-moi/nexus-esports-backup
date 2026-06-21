@@ -8,8 +8,9 @@ import {
   HardDrive, Database, FileArchive, CheckCircle,
   AlertCircle, RefreshCw, Zap, Settings,
   Trash2, ChevronRight, Plus, X,
-  Bell, BellOff, RotateCw, Cloud
+  Bell, BellOff, RotateCw, Cloud, ArrowLeft
 } from "lucide-react"
+import Link from "next/link"
 import toast from "react-hot-toast"
 
 interface Backup {
@@ -54,6 +55,13 @@ export default function BackupSettingsPage() {
   const [creating, setCreating] = useState(false)
   const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
   const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferData, setTransferData] = useState({
+    targetUrl: '',
+    apiKey: '',
+    seasonId: '',
+    tournamentIds: ''
+  })
   const [schedule, setSchedule] = useState<ScheduleConfig>({
     enabled: true,
     frequency: "DAILY",
@@ -108,83 +116,40 @@ export default function BackupSettingsPage() {
   }
 
   async function fetchSchedule() {
-  try {
-    const res = await fetch("/api/admin/backup/schedule")
-    
-    // ✅ Check if response is OK before parsing JSON
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-    }
-    
-    const data = await res.json()
-    setSchedule(data)
-  } catch (error) {
-    console.error("Error fetching schedule:", error)
-    // ✅ Set default schedule on error
-    setSchedule({
-      enabled: true,
-      frequency: "DAILY",
-      time: "02:00",
-      keepDaily: 7,
-      keepWeekly: 4,
-      keepMonthly: 3,
-      lastRunAt: null,
-      nextRunAt: null
-    })
-  }
-}
-
-  // Add this to your component
-async function createBackup() {
-  if (!confirm("Create a new backup snapshot? This may take a few minutes.")) return
-
-  setCreating(true)
-  try {
-    const res = await fetch("/api/admin/backup/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "MANUAL" })
-    })
-
-    if (res.ok) {
-      const data = await res.json()
-      toast.success("Backup queued! It will be processed in the background.")
-      
-      // ✅ Poll for status
-      pollBackupStatus(data.backupId)
-      
-      fetchData()
-    } else {
-      const error = await res.json()
-      toast.error(error.error || "Failed to create backup")
-    }
-  } catch (error) {
-    console.error("Error creating backup:", error)
-    toast.error("Failed to create backup")
-  } finally {
-    setCreating(false)
-  }
-}
-
-async function pollBackupStatus(backupId: string) {
-  const interval = setInterval(async () => {
     try {
-      const res = await fetch(`/api/admin/backup/status?id=${backupId}`)
+      const res = await fetch("/api/admin/backup/schedule")
       const data = await res.json()
-      
-      if (data.status === "COMPLETED") {
-        clearInterval(interval)
-        toast.success("Backup completed successfully!")
+      setSchedule(data)
+    } catch (error) {
+      console.error("Error fetching schedule:", error)
+    }
+  }
+
+  async function createBackup() {
+    if (!confirm("Create a new backup snapshot? This may take a few minutes.")) return
+
+    setCreating(true)
+    try {
+      const res = await fetch("/api/admin/backup/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "MANUAL" })
+      })
+
+      if (res.ok) {
+        toast.success("Backup created successfully!")
         fetchData()
-      } else if (data.status === "FAILED") {
-        clearInterval(interval)
-        toast.error("Backup failed. Check logs for details.")
+      } else {
+        const error = await res.json()
+        toast.error(error.error || "Failed to create backup")
       }
     } catch (error) {
-      console.error("Error polling status:", error)
+      console.error("Error creating backup:", error)
+      toast.error("Failed to create backup")
+    } finally {
+      setCreating(false)
     }
-  }, 3000) // Check every 3 seconds
-}
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -192,11 +157,14 @@ async function pollBackupStatus(backupId: string) {
 
     if (!file.name.endsWith('.zip')) {
       toast.error('Please select a ZIP backup file')
+      e.target.value = ''
       return
     }
 
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('File too large. Max 100MB')
+    const MAX_SIZE = 4.5 * 1024 * 1024
+    if (file.size > MAX_SIZE) {
+      toast.error(`File too large. Max ${MAX_SIZE / 1024 / 1024}MB`)
+      e.target.value = ''
       return
     }
 
@@ -208,7 +176,7 @@ async function pollBackupStatus(backupId: string) {
     try {
       const res = await fetch('/api/admin/backup/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
 
       const data = await res.json()
@@ -224,9 +192,41 @@ async function pollBackupStatus(backupId: string) {
       toast.error('Failed to upload backup')
     } finally {
       toast.dismiss(loadingToast)
+      e.target.value = ''
+    }
+  }
+
+  async function handleTransfer() {
+    if (!transferData.targetUrl) {
+      toast.error('Target URL is required')
+      return
     }
 
-    e.target.value = ''
+    const loadingToast = toast.loading('Transferring backup...')
+
+    try {
+      const res = await fetch('/api/admin/backup/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transferData)
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success('Backup transferred successfully!')
+        setShowTransferModal(false)
+        setTransferData({ targetUrl: '', apiKey: '', seasonId: '', tournamentIds: '' })
+        fetchData()
+      } else {
+        toast.error(data.error || 'Transfer failed')
+      }
+    } catch (error) {
+      console.error('Transfer error:', error)
+      toast.error('Failed to transfer backup')
+    } finally {
+      toast.dismiss(loadingToast)
+    }
   }
 
   async function toggleAutoBackup() {
@@ -295,7 +295,8 @@ async function pollBackupStatus(backupId: string) {
         toast.success("Backup deleted")
         fetchData()
       } else {
-        toast.error("Failed to delete backup")
+        const error = await res.json()
+        toast.error(error.error || "Failed to delete backup")
       }
     } catch (error) {
       console.error("Error deleting backup:", error)
@@ -416,6 +417,19 @@ async function pollBackupStatus(backupId: string) {
                 schedule.enabled ? "translate-x-6" : "translate-x-1"
               }`} />
             </button>
+            <div className="mt-2 p-3 bg-gray-700/30 rounded-lg border border-gray-600">
+  <p className="text-xs text-gray-400">
+    <span className="font-medium text-white">Cron Schedule:</span> {schedule.enabled ? `Runs daily at ${schedule.time}` : "Disabled"}
+  </p>
+  <p className="text-xs text-gray-500 mt-1">
+    Next run: {schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : "Not scheduled"}
+  </p>
+  {schedule.lastRunAt && (
+    <p className="text-xs text-gray-500">
+      Last run: {new Date(schedule.lastRunAt).toLocaleString()}
+    </p>
+  )}
+</div>
           </div>
         </div>
 
@@ -512,6 +526,14 @@ async function pollBackupStatus(backupId: string) {
         </label>
 
         <button
+          onClick={() => setShowTransferModal(true)}
+          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-all"
+        >
+          <Cloud className="h-4 w-4" />
+          Transfer Backup
+        </button>
+
+        <button
           onClick={fetchData}
           className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2.5 rounded-lg hover:bg-gray-600 transition-all"
         >
@@ -558,6 +580,7 @@ async function pollBackupStatus(backupId: string) {
                         backup.type === "MANUAL" ? "bg-blue-500/20 text-blue-400" :
                         backup.type === "AUTO" ? "bg-green-500/20 text-green-400" :
                         backup.type === "UPLOADED" ? "bg-purple-500/20 text-purple-400" :
+                        backup.type === "TRANSFER" ? "bg-cyan-500/20 text-cyan-400" :
                         "bg-red-500/20 text-red-400"
                       }`}>
                         {backup.type}
@@ -657,6 +680,80 @@ async function pollBackupStatus(backupId: string) {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-gray-800 rounded-xl w-full max-w-md p-6 border border-gray-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-white">Transfer Backup</h2>
+              <button onClick={() => setShowTransferModal(false)} className="text-gray-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Target URL</label>
+                <input
+                  type="text"
+                  value={transferData.targetUrl}
+                  onChange={(e) => setTransferData({...transferData, targetUrl: e.target.value})}
+                  placeholder="https://platform-b.vercel.app"
+                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">The URL of the target Nexus Esports platform</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">API Key (optional)</label>
+                <input
+                  type="password"
+                  value={transferData.apiKey}
+                  onChange={(e) => setTransferData({...transferData, apiKey: e.target.value})}
+                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">If the target platform requires API authentication</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Season ID (optional)</label>
+                <input
+                  type="text"
+                  value={transferData.seasonId}
+                  onChange={(e) => setTransferData({...transferData, seasonId: e.target.value})}
+                  placeholder="Leave empty to transfer all"
+                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Tournament IDs (optional)</label>
+                <input
+                  type="text"
+                  value={transferData.tournamentIds}
+                  onChange={(e) => setTransferData({...transferData, tournamentIds: e.target.value})}
+                  placeholder="Comma separated: id1,id2"
+                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+              </div>
+              <div className="bg-blue-500/10 rounded-xl p-4 border border-blue-500/20">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-400 font-medium">What gets transferred?</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      All data including users, profiles, fixtures, results, tournaments, seasons, awards, news, and squads.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleTransfer}
+                className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 transition-all"
+              >
+                Start Transfer
+              </button>
             </div>
           </div>
         </div>

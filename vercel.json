@@ -1,28 +1,22 @@
 {
+  "crons": [
+    {
+      "path": "/api/admin/backup/cron",
+      "schedule": "0 2 * * *"
+    }
+  ],
   "functions": {
-    "app/api/admin/backup/history/route.ts": {
-      "maxDuration": 10,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
-    },
-    "app/api/admin/backup/stats/route.ts": {
-      "maxDuration": 10,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
-    },
-    "app/api/admin/backup/status/route.ts": {
-      "maxDuration": 10,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
+    "app/api/admin/backup/cron/route.ts": {
+      "maxDuration": 300
     },
     "app/api/admin/backup/queue/route.ts": {
-      "maxDuration": 30,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
+      "maxDuration": 300
     },
-    "app/api/admin/backup/download/[id]/route.ts": {
-      "maxDuration": 30,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
+    "app/api/admin/backup/create/route.ts": {
+      "maxDuration": 300
     },
     "app/api/admin/backup/upload/route.ts": {
-      "maxDuration": 60,
-      "excludeFiles": "node_modules/.prisma/client/**/*,node_modules/jszip/**/*,node_modules/@vercel/blob/**/*,node_modules/archiver/**/*"
+      "maxDuration": 60
     }
   }
 }

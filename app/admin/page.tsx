@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Users, Trophy, Calendar, CheckCircle, TrendingUp, Award, Eye, Activity, Zap } from "lucide-react"
 import Link from "next/link"
+import { Skeleton, SkeletonStats } from "@/components/ui/Skeleton"
 
 interface Stats {
   totalPlayers: number
@@ -95,15 +96,37 @@ export default function AdminOverview() {
   ]
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-12 h-12 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 backdrop-blur-sm p-6 border border-white/10">
+        <Skeleton variant="text" className="w-64 h-8" />
+        <Skeleton variant="text" className="w-48 h-4 mt-1" />
+      </div>
+      <SkeletonStats />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-gray-800/30 rounded-xl border border-gray-700 p-5">
+          <Skeleton variant="text" className="w-32 h-6 mb-4" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} variant="card" className="h-20" />
+            ))}
+          </div>
+        </div>
+        <div className="bg-gray-800/30 rounded-xl border border-gray-700 p-5">
+          <Skeleton variant="text" className="w-32 h-6 mb-4" />
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <Skeleton variant="text" className="w-20 h-4" />
+                <Skeleton variant="text" className="w-16 h-4" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   return (
     <div className="space-y-6">

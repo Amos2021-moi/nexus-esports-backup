@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
 import TournamentFlow from "@/components/tournament/TournamentFlow"
+import { SkeletonTournamentBracket, Skeleton } from "@/components/ui/Skeleton"
 
 interface Match {
   id: string
@@ -74,15 +75,15 @@ export default function TournamentPage() {
 
   // ✅ Show header with tournament info
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400 font-medium mt-2">Loading bracket...</p>
-        </div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        <Skeleton variant="card" className="h-40 mb-8" />
+        <SkeletonTournamentBracket />
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   if (!tournament) {
     return (

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Heart, MessageCircle, Send, Image as ImageIcon, X, Trophy, Shield, Calendar, Trash2, Edit2, Flag, Pin, Filter } from "lucide-react"
+import { Heart, MessageCircle, Send, Image as ImageIcon, X, Trophy, Shield, Calendar, Trash2, Edit2, Flag, Pin, Filter, EyeOff } from "lucide-react"
 import toast from "react-hot-toast"
+import { SkeletonCommunityPost, Skeleton } from "@/components/ui/Skeleton"
 
 interface Post {
   id: string
@@ -45,9 +46,11 @@ export default function CommunityPage() {
   const [editingPost, setEditingPost] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
   const [filterType, setFilterType] = useState<string>("ALL")
+  const [privacySettings, setPrivacySettings] = useState<{ allowComments: boolean }>({ allowComments: true })
 
   useEffect(() => {
     fetchPosts()
+    fetchPrivacySettings()
   }, [])
 
   async function fetchPosts() {
@@ -55,6 +58,20 @@ export default function CommunityPage() {
     const data = await res.json()
     setPosts(Array.isArray(data) ? data : [])
     setLoading(false)
+  }
+
+  async function fetchPrivacySettings() {
+    try {
+      const res = await fetch("/api/settings?category=privacy")
+      if (res.ok) {
+        const data = await res.json()
+        setPrivacySettings({
+          allowComments: data.allowComments !== undefined ? data.allowComments : true
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching privacy settings:", error)
+    }
   }
 
   async function handleCreatePost(e: React.FormEvent) {
@@ -109,7 +126,13 @@ export default function CommunityPage() {
     }
   }
 
+  // ✅ Phase 1: Check if commenting is allowed
   async function handleComment(postId: string) {
+    if (!privacySettings.allowComments) {
+      toast.error("Comments are disabled for this post")
+      return
+    }
+
     if (!commentText.trim()) {
       toast.error("Please enter a comment")
       return
@@ -134,7 +157,6 @@ export default function CommunityPage() {
     }
   }
 
-  // ✅ Phase 1: Delete Post
   async function handleDeletePost(postId: string) {
     if (!confirm("Are you sure you want to delete this post?")) return
 
@@ -155,7 +177,6 @@ export default function CommunityPage() {
     }
   }
 
-  // ✅ Phase 2: Edit Post
   async function handleEditPost(postId: string) {
     if (!editContent.trim()) {
       toast.error("Please enter some content")
@@ -204,10 +225,26 @@ export default function CommunityPage() {
     ? posts 
     : posts.filter(post => post.type === filterType)
 
+  // Check if user can comment on a post
+  const canComment = privacySettings.allowComments || false
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading community feed...</div>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div>
+          <Skeleton variant="text" className="w-48 h-8" />
+          <Skeleton variant="text" className="w-64 h-4 mt-1" />
+        </div>
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+          <Skeleton variant="text" className="w-full h-20" />
+          <div className="flex justify-between items-center mt-3">
+            <Skeleton variant="text" className="w-24 h-4" />
+            <Skeleton variant="text" className="w-16 h-8" />
+          </div>
+        </div>
+        {[...Array(3)].map((_, i) => (
+          <SkeletonCommunityPost key={i} />
+        ))}
       </div>
     )
   }
@@ -219,6 +256,22 @@ export default function CommunityPage() {
         <h1 className="text-2xl font-bold text-white">Community Feed</h1>
         <p className="text-gray-400 mt-1">Share updates, celebrate achievements, and connect with players</p>
       </div>
+
+      {/* ✅ Privacy Warning - Show if comments are disabled */}
+      {!privacySettings.allowComments && (
+        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
+          <div className="flex items-start gap-3">
+            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+            <div>
+              <h3 className="text-yellow-400 font-semibold">Comments are Disabled</h3>
+              <p className="text-gray-300 text-sm">
+                Comments on your posts are currently disabled. You can change this in your 
+                <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline ml-1">Privacy Settings</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Post */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
@@ -271,7 +324,7 @@ export default function CommunityPage() {
         </form>
       </div>
 
-      {/* Category Filter - Phase 3 */}
+      {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setFilterType("ALL")}
@@ -354,7 +407,6 @@ export default function CommunityPage() {
                       </div>
                     </div>
                   </div>
-                  {/* ✅ Post Actions - Delete & Edit */}
                   {isOwnPost && (
                     <div className="flex gap-2">
                       <button
@@ -424,8 +476,19 @@ export default function CommunityPage() {
                   <span>{post.likes} likes</span>
                 </button>
                 <button
-                  onClick={() => setCommenting(commenting === post.id ? null : post.id)}
-                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-indigo-400 transition-colors"
+                  onClick={() => {
+                    // ✅ Only allow if comments are enabled
+                    if (!privacySettings.allowComments) {
+                      toast.error("Comments are disabled for this post")
+                      return
+                    }
+                    setCommenting(commenting === post.id ? null : post.id)
+                  }}
+                  className={`flex items-center gap-2 text-sm transition-colors ${
+                    privacySettings.allowComments 
+                      ? "text-gray-400 hover:text-indigo-400" 
+                      : "text-gray-600 cursor-not-allowed"
+                  }`}
                 >
                   <MessageCircle size={18} />
                   <span>{post._count.comments} comments</span>
@@ -438,28 +501,35 @@ export default function CommunityPage() {
                 </button>
               </div>
               
-              {/* Comments Section */}
+              {/* Comments Section - ✅ Only show if comments are allowed */}
               {commenting === post.id && (
                 <div className="p-4 bg-gray-700/30">
-                  <div className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Write a comment..."
-                      className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
-                    />
-                    <button
-                      onClick={() => handleComment(post.id)}
-                      className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-all"
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
+                  {canComment ? (
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        placeholder="Write a comment..."
+                        className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        onClick={() => handleComment(post.id)}
+                        className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-all"
+                      >
+                        <Send size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-2 text-gray-400 text-sm flex items-center justify-center gap-2">
+                      <EyeOff size={16} />
+                      Comments are disabled
+                    </div>
+                  )}
                 </div>
               )}
               
-              {/* Comments List */}
+              {/* Comments List - ✅ Only show if comments exist */}
               {post.comments.length > 0 && (
                 <div className="p-4 space-y-3 bg-gray-700/20">
                   {post.comments.map((comment) => (

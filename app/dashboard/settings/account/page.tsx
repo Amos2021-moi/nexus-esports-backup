@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Save, Loader2, User, Mail, Shield, Camera } from "lucide-react"
+import { Save, Loader2, User, Mail, Shield, Camera, CheckCircle, AlertCircle, Send, RefreshCw } from "lucide-react"
 import ImageUpload from "@/components/dashboard/ImageUpload"
 import toast from "react-hot-toast"
 
@@ -19,6 +19,12 @@ interface ProfileData {
   bannerImage: string
   whatsappNumber: string
   whatsappVisible: boolean
+}
+
+interface EmailStatus {
+  verified: boolean
+  verifiedAt?: string
+  notificationsEnabled: boolean
 }
 
 export default function AccountSettingsPage() {
@@ -42,9 +48,28 @@ export default function AccountSettingsPage() {
     whatsappVisible: true,
   })
 
+  // Email settings state
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>({
+    verified: false,
+    notificationsEnabled: false
+  })
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [emailMessage, setEmailMessage] = useState("")
+  const [resendCooldown, setResendCooldown] = useState(0)
+
   useEffect(() => {
     fetchProfile()
+    fetchEmailStatus()
   }, [])
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [resendCooldown])
 
   async function fetchProfile() {
     try {
@@ -70,6 +95,95 @@ export default function AccountSettingsPage() {
       toast.error("Failed to load profile")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchEmailStatus() {
+    try {
+      const res = await fetch("/api/user/email/preferences")
+      const data = await res.json()
+      setEmailStatus({
+        verified: data.emailVerified || false,
+        verifiedAt: data.emailVerifiedAt,
+        notificationsEnabled: data.emailNotificationsEnabled || false
+      })
+    } catch (error) {
+      console.error("Error fetching email status:", error)
+    }
+  }
+
+  async function handleSendVerification() {
+    setEmailLoading(true)
+    setEmailMessage("")
+    
+    try {
+      const res = await fetch("/api/user/email/verify", {
+        method: "POST"
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setEmailMessage("✅ Verification email sent! Check your inbox.")
+        toast.success("Verification email sent!")
+        setResendCooldown(30) // 30 second cooldown
+      } else {
+        setEmailMessage(`❌ ${data.error || "Failed to send verification"}`)
+        toast.error(data.error || "Failed to send verification")
+      }
+    } catch {
+      setEmailMessage("❌ Something went wrong")
+      toast.error("Something went wrong")
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  async function handleResendVerification() {
+    if (resendCooldown > 0) return
+    
+    setResendLoading(true)
+    setEmailMessage("")
+    
+    try {
+      const res = await fetch("/api/user/email/resend", {
+        method: "POST"
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setEmailMessage("✅ Verification email resent! Check your inbox.")
+        toast.success("Verification email resent!")
+        setResendCooldown(30) // 30 second cooldown
+      } else {
+        setEmailMessage(`❌ ${data.error || "Failed to resend verification"}`)
+        toast.error(data.error || "Failed to resend verification")
+      }
+    } catch {
+      setEmailMessage("❌ Something went wrong")
+      toast.error("Something went wrong")
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  async function handleNotificationToggle(enabled: boolean) {
+    try {
+      const res = await fetch("/api/user/email/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailNotificationsEnabled: enabled })
+      })
+      
+      if (res.ok) {
+        setEmailStatus(prev => ({ ...prev, notificationsEnabled: enabled }))
+        toast.success(enabled ? "Email notifications enabled" : "Email notifications disabled")
+      } else {
+        const data = await res.json()
+        toast.error(data.error || "Failed to update preference")
+      }
+    } catch (error) {
+      console.error("Error updating notification preference:", error)
+      toast.error("Failed to update preference")
     }
   }
 
@@ -320,6 +434,99 @@ export default function AccountSettingsPage() {
             <label htmlFor="whatsappVisible" className="text-sm text-gray-300">
               Allow match opponents to see my WhatsApp number
             </label>
+          </div>
+        </div>
+
+        {/* Email Settings Section */}
+        <div className="border-t border-gray-800 pt-6">
+          <h3 className="text-md font-semibold text-white flex items-center gap-2 mb-4">
+            <Mail className="h-5 w-5 text-indigo-400" />
+            Email Settings
+          </h3>
+          
+          <div className="space-y-4">
+            {/* Verification Status */}
+            <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+              <div>
+                <p className="text-white font-medium">Email Verification</p>
+                <p className="text-sm text-gray-400">
+                  {emailStatus.verified ? (
+                    <span className="text-green-400 flex items-center gap-1">
+                      <CheckCircle size={14} /> Verified {emailStatus.verifiedAt ? `at ${new Date(emailStatus.verifiedAt).toLocaleDateString()}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-yellow-400 flex items-center gap-1">
+                      <AlertCircle size={14} /> Not verified
+                    </span>
+                  )}
+                </p>
+              </div>
+              {!emailStatus.verified && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSendVerification}
+                    disabled={emailLoading}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {emailLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send size={14} />
+                    )}
+                    Verify Email
+                  </button>
+                  <button
+                    onClick={handleResendVerification}
+                    disabled={resendLoading || resendCooldown > 0}
+                    className="px-4 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {resendLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw size={14} />
+                    )}
+                    {resendCooldown > 0 ? `${resendCooldown}s` : "Resend"}
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Message display */}
+            {emailMessage && (
+              <div className={`p-3 rounded-lg text-sm ${emailMessage.includes('✅') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {emailMessage}
+              </div>
+            )}
+            
+            {/* Email Notification Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg border border-gray-700/50">
+              <div>
+                <p className="text-white font-medium">Email Notifications</p>
+                <p className="text-sm text-gray-400">
+                  Receive match reminders and important updates
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emailStatus.notificationsEnabled}
+                  disabled={!emailStatus.verified}
+                  className="sr-only peer"
+                  onChange={(e) => handleNotificationToggle(e.target.checked)}
+                />
+                <div className={`w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-indigo-600 transition-all ${!emailStatus.verified ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full m-1 transition-all ${emailStatus.notificationsEnabled ? 'translate-x-5' : ''}`} />
+                </div>
+              </label>
+            </div>
+            
+            {/* Info message if not verified */}
+            {!emailStatus.verified && (
+              <p className="text-sm text-yellow-400/80 flex items-center gap-1">
+                <AlertCircle size={14} />
+                Verify your email to enable email notifications
+              </p>
+            )}
           </div>
         </div>
 
