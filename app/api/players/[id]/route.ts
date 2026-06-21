@@ -5,13 +5,13 @@ import { prisma } from "@/lib/prisma"
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }  // ✅ Fixed: removed Promise
+  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
 ) {
   try {
-    const { id } = params  // ✅ Fixed: no await needed
+    const { id } = await params  // ✅ Await the params
     const session = await getServerSession(authOptions)
 
-    console.log("📊 Fetching profile for ID:", id)  // ✅ Debug log
+    console.log("📊 Fetching profile for ID:", id)
 
     // Get user with profile and related data
     const user = await prisma.user.findUnique({
@@ -63,7 +63,7 @@ export async function GET(
     })
 
     if (!user || !user.profile) {
-      console.log("❌ User not found for ID:", id)  // ✅ Debug log
+      console.log("❌ User not found for ID:", id)
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
