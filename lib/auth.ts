@@ -14,6 +14,12 @@ export const authOptions: NextAuthOptions = {
       httpOptions: {
         timeout: 10000,
       },
+      // ✅ FIX: Add authorization params to prevent state cookie errors
+      authorization: {
+        params: {
+          prompt: "select_account",
+        },
+      },
     }),
 
     // ✅ Facebook Provider
@@ -159,11 +165,48 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
+    error: "/auth/error", // ✅ Add error page
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // ✅ Add cookies configuration for production
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" 
+        ? `__Secure-next-auth.session-token` 
+        : `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    callbackUrl: {
+      name: process.env.NODE_ENV === "production"
+        ? `__Secure-next-auth.callback-url`
+        : `next-auth.callback-url`,
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name: process.env.NODE_ENV === "production"
+        ? `__Host-next-auth.csrf-token`
+        : `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
 }
 
 declare module "next-auth" {
