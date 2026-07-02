@@ -1,4 +1,5 @@
 {
+  "buildCommand": "prisma generate && prisma db push --accept-data-loss && next build",
   "crons": [
     {
       "path": "/api/admin/backup/cron",
@@ -22,5 +23,6 @@
     "app/api/admin/backup/upload/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "ignoreCommand": "echo 'Ignoring backups folder'"
 }

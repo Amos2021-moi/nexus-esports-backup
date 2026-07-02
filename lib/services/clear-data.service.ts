@@ -1,91 +1,83 @@
 import { prisma } from "@/lib/prisma"
-import { backupService } from "./backup.service"
 
-export class ClearDataService {
-  async clearAllData(adminId: string): Promise<{ success: boolean; message: string; backupId?: string }> {
-    try {
-      // ✅ Step 1: Create a backup first
-      console.log("📦 Creating backup before clearing data...")
-      const backup = await backupService.createBackup(adminId, "MANUAL")
-      console.log(`✅ Backup created: ${backup.id}`)
+export async function clearAllData() {
+  try {
+    console.log("🧹 Starting data cleanup...")
 
-      // ✅ Step 2: Delete data in correct order (respect foreign keys)
-      console.log("🗑️ Clearing all data...")
+    await prisma.$transaction(async (tx) => {
+      // Delete in reverse order to avoid foreign key conflicts
 
-      // Delete in reverse order of dependencies
-      await prisma.$transaction([
-        // 1. Delete notifications
-        prisma.notification.deleteMany(),
-        
-        // 2. Delete reports
-        prisma.report.deleteMany(),
-        
-        // 3. Delete audit logs
-        prisma.auditLog.deleteMany(),
-        
-        // 4. Delete comments and likes
-        prisma.comment.deleteMany(),
-        prisma.like.deleteMany(),
-        
-        // 5. Delete posts
-        prisma.post.deleteMany(),
-        
-        // 6. Delete squads
-        prisma.squad.deleteMany(),
-        
-        // 7. Delete awards and hall of fame
-        prisma.award.deleteMany(),
-        prisma.hallOfFame.deleteMany(),
-        
-        // 8. Delete tournament data
-        prisma.tournamentParticipant.deleteMany(),
-        prisma.tournamentMatch.deleteMany(),
-        prisma.tournament.deleteMany(),
-        
-        // 9. Delete results and fixtures
-        prisma.result.deleteMany(),
-        prisma.fixture.deleteMany(),
-        
-        // 10. Delete league entries
-        prisma.leagueEntry.deleteMany(),
-        
-        // 11. Delete seasons
-        prisma.season.deleteMany(),
-        
-        // 12. Delete news
-        prisma.news.deleteMany(),
-        
-        // 13. Delete backups (keep the one we just created?)
-        // We'll keep the backup we just created
-        // prisma.backup.deleteMany({ where: { id: { not: backup.id } } }),
-        
-        // 14. Delete profiles (but keep admin profile)
-        prisma.profile.deleteMany({
-          where: {
-            userId: { not: adminId }
-          }
-        }),
-        
-        // 15. Delete non-admin users
-        prisma.user.deleteMany({
-          where: {
-            id: { not: adminId }
-          }
-        }),
-      ])
+      // 1. Delete payment audits
+      await tx.paymentAudit.deleteMany()
+      console.log("✅ Payment audits cleared")
 
-      console.log("✅ All data cleared successfully!")
+      // 2. Delete notifications
+      await tx.notification.deleteMany()
+      console.log("✅ Notifications cleared")
 
-      return {
-        success: true,
-        message: "All data has been cleared successfully. A backup was created before clearing.",
-        backupId: backup.id
-      }
-    } catch (error) {
-      console.error("❌ Error clearing data:", error)
-      throw new Error("Failed to clear data. Please try again.")
-    }
+      // 3. Delete results
+      await tx.result.deleteMany()
+      console.log("✅ Results cleared")
+
+      // 4. Delete fixtures
+      await tx.fixture.deleteMany()
+      console.log("✅ Fixtures cleared")
+
+      // 5. Delete league entries
+      await tx.leagueEntry.deleteMany()
+      console.log("✅ League entries cleared")
+
+      // 6. Delete season entries
+      await tx.seasonEntry.deleteMany()
+      console.log("✅ Season entries cleared")
+
+      // 7. Delete prize pools
+      await tx.prizePool.deleteMany()
+      console.log("✅ Prize pools cleared")
+
+      // 8. Delete tournament participants
+      await tx.tournamentParticipant.deleteMany()
+      console.log("✅ Tournament participants cleared")
+
+      // 9. Delete tournament matches
+      await tx.tournamentMatch.deleteMany()
+      console.log("✅ Tournament matches cleared")
+
+      // 10. Delete tournaments
+      await tx.tournament.deleteMany()
+      console.log("✅ Tournaments cleared")
+
+      // 11. Delete awards
+      await tx.award.deleteMany()
+      console.log("✅ Awards cleared")
+
+      // 12. Delete hall of fame
+      await tx.hallOfFame.deleteMany()
+      console.log("✅ Hall of Fame cleared")
+
+      // 13. Delete news
+      await tx.news.deleteMany()
+      console.log("✅ News cleared")
+
+      // 14. Delete posts, comments, likes
+      await tx.like.deleteMany()
+      await tx.comment.deleteMany()
+      await tx.post.deleteMany()
+      console.log("✅ Community content cleared")
+
+      // 15. Delete reports
+      await tx.report.deleteMany()
+      console.log("✅ Reports cleared")
+
+      // 16. Keep seasons, users, profiles, and settings
+      console.log("✅ Keeping: Seasons, Users, Profiles, Settings")
+
+      console.log("🎉 Data cleanup completed successfully!")
+    })
+
+    return { success: true, message: "Data cleared successfully" }
+  } catch (error) {
+    console.error("Error clearing data:", error)
+    throw new Error("Failed to clear data")
   }
 }
-
-export const clearDataService = new ClearDataService()

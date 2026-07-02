@@ -1,54 +1,94 @@
-"use client"
+"use client";
 
-import { useSession } from "next-auth/react"
-import { useEffect, useState } from "react"
-import { Camera, Edit2, Mail, Users, Trophy, Calendar, Award, MapPin, Shield, TrendingUp, Target, Activity, Phone, Star, CheckCircle } from "lucide-react"
-import Link from "next/link"
-import TrustBadge from "@/components/ui/TrustBadge"
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import {
+  Camera,
+  Edit2,
+  Mail,
+  Trophy,
+  Award,
+  Shield,
+  TrendingUp,
+  Target,
+  Activity,
+  Phone,
+  Star,
+  Gamepad2,
+  Crown,
+  User as UserIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { motion, type Variants } from "framer-motion";
+import TrustBadge from "@/components/ui/TrustBadge";
+import Image from "next/image";
 
 interface ProfileData {
-  username: string
-  class: string
-  bio: string
-  favoriteClub: string
-  preferredFormation: string
-  preferredPlaystyle: string
-  profilePicture: string
-  bannerImage: string
-  totalWins: number
-  totalDraws: number
-  totalLosses: number
-  totalPoints: number
-  goalsFor: number
-  goalsAgainst: number
-  goalDifference: number
-  matchesPlayed: number
-  winRate: number
-  whatsappNumber: string
-  whatsappVisible: boolean
-  verifiedBadge: boolean
-  trustScore: number
-  isVerified: boolean
-  name: string
-  email: string
+  username: string;
+  class: string;
+  bio: string;
+  favoriteClub: string;
+  preferredFormation: string;
+  preferredPlaystyle: string;
+  profilePicture: string;
+  bannerImage: string;
+  totalWins: number;
+  totalDraws: number;
+  totalLosses: number;
+  totalPoints: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  matchesPlayed: number;
+  winRate: number;
+  whatsappNumber: string;
+  whatsappVisible: boolean;
+  verifiedBadge: boolean;
+  trustScore: number;
+  isVerified: boolean;
+  name: string;
+  email: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.07, delayChildren: 0.05 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+};
+
 export default function ProfilePage() {
-  const { data: session } = useSession()
-  const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [trustScore, setTrustScore] = useState<number>(0)
+  const { data: session } = useSession();
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [trustScore, setTrustScore] = useState<number>(0);
 
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const response = await fetch("/api/profile")
-        const data = await response.json()
-        
-        const matchesPlayed = (data.totalWins || 0) + (data.totalDraws || 0) + (data.totalLosses || 0)
-        const winRate = matchesPlayed > 0 ? Math.round(((data.totalWins || 0) / matchesPlayed) * 100) : 0
-        const goalDifference = (data.goalsFor || 0) - (data.goalsAgainst || 0)
-        
+        const response = await fetch("/api/profile");
+        const data = await response.json();
+
+        const matchesPlayed =
+          (data.totalWins || 0) +
+          (data.totalDraws || 0) +
+          (data.totalLosses || 0);
+        const winRate =
+          matchesPlayed > 0
+            ? Math.round(((data.totalWins || 0) / matchesPlayed) * 100)
+            : 0;
+        const goalDifference = (data.goalsFor || 0) - (data.goalsAgainst || 0);
+
         setProfile({
           ...data,
           matchesPlayed,
@@ -56,211 +96,374 @@ export default function ProfilePage() {
           goalDifference,
           trustScore: data.trustScore || 0,
           isVerified: data.isVerified || false,
-          verifiedBadge: data.verifiedBadge || false
-        })
+          verifiedBadge: data.verifiedBadge || false,
+        });
 
         // ✅ Also fetch trust score separately
         if (session?.user?.id) {
-          const trustRes = await fetch(`/api/admin/trust-score?userId=${session.user.id}`)
+          const trustRes = await fetch(
+            `/api/admin/trust-score?userId=${session.user.id}`,
+          );
           if (trustRes.ok) {
-            const trustData = await trustRes.json()
-            setTrustScore(trustData.trustScore || 0)
+            const trustData = await trustRes.json();
+            setTrustScore(trustData.trustScore || 0);
           }
         }
       } catch (error) {
-        console.error("Error fetching profile:", error)
+        console.error("Error fetching profile:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
     if (session) {
-      fetchProfile()
+      fetchProfile();
     }
-  }, [session])
+  }, [session]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading profile...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <div className="text-gray-400">Loading profile...</div>
+        </div>
       </div>
-    )
+    );
   }
 
-  const displayTrustScore = profile?.trustScore || trustScore || 0
+  const displayTrustScore = profile?.trustScore || trustScore || 0;
   // ✅ Check both isVerified and verifiedBadge
-  const isVerified = profile?.isVerified || profile?.verifiedBadge || false
+  const isVerified = profile?.isVerified || profile?.verifiedBadge || false;
+
+  const trustColor =
+    displayTrustScore >= 80
+      ? "text-green-400"
+      : displayTrustScore >= 50
+        ? "text-yellow-400"
+        : "text-white";
+
+  /* Primary stat cards (matches / wins / win-rate / points). */
+  const primaryStats = [
+    {
+      label: "Matches",
+      value: profile?.matchesPlayed || 0,
+      icon: Activity,
+      tint: "text-blue-400",
+      ring: "ring-blue-500/30",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "Wins",
+      value: profile?.totalWins || 0,
+      icon: Trophy,
+      tint: "text-green-400",
+      ring: "ring-green-500/30",
+      bg: "bg-green-500/10",
+    },
+    {
+      label: "Win Rate",
+      value: `${profile?.winRate || 0}%`,
+      icon: Target,
+      tint: "text-yellow-400",
+      ring: "ring-yellow-500/30",
+      bg: "bg-yellow-500/10",
+    },
+    {
+      label: "Points",
+      value: profile?.totalPoints || 0,
+      icon: Award,
+      tint: "text-purple-400",
+      ring: "ring-purple-500/30",
+      bg: "bg-purple-500/10",
+    },
+  ];
+
+  /* Detailed breakdown row. */
+  const detailStats = [
+    { label: "Wins", value: profile?.totalWins || 0, tint: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+    { label: "Draws", value: profile?.totalDraws || 0, tint: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20" },
+    { label: "Losses", value: profile?.totalLosses || 0, tint: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+    { label: "Goals For", value: profile?.goalsFor || 0, tint: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+    { label: "Goals Against", value: profile?.goalsAgainst || 0, tint: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  ];
+
+  /* Player detail chips (class / club / formation / playstyle / points). */
+  const detailChips = [
+    { label: "Class", value: profile?.class || "Not set", icon: Shield, accent: "text-indigo-400" },
+    { label: "Favorite Club", value: profile?.favoriteClub || "Not set", icon: Crown, accent: "text-yellow-400" },
+    { label: "Formation", value: profile?.preferredFormation || "Not set", icon: Gamepad2, accent: "text-pink-400" },
+    { label: "Playstyle", value: profile?.preferredPlaystyle || "Not set", icon: Activity, accent: "text-cyan-400" },
+    { label: "Total Points", value: profile?.totalPoints || 0, icon: Award, accent: "text-purple-400" },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="max-w-5xl mx-auto"
+    >
       {/* Banner Section */}
-      <div className="relative h-48 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 overflow-hidden">
+      <motion.div
+        variants={itemVariants}
+        className="relative h-48 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 sm:h-56"
+      >
         {profile?.bannerImage && (
-          <img src={profile.bannerImage} alt="Banner" className="h-full w-full object-cover" />
+          <Image
+            src={profile.bannerImage || "/default-banner.jpg"}
+            alt="Banner"
+            width={1200}
+            height={300}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
         )}
+        {/* Gradient overlay for contrast */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-gray-900/70 via-gray-900/10 to-transparent"
+        />
+        {/* Decorative grid */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
         <Link
           href="/dashboard/profile/edit"
-          className="absolute bottom-4 right-4 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-all"
+          aria-label="Change banner image"
+          className="absolute bottom-4 right-4 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/50 p-2 text-white backdrop-blur-sm transition hover:bg-black/70"
         >
           <Camera size={20} />
         </Link>
-      </div>
+      </motion.div>
 
       {/* Profile Picture */}
-      <div className="relative mx-6 -mt-16 flex items-end justify-between">
-        <div className="relative">
-          <div className="h-28 w-28 rounded-full border-4 border-gray-800 bg-gray-700 overflow-hidden">
+      <motion.div
+        variants={itemVariants}
+        className="relative mx-6 -mt-16 flex items-end justify-between"
+      >
+        <div className="group relative">
+          <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-gray-900 bg-gray-700 shadow-xl shadow-black/40">
             {profile?.profilePicture ? (
-              <img src={profile.profilePicture} alt={profile.username} className="h-full w-full object-cover" />
+              <Image
+                src={profile.profilePicture || "/default-avatar.png"}
+                alt={profile.username || "Profile"}
+                width={112}
+                height={112}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             ) : (
-              <div className="flex h-full items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 text-3xl text-white">
+              <div className="flex h-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 text-3xl font-bold text-white">
                 {profile?.username?.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
+          {/* Hover overlay hint */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
+          >
+            <Camera size={22} className="text-white" />
+          </div>
           <Link
             href="/dashboard/profile/edit"
-            className="absolute bottom-0 right-0 rounded-full bg-indigo-600 p-1.5 text-white hover:bg-indigo-700 transition-all"
+            aria-label="Change profile picture"
+            className="absolute bottom-0 right-0 inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 p-1.5 text-white shadow-lg transition hover:from-indigo-500 hover:to-purple-500"
           >
             <Camera size={14} />
           </Link>
         </div>
-      </div>
+      </motion.div>
 
       {/* Profile Info */}
       <div className="mt-6 px-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <motion.div
+          variants={itemVariants}
+          className="flex flex-wrap items-start justify-between gap-4"
+        >
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-white">{profile?.username}</h1>
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                {profile?.username}
+              </h1>
               {/* ✅ Show Verified Badge */}
-              {isVerified && (
-                <TrustBadge type="verified" />
-              )}
+              {isVerified && <TrustBadge type="verified" />}
               {displayTrustScore >= 80 && (
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-xs">
+                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400 ring-1 ring-emerald-500/30">
                   <Star size={12} />
                   <span>High Trust</span>
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="mt-1.5 flex items-center gap-2">
               <Mail size={14} className="text-gray-500" />
-              <p className="text-gray-400 text-sm">{profile?.email || session?.user?.email}</p>
+              <p className="text-sm text-gray-400">
+                {profile?.email || session?.user?.email}
+              </p>
             </div>
             {/* Trust Score Display */}
-            <div className="flex items-center gap-2 mt-1">
+            <div className="mt-1 flex items-center gap-2">
               <Shield size={14} className="text-indigo-400" />
-              <p className="text-gray-400 text-sm">
-                Trust Score: <span className={`font-semibold ${displayTrustScore >= 80 ? "text-green-400" : displayTrustScore >= 50 ? "text-yellow-400" : "text-white"}`}>
+              <p className="text-sm text-gray-400">
+                Trust Score:{" "}
+                <span className={`font-semibold ${trustColor}`}>
                   {displayTrustScore}/100
                 </span>
               </p>
             </div>
             {profile?.whatsappNumber && profile?.whatsappVisible && (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="mt-1 flex items-center gap-2">
                 <Phone size={14} className="text-green-500" />
-                <p className="text-gray-400 text-sm">WhatsApp available for match coordination</p>
+                <p className="text-sm text-gray-400">
+                  WhatsApp available for match coordination
+                </p>
               </div>
             )}
           </div>
           <Link
             href="/dashboard/profile/edit"
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white text-sm font-medium hover:bg-indigo-700 transition-all"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500"
           >
             <Edit2 size={16} />
             Edit Profile
           </Link>
-        </div>
+        </motion.div>
+
+        {/* Trust score progress bar */}
+        <motion.div variants={itemVariants} className="mt-4">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(displayTrustScore, 100)}%` }}
+              transition={{ duration: 0.9, ease: "easeOut", delay: 0.2 }}
+              className={`h-full rounded-full ${
+                displayTrustScore >= 80
+                  ? "bg-gradient-to-r from-emerald-500 to-green-500"
+                  : displayTrustScore >= 50
+                    ? "bg-gradient-to-r from-yellow-500 to-amber-500"
+                    : "bg-gradient-to-r from-indigo-500 to-purple-500"
+              }`}
+            />
+          </div>
+        </motion.div>
 
         {profile?.bio && (
-          <p className="mt-4 text-gray-300">{profile.bio}</p>
+          <motion.div
+            variants={itemVariants}
+            className="mt-5 rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl"
+          >
+            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <UserIcon size={13} />
+              About
+            </div>
+            <p className="text-gray-300">{profile.bio}</p>
+          </motion.div>
         )}
 
         {/* Player Details */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500">Class</p>
-            <p className="text-sm font-semibold text-white mt-1">{profile?.class || "Not set"}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500">Favorite Club</p>
-            <p className="text-sm font-semibold text-white mt-1">{profile?.favoriteClub || "Not set"}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500">Formation</p>
-            <p className="text-sm font-semibold text-white mt-1">{profile?.preferredFormation || "Not set"}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500">Playstyle</p>
-            <p className="text-sm font-semibold text-white mt-1">{profile?.preferredPlaystyle || "Not set"}</p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <p className="text-xs text-gray-500">Total Points</p>
-            <p className="text-sm font-semibold text-indigo-400 mt-1">{profile?.totalPoints || 0}</p>
-          </div>
-        </div>
+        <motion.div
+          variants={containerVariants}
+          className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        >
+          {detailChips.map((chip) => (
+            <motion.div
+              key={chip.label}
+              variants={itemVariants}
+              className="rounded-xl border border-white/10 bg-gray-800/40 p-3 backdrop-blur-xl transition hover:border-white/20"
+            >
+              <div className="flex items-center gap-1.5">
+                <chip.icon className={`h-3.5 w-3.5 ${chip.accent}`} />
+                <p className="text-xs text-gray-500">{chip.label}</p>
+              </div>
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  chip.label === "Total Points" ? "text-indigo-400" : "text-white"
+                }`}
+              >
+                {chip.value}
+              </p>
+            </motion.div>
+          ))}
+        </motion.div>
 
         {/* Statistics Section */}
         <div className="mt-8">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <motion.h2
+            variants={itemVariants}
+            className="mb-4 flex items-center gap-2 text-xl font-bold text-white"
+          >
             <TrendingUp className="h-5 w-5 text-indigo-400" />
             Player Statistics
-          </h2>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="bg-blue-500/10 rounded-xl p-4 text-center border border-blue-500/20">
-              <Activity className="h-6 w-6 text-blue-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-blue-400">{profile?.matchesPlayed || 0}</p>
-              <p className="text-xs text-gray-400 mt-1">Matches</p>
-            </div>
-            <div className="bg-green-500/10 rounded-xl p-4 text-center border border-green-500/20">
-              <Trophy className="h-6 w-6 text-green-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-green-400">{profile?.totalWins || 0}</p>
-              <p className="text-xs text-gray-400 mt-1">Wins</p>
-            </div>
-            <div className="bg-yellow-500/10 rounded-xl p-4 text-center border border-yellow-500/20">
-              <Target className="h-6 w-6 text-yellow-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-yellow-400">{profile?.winRate || 0}%</p>
-              <p className="text-xs text-gray-400 mt-1">Win Rate</p>
-            </div>
-            <div className="bg-purple-500/10 rounded-xl p-4 text-center border border-purple-500/20">
-              <Award className="h-6 w-6 text-purple-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-purple-400">{profile?.totalPoints || 0}</p>
-              <p className="text-xs text-gray-400 mt-1">Points</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/20">
-              <p className="text-xs text-gray-500">Wins</p>
-              <p className="text-lg font-bold text-green-400">{profile?.totalWins || 0}</p>
-            </div>
-            <div className="bg-yellow-500/10 rounded-lg p-3 text-center border border-yellow-500/20">
-              <p className="text-xs text-gray-500">Draws</p>
-              <p className="text-lg font-bold text-yellow-400">{profile?.totalDraws || 0}</p>
-            </div>
-            <div className="bg-red-500/10 rounded-lg p-3 text-center border border-red-500/20">
-              <p className="text-xs text-gray-500">Losses</p>
-              <p className="text-lg font-bold text-red-400">{profile?.totalLosses || 0}</p>
-            </div>
-            <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/20">
-              <p className="text-xs text-gray-500">Goals For</p>
-              <p className="text-lg font-bold text-blue-400">{profile?.goalsFor || 0}</p>
-            </div>
-            <div className="bg-orange-500/10 rounded-lg p-3 text-center border border-orange-500/20">
-              <p className="text-xs text-gray-500">Goals Against</p>
-              <p className="text-lg font-bold text-orange-400">{profile?.goalsAgainst || 0}</p>
-            </div>
-            <div className="bg-indigo-500/10 rounded-lg p-3 text-center border border-indigo-500/20">
+          </motion.h2>
+
+          {/* Primary highlight cards */}
+          <motion.div
+            variants={containerVariants}
+            className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4"
+          >
+            {primaryStats.map((stat) => (
+              <motion.div
+                key={stat.label}
+                variants={itemVariants}
+                whileHover={{ y: -4 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className={`rounded-2xl border border-white/10 ${stat.bg} p-4 text-center backdrop-blur-xl`}
+              >
+                <div
+                  className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-900/40 ring-1 ${stat.ring}`}
+                >
+                  <stat.icon className={`h-5 w-5 ${stat.tint}`} />
+                </div>
+                <p className={`text-2xl font-bold ${stat.tint}`}>{stat.value}</p>
+                <p className="mt-1 text-xs text-gray-400">{stat.label}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Detailed breakdown */}
+          <motion.div
+            variants={containerVariants}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+          >
+            {detailStats.map((stat) => (
+              <motion.div
+                key={stat.label}
+                variants={itemVariants}
+                className={`rounded-xl border ${stat.border} ${stat.bg} p-3 text-center backdrop-blur-sm`}
+              >
+                <p className="text-xs text-gray-500">{stat.label}</p>
+                <p className={`text-lg font-bold ${stat.tint}`}>{stat.value}</p>
+              </motion.div>
+            ))}
+
+            {/* Goal difference with sign-based color (logic preserved) */}
+            <motion.div
+              variants={itemVariants}
+              className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3 text-center backdrop-blur-sm"
+            >
               <p className="text-xs text-gray-500">Goal Diff</p>
-              <p className={`text-lg font-bold ${(profile?.goalDifference || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {(profile?.goalDifference || 0) >= 0 ? `+${profile?.goalDifference}` : profile?.goalDifference}
+              <p
+                className={`text-lg font-bold ${
+                  (profile?.goalDifference || 0) >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+                }`}
+              >
+                {(profile?.goalDifference || 0) >= 0
+                  ? `+${profile?.goalDifference}`
+                  : profile?.goalDifference}
               </p>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
-    </div>
-  )
+    </motion.div>
+  );
 }

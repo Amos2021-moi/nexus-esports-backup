@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const seasonId = searchParams.get("seasonId")
-
+// ✅ Cache standings for 60 seconds
+const getCachedStandings = unstable_cache(
+  async (seasonId: string) => {
     // Get all seasons
     const seasons = await prisma.season.findMany({
       orderBy: { startDate: 'desc' }
@@ -22,7 +21,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // ✅ FIXED: Only add seasonId filter if we have one
+    // Get entries
     const entries = await prisma.leagueEntry.findMany({
       where: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
       include: {
@@ -65,14 +64,26 @@ export async function GET(request: Request) {
       points: entry.points
     }))
 
-    return NextResponse.json({
+    return {
       entries: formattedEntries,
       seasons,
       selectedSeasonId,
       totalPlayers,
       totalMatches,
       totalAwards
-    })
+    }
+  },
+  ['standings'],
+  { revalidate: 60 } // ✅ Refresh every 60 seconds
+)
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const seasonId = searchParams.get("seasonId") || ""
+
+    const data = await getCachedStandings(seasonId)
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching public standings:", error)
     return NextResponse.json({

@@ -72,3 +72,7 @@ backups/
 
 # Large packages
 node_modules/
+# Backup files
+backups/
+*.zip
+*.sqlite

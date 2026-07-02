@@ -8,7 +8,7 @@ import {
   Crown, TrendingUp, ArrowLeft, CheckCircle, Clock,
   Shield, Activity, Target, GitBranch
 } from "lucide-react"
-
+import Image from "next/image"
 interface SeasonArchive {
   season: {
     id: string
@@ -217,8 +217,14 @@ export default function SeasonArchivePage() {
               </div>
               <div className="flex items-center gap-4">
                 {champion.profilePicture ? (
-                  <img src={champion.profilePicture} alt={champion.name} className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500" />
-                ) : (
+<Image
+  src={champion.profilePicture || "/default-avatar.png"}
+  alt={champion.name}
+  width={64}
+  height={64}
+  className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500"
+  loading="lazy"
+/>                ) : (
                   <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center text-2xl font-bold text-yellow-500">
                     {champion.name.charAt(0).toUpperCase()}
                   </div>

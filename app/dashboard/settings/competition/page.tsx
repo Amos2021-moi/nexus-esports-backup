@@ -1,15 +1,26 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { Save, Loader2, Trophy, Calendar, Clock, Shield, Users, Zap } from "lucide-react"
-import toast from "react-hot-toast"
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import {
+  Save,
+  Loader2,
+  Trophy,
+  Calendar,
+  Clock,
+  Shield,
+  CalendarCheck,
+  Sparkles,
+  Check,
+} from "lucide-react";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import toast from "react-hot-toast";
 
 interface CompetitionSettings {
-  defaultSquad: "MAIN" | "SEASONAL" | "TOURNAMENT"
-  autoSelectTournamentSquad: boolean
-  matchReminderTime: "15m" | "30m" | "1h" | "2h" | "24h"
-  fixtureCalendarSync: boolean
+  defaultSquad: "MAIN" | "SEASONAL" | "TOURNAMENT";
+  autoSelectTournamentSquad: boolean;
+  matchReminderTime: "15m" | "30m" | "1h" | "2h" | "24h";
+  fixtureCalendarSync: boolean;
 }
 
 const defaultSettings: CompetitionSettings = {
@@ -17,40 +28,69 @@ const defaultSettings: CompetitionSettings = {
   autoSelectTournamentSquad: false,
   matchReminderTime: "1h",
   fixtureCalendarSync: false,
-}
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: "easeOut" },
+  },
+};
 
 export default function CompetitionSettingsPage() {
-  const { data: session } = useSession()
-  const [settings, setSettings] = useState<CompetitionSettings>(defaultSettings)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const { data: session } = useSession();
+  const [settings, setSettings] = useState<CompetitionSettings>(defaultSettings);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    fetchSettings()
-  }, [])
+    fetchSettings();
+  }, []);
 
   async function fetchSettings() {
     try {
-      const res = await fetch("/api/settings?category=competition")
+      const res = await fetch("/api/settings?category=competition");
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json();
         setSettings({
           defaultSquad: data.defaultSquad || defaultSettings.defaultSquad,
-          autoSelectTournamentSquad: data.autoSelectTournamentSquad !== undefined ? data.autoSelectTournamentSquad : defaultSettings.autoSelectTournamentSquad,
-          matchReminderTime: data.matchReminderTime || defaultSettings.matchReminderTime,
-          fixtureCalendarSync: data.fixtureCalendarSync !== undefined ? data.fixtureCalendarSync : defaultSettings.fixtureCalendarSync,
-        })
+          autoSelectTournamentSquad:
+            data.autoSelectTournamentSquad !== undefined
+              ? data.autoSelectTournamentSquad
+              : defaultSettings.autoSelectTournamentSquad,
+          matchReminderTime:
+            data.matchReminderTime || defaultSettings.matchReminderTime,
+          fixtureCalendarSync:
+            data.fixtureCalendarSync !== undefined
+              ? data.fixtureCalendarSync
+              : defaultSettings.fixtureCalendarSync,
+        });
       }
     } catch (error) {
-      console.error("Error fetching competition settings:", error)
+      console.error("Error fetching competition settings:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+    e.preventDefault();
+    setSaving(true);
 
     try {
       for (const [key, value] of Object.entries(settings)) {
@@ -62,180 +102,432 @@ export default function CompetitionSettingsPage() {
             key,
             value,
           }),
-        })
+        });
       }
 
-      toast.success("Competition settings updated!")
+      toast.success("Competition settings updated!");
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2200);
     } catch (error) {
-      console.error("Error saving competition settings:", error)
-      toast.error("Failed to save settings")
+      console.error("Error saving competition settings:", error);
+      toast.error("Failed to save settings");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   const handleChange = (key: keyof CompetitionSettings, value: any) => {
-    setSettings({ ...settings, [key]: value })
-  }
+    setSettings({ ...settings, [key]: value });
+  };
+
+  /* ------------------------------ option configs --------------------------- */
+  const squadOptions: {
+    value: "MAIN" | "SEASONAL" | "TOURNAMENT";
+    label: string;
+    icon: typeof Shield;
+    desc: string;
+  }[] = [
+    { value: "MAIN", label: "Main Squad", icon: Shield, desc: "Your default lineup" },
+    {
+      value: "SEASONAL",
+      label: "Seasonal Squad",
+      icon: Calendar,
+      desc: "League season lineup",
+    },
+    {
+      value: "TOURNAMENT",
+      label: "Tournament Squad",
+      icon: Trophy,
+      desc: "Knockout lineup",
+    },
+  ];
+
+  const reminderLabels: Record<CompetitionSettings["matchReminderTime"], string> = {
+    "15m": "15 minutes before",
+    "30m": "30 minutes before",
+    "1h": "1 hour before",
+    "2h": "2 hours before",
+    "24h": "24 hours before",
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="relative flex h-64 items-center justify-center">
+        <DecorBackground />
         <div className="text-center">
-          <div className="w-8 h-8 border-3 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-400 text-sm">Loading settings...</p>
+          <div className="relative mx-auto mb-3 h-10 w-10">
+            <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20" />
+            <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
+            <Trophy className="absolute inset-0 m-auto h-4 w-4 text-indigo-400" />
+          </div>
+          <p className="text-sm text-gray-400">Loading settings...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="max-w-3xl">
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy className="h-5 w-5 text-indigo-400" />
-            <h2 className="text-xl font-semibold text-white">Competition Settings</h2>
-          </div>
-          <p className="text-gray-400 text-sm">Configure your competitive preferences</p>
-        </div>
+    <div className="relative min-h-screen pb-28">
+      <DecorBackground />
 
-        {/* Default Squad */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Default Squad
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { value: "MAIN", label: "Main Squad", icon: Shield },
-              { value: "SEASONAL", label: "Seasonal Squad", icon: Calendar },
-              { value: "TOURNAMENT", label: "Tournament Squad", icon: Trophy },
-            ].map((option) => {
-              const Icon = option.icon
-              const isSelected = settings.defaultSquad === option.value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleChange("defaultSquad", option.value)}
-                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    isSelected
-                      ? "border-indigo-500 bg-indigo-500/10"
-                      : "border-gray-700 hover:border-gray-600"
-                  }`}
-                >
-                  <Icon className={`h-6 w-6 ${isSelected ? "text-indigo-400" : "text-gray-400"}`} />
-                  <span className={`text-sm font-medium ${isSelected ? "text-white" : "text-gray-400"}`}>
-                    {option.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          <p className="text-xs text-gray-500 mt-2">This squad will be used by default in matches</p>
-        </div>
-
-        {/* Auto Select Tournament Squad */}
-        <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">
-          <div>
-            <p className="text-white font-medium">Auto-Select Tournament Squad</p>
-            <p className="text-xs text-gray-400">Automatically use your tournament squad in tournaments</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleChange("autoSelectTournamentSquad", !settings.autoSelectTournamentSquad)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${
-              settings.autoSelectTournamentSquad ? "bg-indigo-600" : "bg-gray-700"
-            }`}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="max-w-3xl"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Header */}
+          <motion.div
+            variants={itemVariants}
+            className="flex items-center justify-between gap-3"
           >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all ${
-              settings.autoSelectTournamentSquad ? "translate-x-6" : "translate-x-1"
-            }`} />
-          </button>
-        </div>
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
+                <Trophy className="h-6 w-6 text-white" />
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-gray-900 bg-yellow-500">
+                  <Sparkles className="h-2.5 w-2.5 text-white" />
+                </span>
+              </span>
+              <div>
+                <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                  🏆 Competition Settings
+                </h1>
+                <p className="mt-1 text-gray-400">
+                  Configure your competitive preferences
+                </p>
+              </div>
+            </div>
 
-        {/* Match Reminder Time - Updated description */}
-<div>
-  <label className="block text-sm font-medium text-gray-300 mb-2">
-    <span className="flex items-center gap-2">
-      <Clock className="h-4 w-4" />
-      Match Reminder Time
-    </span>
-  </label>
-  <select
-    value={settings.matchReminderTime}
-    onChange={(e) => handleChange("matchReminderTime", e.target.value)}
-    className="w-full rounded-xl border border-gray-700 bg-gray-800/50 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
-  >
-    <option value="15m">15 minutes before</option>
-    <option value="30m">30 minutes before</option>
-    <option value="1h">1 hour before</option>
-    <option value="2h">2 hours before</option>
-    <option value="24h">24 hours before</option>
-  </select>
-  <p className="text-xs text-gray-500 mt-2">When to send match reminder emails</p>
-</div>
+            {/* Live default-squad badge */}
+            <span className="hidden items-center gap-2 self-start rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3.5 py-2 text-indigo-300 sm:flex">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-semibold capitalize">
+                {settings.defaultSquad.toLowerCase()}
+              </span>
+            </span>
+          </motion.div>
 
-{/* Fixture Calendar Sync - Updated description */}
-<div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">
-  <div>
-    <p className="text-white font-medium">Calendar Sync</p>
-    <p className="text-xs text-gray-400">Generate .ics calendar files when fixtures are created</p>
-  </div>
-  <button
-    type="button"
-    onClick={() => handleChange("fixtureCalendarSync", !settings.fixtureCalendarSync)}
-    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${
-      settings.fixtureCalendarSync ? "bg-indigo-600" : "bg-gray-700"
-    }`}
-  >
-    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all ${
-      settings.fixtureCalendarSync ? "translate-x-6" : "translate-x-1"
-    }`} />
-  </button>
-</div>
-
-        {/* Fixture Calendar Sync */}
-        <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl border border-gray-700">
-          <div>
-            <p className="text-white font-medium">Calendar Sync</p>
-            <p className="text-xs text-gray-400">Add fixtures to your calendar automatically</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleChange("fixtureCalendarSync", !settings.fixtureCalendarSync)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all ${
-              settings.fixtureCalendarSync ? "bg-indigo-600" : "bg-gray-700"
-            }`}
+          {/* Default Squad */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
           >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all ${
-              settings.fixtureCalendarSync ? "translate-x-6" : "translate-x-1"
-            }`} />
-          </button>
-        </div>
+            <SectionTitle icon={Shield} title="Default Squad" />
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              {squadOptions.map((option) => {
+                const Icon = option.icon;
+                const isSelected = settings.defaultSquad === option.value;
+                return (
+                  <motion.button
+                    key={option.value}
+                    type="button"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => handleChange("defaultSquad", option.value)}
+                    className={`relative flex min-h-[44px] flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all ${
+                      isSelected
+                        ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/20 ring-2 ring-indigo-500/20"
+                        : "border-gray-700 hover:border-gray-600 hover:bg-gray-700/20"
+                    }`}
+                  >
+                    {isSelected && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500"
+                      >
+                        <Check className="h-3 w-3 text-white" />
+                      </motion.span>
+                    )}
+                    <Icon
+                      className={`h-6 w-6 ${
+                        isSelected ? "text-indigo-400" : "text-gray-400"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm font-medium ${
+                        isSelected ? "text-white" : "text-gray-400"
+                      }`}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="text-center text-[10px] text-gray-500">
+                      {option.desc}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              This squad will be used by default in matches
+            </p>
+          </motion.div>
 
-        {/* Save Button */}
-        <div className="flex gap-4 pt-4 border-t border-gray-800">
-          <button
+          {/* Squad & Tournament Options */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
+          >
+            <SectionTitle icon={Trophy} title="Tournament & Fixtures" accent="text-purple-400" />
+
+            <div className="mt-4 space-y-3">
+              {/* Auto Select Tournament Squad */}
+              <ToggleRow
+                icon={Trophy}
+                label="Auto-Select Tournament Squad"
+                description="Automatically use your tournament squad in tournaments"
+                enabled={settings.autoSelectTournamentSquad}
+                onToggle={() =>
+                  handleChange(
+                    "autoSelectTournamentSquad",
+                    !settings.autoSelectTournamentSquad
+                  )
+                }
+              />
+
+              {/* Fixture Calendar Sync (deduplicated — single toggle) */}
+              <ToggleRow
+                icon={CalendarCheck}
+                label="Calendar Sync"
+                description="Generate .ics calendar files when fixtures are created"
+                enabled={settings.fixtureCalendarSync}
+                onToggle={() =>
+                  handleChange(
+                    "fixtureCalendarSync",
+                    !settings.fixtureCalendarSync
+                  )
+                }
+              />
+            </div>
+          </motion.div>
+
+          {/* Match Reminder Time */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
+          >
+            <SectionTitle icon={Clock} title="Match Reminder Time" accent="text-pink-400" />
+
+            <div className="mt-4">
+              {/* Quick pill selector mirrors the native select */}
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(["15m", "30m", "1h", "2h", "24h"] as const).map((opt) => {
+                  const active = settings.matchReminderTime === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => handleChange("matchReminderTime", opt)}
+                      className={`min-h-[44px] rounded-xl border px-4 text-sm font-medium transition-all ${
+                        active
+                          ? "border-indigo-500 bg-indigo-500/15 text-white shadow-md shadow-indigo-500/20"
+                          : "border-gray-700 bg-gray-900/40 text-gray-400 hover:border-gray-600 hover:text-white"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <label className="sr-only" htmlFor="matchReminderTime">
+                Match Reminder Time
+              </label>
+              <select
+                id="matchReminderTime"
+                value={settings.matchReminderTime}
+                onChange={(e) =>
+                  handleChange("matchReminderTime", e.target.value)
+                }
+                className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              >
+                <option value="15m">15 minutes before</option>
+                <option value="30m">30 minutes before</option>
+                <option value="1h">1 hour before</option>
+                <option value="2h">2 hours before</option>
+                <option value="24h">24 hours before</option>
+              </select>
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                <Clock className="h-3 w-3" />
+                Reminders sent{" "}
+                <span className="text-gray-400">
+                  {reminderLabels[settings.matchReminderTime]}
+                </span>{" "}
+                each match
+              </p>
+            </div>
+          </motion.div>
+        </form>
+      </motion.div>
+
+      {/* Sticky Save Bar */}
+      <motion.div
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-gray-900/80 backdrop-blur-xl"
+      >
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+          <p className="hidden text-xs text-gray-500 sm:block">
+            Default squad:{" "}
+            <span className="font-semibold capitalize text-gray-300">
+              {settings.defaultSquad.toLowerCase()}
+            </span>{" "}
+            · Reminder:{" "}
+            <span className="font-semibold text-gray-300">
+              {settings.matchReminderTime}
+            </span>
+          </p>
+          <motion.button
             type="submit"
+            onClick={handleSubmit}
             disabled={saving}
-            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50"
+            whileTap={{ scale: 0.97 }}
+            className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 font-semibold text-white shadow-lg transition-all disabled:opacity-50 sm:w-auto ${
+              saveSuccess
+                ? "bg-gradient-to-r from-emerald-500 to-green-600 shadow-emerald-500/30"
+                : "bg-gradient-to-r from-indigo-600 to-purple-600 shadow-indigo-500/30 hover:from-indigo-700 hover:to-purple-700 hover:shadow-indigo-500/50"
+            }`}
           >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
+            <AnimatePresence mode="wait" initial={false}>
+              {saving ? (
+                <motion.span
+                  key="saving"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </motion.span>
+              ) : saveSuccess ? (
+                <motion.span
+                  key="saved"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  Saved!
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="save"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Changes
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
         </div>
-      </form>
+      </motion.div>
     </div>
-  )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                       Reusable presentational bits                          */
+/* -------------------------------------------------------------------------- */
+
+function ToggleRow({
+  icon: Icon,
+  label,
+  description,
+  enabled,
+  onToggle,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className="group flex min-h-[44px] items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-900/40 p-4 transition-all hover:border-indigo-500/40 hover:bg-gray-900/70"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-colors ${
+            enabled
+              ? "bg-indigo-500/20 ring-1 ring-indigo-500/30"
+              : "bg-gray-700/50 ring-1 ring-white/5"
+          }`}
+        >
+          <Icon
+            className={`h-5 w-5 transition-colors ${
+              enabled ? "text-indigo-400" : "text-gray-500"
+            }`}
+          />
+        </div>
+        <div>
+          <p className="font-medium text-white">{label}</p>
+          <p className="text-xs text-gray-400">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={enabled}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-all ${
+          enabled ? "bg-indigo-600 shadow-md shadow-indigo-500/30" : "bg-gray-700"
+        }`}
+      >
+        <motion.span
+          layout
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ${
+            enabled ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </motion.div>
+  );
+}
+
+function SectionTitle({
+  icon: Icon,
+  title,
+  accent = "text-indigo-400",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  accent?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
+        <Icon className={`h-4 w-4 ${accent}`} />
+      </span>
+      <h3 className="text-base font-semibold text-white">{title}</h3>
+    </div>
+  );
+}
+
+/* Decorative animated gradient background with blur orbs + grid overlay */
+function DecorBackground() {
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[120px]" />
+      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-[120px]" />
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+    </div>
+  );
 }

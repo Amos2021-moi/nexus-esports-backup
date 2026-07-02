@@ -10,130 +10,170 @@ export async function POST(
   try {
     const { fixtureId } = await params
     const session = await getServerSession(authOptions)
-    
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if fixture exists with season
+    const formData = await request.formData()
+    const homeScore = parseInt(formData.get("homeScore") as string)
+    const awayScore = parseInt(formData.get("awayScore") as string)
+    const evidence = formData.get("evidence") as File | null
+
+    if (isNaN(homeScore) || isNaN(awayScore)) {
+      return NextResponse.json(
+        { error: "Valid scores are required" },
+        { status: 400 }
+      )
+    }
+
+    // Get fixture with players
     const fixture = await prisma.fixture.findUnique({
       where: { id: fixtureId },
-      include: { 
-        season: true
-      }
+      include: {
+        homePlayer: {
+          include: { profile: true },
+        },
+        awayPlayer: {
+          include: { profile: true },
+        },
+        season: true,
+      },
     })
 
     if (!fixture) {
       return NextResponse.json({ error: "Fixture not found" }, { status: 404 })
     }
 
-    // ✅ ALLOW BOTH home and away players to submit
-    if (fixture.homePlayerId !== session.user.id && fixture.awayPlayerId !== session.user.id) {
-      return NextResponse.json({ 
-        error: "You are not part of this fixture." 
-      }, { status: 403 })
-    }
-
-    // Check Season Status - Only ALLOW if season is LIVE
-    if (fixture.season?.status !== "LIVE") {
-      return NextResponse.json({ 
-        error: `Results can only be submitted when season is LIVE (current: ${fixture.season?.status || "UNKNOWN"})` 
-      }, { status: 403 })
-    }
-
-    // ✅ Check if fixture already has a result (LOCKED)
-    if (fixture.status === "PENDING") {
-      const submittedBy = await prisma.user.findUnique({
-        where: { id: fixture.submittedBy || undefined },
-        select: { name: true }
-      })
-      const submittedByName = submittedBy?.name || "Someone"
-      
-      return NextResponse.json({ 
-        error: `This fixture already has a pending result submitted by ${submittedByName}. Waiting for admin approval.`,
-        locked: true,
-        submittedBy: submittedByName
-      }, { status: 400 })
-    }
-
+    // ✅ Check if fixture is completed
     if (fixture.status === "COMPLETED") {
-      return NextResponse.json({ 
-        error: "This fixture has already been completed and approved." 
-      }, { status: 400 })
+      return NextResponse.json(
+        { error: "Fixture already completed" },
+        { status: 400 }
+      )
     }
 
-    const formData = await request.formData()
-    const homeScore = parseInt(formData.get("homeScore") as string)
-    const awayScore = parseInt(formData.get("awayScore") as string)
-    const evidenceFile = formData.get("evidence") as File
-
-    if (isNaN(homeScore) || isNaN(awayScore)) {
-      return NextResponse.json({ error: "Invalid scores" }, { status: 400 })
+    // ✅ Check if user is part of this fixture
+    if (fixture.homePlayerId !== session.user.id && fixture.awayPlayerId !== session.user.id) {
+      return NextResponse.json(
+        { error: "You are not part of this fixture" },
+        { status: 403 }
+      )
     }
 
-    if (!evidenceFile) {
-      return NextResponse.json({ error: "Evidence screenshot is required" }, { status: 400 })
-    }
-
-    // Convert image to base64
-    let evidenceImage = null
-    if (evidenceFile && evidenceFile.size > 0) {
-      const bytes = await evidenceFile.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-      evidenceImage = buffer.toString("base64")
-    }
-
-    // Update fixture to PENDING status
-    await prisma.fixture.update({
-      where: { id: fixtureId },
-      data: {
-        homeScore,
-        awayScore,
-        status: "PENDING",
-        submittedBy: session.user.id,
-        submittedAt: new Date()
-      }
+    // ✅ Check payment requirement for this season
+    const leagueSettings = await prisma.leagueSettings.findUnique({
+      where: { seasonId: fixture.seasonId },
     })
 
-    // Create result with source: "LEAGUE"
+    if (leagueSettings?.paymentRequired) {
+      // ✅ Check PlayerSeasonEntry (admin marked paid)
+      const playerEntry = await prisma.playerSeasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: fixture.seasonId,
+          },
+        },
+      })
+
+      // ✅ Check SeasonEntry (M-Pesa payment)
+      const seasonEntry = await prisma.seasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: fixture.seasonId,
+          },
+        },
+      })
+
+      const hasPaid = playerEntry?.hasPaid || seasonEntry?.status === "ACTIVE"
+
+      if (!hasPaid) {
+        return NextResponse.json(
+          { error: "You must pay the entry fee to submit results. Please pay on your dashboard." },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Check if result already exists for this fixture
+    const existingResult = await prisma.result.findUnique({
+      where: { fixtureId },
+    })
+
+    if (existingResult) {
+      return NextResponse.json(
+        { error: "Result already submitted for this fixture" },
+        { status: 400 }
+      )
+    }
+
+    // Handle evidence upload
+    let evidenceBase64 = null
+    if (evidence) {
+      const buffer = Buffer.from(await evidence.arrayBuffer())
+      evidenceBase64 = buffer.toString("base64")
+    }
+
+    // Create result with PENDING status
     const result = await prisma.result.create({
       data: {
         fixtureId,
         homeScore,
         awayScore,
-        evidenceImage,
+        evidenceImage: evidenceBase64,
         submittedBy: session.user.id,
         approved: false,
         source: "LEAGUE",
-      }
+      },
+      include: {
+        fixture: {
+          include: {
+            homePlayer: {
+              include: { profile: true },
+            },
+            awayPlayer: {
+              include: { profile: true },
+            },
+          },
+        },
+      },
     })
 
-    // ✅ Notify the other player that result was submitted
-    const otherPlayerId = fixture.homePlayerId === session.user.id 
-      ? fixture.awayPlayerId 
-      : fixture.homePlayerId
-
-    const submitterName = session.user.name || "A player"
-
-    await prisma.notification.create({
-      data: {
-        userId: otherPlayerId,
-        title: "📋 Result Submitted",
-        message: `${submitterName} has submitted a result for your match. Waiting for admin approval.`,
-        type: "RESULT_APPROVED",
-        link: `/matches/${fixtureId}`
-      }
+    // Update fixture status to PENDING
+    await prisma.fixture.update({
+      where: { id: fixtureId },
+      data: { status: "PENDING" },
     })
 
-    return NextResponse.json({ 
-      success: true, 
-      message: "Result submitted! Waiting for admin approval.",
-      result 
+    // ✅ Notify admins about pending result
+    const admins = await prisma.user.findMany({
+      where: { role: "ADMIN" },
+      select: { id: true },
+    })
+
+    if (admins.length > 0) {
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          title: "📋 New Result Pending",
+          message: `New result submitted for ${fixture.homePlayer?.name || "Home"} vs ${fixture.awayPlayer?.name || "Away"}. Please review.`,
+          type: "RESULT_SUBMITTED",
+          link: `/admin/results`,
+        })),
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Result submitted successfully! Waiting for admin approval.",
+      result,
     })
   } catch (error) {
     console.error("Error submitting result:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to submit" },
+      { error: error instanceof Error ? error.message : "Failed to submit result" },
       { status: 500 }
     )
   }

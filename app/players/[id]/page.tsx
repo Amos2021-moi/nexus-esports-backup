@@ -8,6 +8,7 @@ import {
   Target, Activity, CheckCircle, Crown, Sparkles, Eye, MessageCircle, Lock, EyeOff
 } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import TrustBadge from "@/components/ui/TrustBadge"
 
 interface PlayerProfile {
@@ -187,25 +188,37 @@ export default function PlayerProfilePage() {
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="h-40 bg-gradient-to-r from-indigo-600 to-purple-600 relative">
           {profile.bannerImage && (
-            <img src={profile.bannerImage} alt="Banner" className="h-full w-full object-cover" />
-          )}
+  <Image
+    src={profile.bannerImage}
+    alt="Banner"
+    width={1200}
+    height={160}
+    className="h-full w-full object-cover"
+    loading="lazy"
+  />
+)}
         </div>
 
         <div className="relative px-6 pb-6">
           <div className="flex flex-wrap items-end gap-4 -mt-16">
             <div className="relative">
-              {profile.profilePicture ? (
-                <img 
-                  src={profile.profilePicture} 
-                  alt={profile.username}
-                  className="w-28 h-28 rounded-full border-4 border-gray-800 object-cover"
-                />
-              ) : (
-                <div className="w-28 h-28 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-4xl font-bold border-4 border-gray-800">
-                  {profile.username?.charAt(0)?.toUpperCase() || "?"}
-                </div>
-              )}
-              {!privacy.publicProfile && (isOwnProfile || isAdmin) && (
+              import Image from "next/image"
+
+{profile.profilePicture ? (
+  <Image
+    src={profile.profilePicture}
+    alt={profile.username || "Player"}
+    width={112}
+    height={112}
+    className="w-28 h-28 rounded-full border-4 border-gray-800 object-cover"
+    loading="lazy"
+  />
+) : (
+  <div className="w-28 h-28 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-4xl font-bold border-4 border-gray-800">
+    {(profile.username || "Player").charAt(0).toUpperCase()}
+  </div>
+)}
+              {!profile.privacySettings?.publicProfile && (isOwnProfile || isAdmin) && (
                 <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1 border-2 border-gray-800">
                   <Lock size={12} className="text-white" />
                 </div>

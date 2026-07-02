@@ -1,391 +1,637 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { 
-  Trophy, 
-  Mail, 
-  Lock, 
-  AlertCircle, 
-  CheckCircle, 
-  Loader2,
+import {
+  useState,
+  useEffect,
+  type FormEvent,
+  type ChangeEvent,
+  Suspense,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import toast, { Toaster } from "react-hot-toast";
+import {
+  Shield,
+  Mail,
+  Lock,
   Eye,
   EyeOff,
-  Sparkles,
-  Shield,
-  Users,
-  Calendar,
+  Loader2,
   ArrowRight,
-  Gamepad2,
-  Code2,
-} from "lucide-react"
-import toast from "react-hot-toast"
+  AlertCircle,
+} from "lucide-react";
 
-export default function SignInForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [error, setError] = useState<string>("")
-  const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  
-  const registered = searchParams.get("registered")
-  const errorParam = searchParams.get("error")
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                     */
+/* -------------------------------------------------------------------------- */
 
-  // Clean URL on load
+interface FormState {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+}
+
+type OAuthProvider = "google" | "facebook";
+
+interface SessionUser {
+  role?: string;
+  [key: string]: unknown;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Constants                                   */
+/* -------------------------------------------------------------------------- */
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const DEFAULT_PLAYER_REDIRECT = "/dashboard";
+const ADMIN_REDIRECT = "/admin";
+
+/**
+ * Maps NextAuth error codes (passed via the `?error=` query param on the
+ * callback URL) to user-friendly messages.
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+  CredentialsSignin: "Invalid email or password. Please try again.",
+  OAuthSignin: "Couldn't start the sign-in flow. Please try again.",
+  OAuthCallback: "Authentication failed during callback. Please try again.",
+  OAuthCreateAccount: "Could not create an account with this provider.",
+  EmailCreateAccount: "Could not create an account with this email.",
+  Callback: "Authentication callback failed. Please try again.",
+  OAuthAccountNotLinked:
+    "This email is already linked to another sign-in method.",
+  SessionRequired: "Please sign in to access that page.",
+  AccessDenied: "Access denied. You don't have permission to sign in.",
+  default: "Something went wrong. Please try again.",
+};
+
+/* -------------------------------------------------------------------------- */
+/*                              Helper functions                              */
+/* -------------------------------------------------------------------------- */
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function resolveRedirect(role: string | undefined, callbackUrl: string): string {
+  // Honour an explicit, safe callbackUrl first.
+  if (callbackUrl && callbackUrl !== "/" && isSafeRelativeUrl(callbackUrl)) {
+    return callbackUrl;
+  }
+  return role === "admin" ? ADMIN_REDIRECT : DEFAULT_PLAYER_REDIRECT;
+}
+
+/** Only allow same-origin relative paths to avoid open-redirect attacks. */
+function isSafeRelativeUrl(url: string): boolean {
+  return url.startsWith("/") && !url.startsWith("//");
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Brand SVG Icons                                  */
+/* -------------------------------------------------------------------------- */
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.24 1.3-.97 2.4-2.06 3.13v2.6h3.33c1.95-1.8 3.07-4.45 3.07-7.6 0-.7-.06-1.4-.18-2.03H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.79 0 5.13-.92 6.84-2.5l-3.33-2.6c-.92.62-2.1.99-3.51.99-2.7 0-4.98-1.82-5.8-4.27H2.77v2.68C4.47 19.66 7.99 22 12 22z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.2 13.62A6 6 0 0 1 5.88 12c0-.56.1-1.11.27-1.62V7.7H2.77A10 10 0 0 0 2 12c0 1.6.38 3.12 1.06 4.46l3.14-2.84z"
+      />
+      <path
+        fill="#4285F4"
+        d="M12 5.95c1.52 0 2.88.52 3.96 1.55l2.95-2.95C17.13 2.92 14.79 2 12 2 7.99 2 4.47 4.34 2.77 7.7l3.43 2.68C7.02 7.93 9.3 5.95 12 5.95z"
+      />
+    </svg>
+  );
+}
+
+function FacebookIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#1877F2"
+        d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.01 10.12 11.93v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.25h3.32l-.53 3.49h-2.79V24C19.61 23.08 24 18.09 24 12.07z"
+      />
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: "easeOut", staggerChildren: 0.07 },
+  },
+} as const;
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Sign In Form                                */
+/* -------------------------------------------------------------------------- */
+
+function SignInForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
+
+  const callbackUrl = searchParams?.get("callbackUrl") ?? "";
+  const urlError = searchParams?.get("error") ?? "";
+
+  const [form, setForm] = useState<FormState>({
+    email: "",
+    password: "",
+    rememberMe: false,
+  });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const [greeting, setGreeting] = useState("Welcome back");
+
+  /* Set the greeting on mount (avoids SSR/CSR mismatch). */
   useEffect(() => {
-    if (window.location.search) {
-      window.history.replaceState({}, document.title, "/auth/signin")
-    }
-  }, [])
+    setGreeting(getGreeting());
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!email || !password) {
-      setError("Please enter both email and password")
-      toast.error("Please enter both email and password")
-      return
+  /* Surface OAuth / callback errors arriving via the query string. */
+  useEffect(() => {
+    if (urlError) {
+      toast.error(ERROR_MESSAGES[urlError] ?? ERROR_MESSAGES.default, {
+        id: "auth-url-error",
+      });
+    }
+  }, [urlError]);
+
+  /* If a session already exists, route the user onward immediately. */
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const role = (session.user as SessionUser).role;
+      router.replace(resolveRedirect(role, callbackUrl));
+    }
+  }, [status, session, router, callbackUrl]);
+
+  /* ----------------------------- Validation ----------------------------- */
+
+  function validate(): boolean {
+    const next: FormErrors = {};
+
+    if (!form.email.trim()) {
+      next.email = "Email is required.";
+    } else if (!EMAIL_REGEX.test(form.email.trim())) {
+      next.email = "Enter a valid email address.";
     }
 
-    setLoading(true)
-    setError("")
+    if (!form.password) {
+      next.password = "Password is required.";
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  /* ----------------------------- Handlers ------------------------------- */
+
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    // Clear the field-level error as the user types.
+    if (errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+  }
+
+  async function handleCredentialsSignIn(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (isSubmitting || oauthLoading) return;
+    if (!validate()) return;
+
+    setIsSubmitting(true);
 
     try {
       const result = await signIn("credentials", {
-        email: email.trim(),
-        password: password.trim(),
         redirect: false,
-      })
+        email: form.email.trim(),
+        password: form.password,
+        rememberMe: form.rememberMe,
+        callbackUrl: callbackUrl || DEFAULT_PLAYER_REDIRECT,
+      });
 
-      if (result?.error) {
-        setError("Invalid email or password")
-        setLoading(false)
-        toast.error("Invalid email or password")
-        return
+      if (!result) {
+        toast.error(ERROR_MESSAGES.default);
+        return;
       }
 
-      // Wait for session
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Check role and redirect
-      const sessionRes = await fetch("/api/auth/session", {
-        credentials: "include",
-      })
-      const session = await sessionRes.json()
-      
-      if (session?.user) {
-        toast.success(`Welcome back, ${session.user.name || "Player"}! 🎮`)
-        
-        if (session.user.role === "ADMIN") {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
-      } else {
-        setError("Failed to authenticate. Please try again.")
-        setLoading(false)
+      if (result.error) {
+        const message =
+          result.error === "CredentialsSignin"
+            ? ERROR_MESSAGES.CredentialsSignin
+            : ERROR_MESSAGES[result.error] ?? ERROR_MESSAGES.default;
+        toast.error(message);
+        return;
       }
-    } catch (err) {
-      console.error("Sign in error:", err)
-      setError("Something went wrong. Please try again.")
-      setLoading(false)
+
+      toast.success("Signed in successfully. Redirecting…");
+
+      // Determine destination from the fresh session so role-based
+      // routing works correctly.
+      let role: string | undefined;
+      try {
+        const res = await fetch("/api/auth/session");
+        const data = (await res.json()) as { user?: SessionUser };
+        role = data?.user?.role;
+      } catch {
+        /* fall back to default redirect below */
+      }
+
+      const destination =
+        result.url && isSafeRelativeUrl(new URL(result.url, window.location.origin).pathname)
+          ? resolveRedirect(role, callbackUrl)
+          : resolveRedirect(role, callbackUrl);
+
+      router.push(destination);
+      router.refresh();
+    } catch {
+      toast.error(ERROR_MESSAGES.default);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  // Quick fill for testing
-  const fillTestAccount = (role: "admin" | "player") => {
-    if (role === "admin") {
-      setEmail("admin@example.com")
-      setPassword("admin123")
-    } else {
-      setEmail("player@example.com")
-      setPassword("player123")
+  async function handleOAuthSignIn(provider: OAuthProvider) {
+    if (isSubmitting || oauthLoading) return;
+    setOauthLoading(provider);
+    try {
+      // For OAuth we let NextAuth handle the full-page redirect flow.
+      await signIn(provider, {
+        callbackUrl: callbackUrl || DEFAULT_PLAYER_REDIRECT,
+      });
+    } catch {
+      toast.error(ERROR_MESSAGES.OAuthSignin);
+      setOauthLoading(null);
     }
   }
+
+  const busy = isSubmitting || oauthLoading !== null;
+
+  /* ------------------------------- Render ------------------------------- */
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 p-4 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-500/5 rounded-full blur-3xl"></div>
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
+    <main className="relative min-h-screen w-full overflow-hidden bg-gray-900 text-white">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: "#1f2937",
+            color: "#fff",
+            border: "1px solid #374151",
+          },
+          success: { iconTheme: { primary: "#4f46e5", secondary: "#fff" } },
+          error: { iconTheme: { primary: "#ef4444", secondary: "#fff" } },
+        }}
+      />
+
+      {/* Decorative gradient background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+        <motion.div
+          aria-hidden="true"
+          className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/30 blur-[120px]"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          aria-hidden="true"
+          className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-purple-600/30 blur-[120px]"
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.5, 0.3, 0.5] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+        {/* Subtle grid overlay */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
       </div>
 
-      <div className="w-full max-w-6xl relative z-10">
-        <div className="grid lg:grid-cols-2 gap-8 items-center">
-          {/* Left Side - Branding */}
-          <div className="hidden lg:block space-y-8 text-white">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl shadow-xl shadow-indigo-500/20">
-                <Trophy className="h-10 w-10 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">Nexus Esports</h1>
-                <p className="text-white/50 text-sm">Premier eFootball League</p>
+      {/* Content */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-md"
+        >
+          {/* Brand */}
+          <motion.div
+            variants={itemVariants}
+            className="mb-8 flex flex-col items-center text-center"
+          >
+            <div className="relative mb-4">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 blur-md opacity-60" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-900/50">
+                <Shield className="h-9 w-9 text-white" strokeWidth={2.2} />
               </div>
             </div>
+            <h1 className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
+              Nexus Esports
+            </h1>
+            <p className="mt-1 text-sm text-gray-400">
+              {greeting} — sign in to continue
+            </p>
+          </motion.div>
 
-            <div className="space-y-6">
-              <h2 className="text-4xl font-bold leading-tight bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
-                Welcome Back,<br />
-                <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Champion
-                </span>
-              </h2>
-              <p className="text-white/60 text-lg leading-relaxed max-w-md">
-                Continue your journey to the top. Compete, connect, and claim your place in the Hall of Fame.
+          {/* Glass card */}
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
+          >
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-white">Sign in</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Enter your credentials to access your account.
               </p>
-
-              <div className="space-y-4 pt-4">
-                <div className="flex items-center gap-4 text-white/70">
-                  <div className="p-2 bg-white/5 rounded-xl border border-white/5">
-                    <Users className="h-5 w-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">1,200+ Players</p>
-                    <p className="text-sm text-white/40">Competing daily</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-white/70">
-                  <div className="p-2 bg-white/5 rounded-xl border border-white/5">
-                    <Calendar className="h-5 w-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">50+ Tournaments</p>
-                    <p className="text-sm text-white/40">Held this season</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-white/70">
-                  <div className="p-2 bg-white/5 rounded-xl border border-white/5">
-                    <Shield className="h-5 w-5 text-pink-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">Trust Score System</p>
-                    <p className="text-sm text-white/40">Verified players</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* Trust Badges */}
-            <div className="flex flex-wrap gap-3 pt-4">
-              <div className="px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-xs text-white/50 flex items-center gap-1.5">
-                <CheckCircle className="h-3 w-3 text-green-400" />
-                Secure Login
-              </div>
-              <div className="px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-xs text-white/50 flex items-center gap-1.5">
-                <Shield className="h-3 w-3 text-blue-400" />
-                Admin Verified
-              </div>
-              <div className="px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-xs text-white/50 flex items-center gap-1.5">
-                <Gamepad2 className="h-3 w-3 text-purple-400" />
-                eFootball Pro
-              </div>
+            {/* URL-level error banner */}
+            <AnimatePresence>
+              {urlError && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-5 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"
+                  role="alert"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{ERROR_MESSAGES[urlError] ?? ERROR_MESSAGES.default}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Social logins */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handleOAuthSignIn("google")}
+                disabled={busy}
+                aria-label="Sign in with Google"
+                className="group flex items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {oauthLoading === "google" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <GoogleIcon className="h-5 w-5" />
+                )}
+                <span>Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOAuthSignIn("facebook")}
+                disabled={busy}
+                aria-label="Sign in with Facebook"
+                className="group flex items-center justify-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {oauthLoading === "facebook" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <FacebookIcon className="h-5 w-5" />
+                )}
+                <span>Facebook</span>
+              </button>
             </div>
-          </div>
 
-          {/* Right Side - Sign In Form */}
-          <div className="w-full max-w-md mx-auto lg:mx-0">
-            <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl p-8 relative overflow-hidden">
-              {/* Subtle gradient overlay */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-              
-              {/* Mobile Logo */}
-              <div className="lg:hidden text-center mb-6">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 shadow-xl shadow-indigo-500/20 mb-3">
-                  <Trophy className="h-7 w-7 text-white" />
+            {/* Divider */}
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                or continue with
+              </span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {/* Credentials form */}
+            <form onSubmit={handleCredentialsSignIn} noValidate className="space-y-4">
+              {/* Email */}
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-1.5 block text-sm font-medium text-gray-300"
+                >
+                  Email address
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <Mail className="h-5 w-5" />
+                  </span>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={handleChange}
+                    disabled={busy}
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? "email-error" : undefined}
+                    className={`w-full rounded-xl border bg-gray-900/60 py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 transition focus:outline-none focus:ring-2 disabled:opacity-60 ${
+                      errors.email
+                        ? "border-red-500/60 focus:ring-red-500/50"
+                        : "border-white/10 focus:border-indigo-500/60 focus:ring-indigo-500/50"
+                    }`}
+                  />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
-                <p className="text-white/50 text-sm mt-1">Sign in to continue</p>
+                {errors.email && (
+                  <p id="email-error" className="mt-1.5 text-xs text-red-400">
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
-              {/* Alerts */}
-              {registered && (
-                <div className="mb-4 rounded-xl bg-green-500/20 border border-green-500/30 p-3 flex items-center gap-2 text-green-200 text-sm">
-                  <CheckCircle size={18} />
-                  <span>Account created successfully! Please sign in.</span>
-                </div>
-              )}
-
-              {errorParam === "registrations_closed" && (
-                <div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 p-3 flex items-center gap-2 text-red-200 text-sm">
-                  <AlertCircle size={18} />
-                  <span>Registrations are currently closed.</span>
-                </div>
-              )}
-
-              {error && (
-                <div className="mb-4 rounded-xl bg-red-500/20 border border-red-500/30 p-3 flex items-center gap-2 text-red-200 text-sm animate-shake">
-                  <AlertCircle size={18} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-1.5">
-                    Email Address
-                  </label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/30 group-focus-within:text-indigo-400 transition-colors" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
-                      autoComplete="email"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-1.5">
+              {/* Password */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-300"
+                  >
                     Password
-                  </label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/30 group-focus-within:text-indigo-400 transition-colors" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-white/10 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Remember Me & Forgot Password */}
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/20 bg-white/5 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
-                    />
-                    <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors">
-                      Remember me
-                    </span>
                   </label>
                   <Link
                     href="/auth/forgot-password"
-                    className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                    className="text-xs font-medium text-indigo-400 transition hover:text-indigo-300"
                   >
                     Forgot password?
                   </Link>
                 </div>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                    <Lock className="h-5 w-5" />
+                  </span>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={form.password}
+                    onChange={handleChange}
+                    disabled={busy}
+                    aria-invalid={!!errors.password}
+                    aria-describedby={
+                      errors.password ? "password-error" : undefined
+                    }
+                    className={`w-full rounded-xl border bg-gray-900/60 py-2.5 pl-10 pr-11 text-sm text-white placeholder-gray-500 transition focus:outline-none focus:ring-2 disabled:opacity-60 ${
+                      errors.password
+                        ? "border-red-500/60 focus:ring-red-500/50"
+                        : "border-white/10 focus:border-indigo-500/60 focus:ring-indigo-500/50"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    disabled={busy}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 transition hover:text-gray-300 focus:outline-none focus:text-indigo-400 disabled:opacity-60"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p id="password-error" className="mt-1.5 text-xs text-red-400">
+                    {errors.password}
+                  </p>
+                )}
+              </div>
 
-                {/* Sign In Button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3.5 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group relative overflow-hidden"
+              {/* Remember me */}
+              <div className="flex items-center">
+                <label
+                  htmlFor="rememberMe"
+                  className="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-300"
                 >
-                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      Sign In
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/10"></div>
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-transparent text-white/30">or continue with</span>
-                </div>
+                  <input
+                    id="rememberMe"
+                    name="rememberMe"
+                    type="checkbox"
+                    checked={form.rememberMe}
+                    onChange={handleChange}
+                    disabled={busy}
+                    className="h-4 w-4 rounded border-white/20 bg-gray-900/60 text-indigo-600 accent-indigo-600 focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-0"
+                  />
+                  Remember me
+                </label>
               </div>
-{/* Social Buttons */}
-<div className="grid grid-cols-2 gap-3">
-  {/* Google Sign-In Button */}
-  <button
-    type="button"
-    onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-    className="flex items-center justify-center gap-2 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:bg-white/10 hover:text-white transition-all text-sm group"
-  >
-    <svg className="h-4 w-4" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-    </svg>
-    Google
-  </button>
-  
-  {/* GitHub Button (Coming Soon) */}
-  <button
-    type="button"
-    className="flex items-center justify-center gap-2 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:bg-white/10 hover:text-white transition-all text-sm"
-    onClick={() => toast("GitHub sign-in coming soon!")}
-  >
-    <Code2 className="h-4 w-4" />
-    GitHub
-  </button>
-</div>
 
-              {/* Footer */}
-              <div className="mt-6 text-center space-y-3">
-                <p className="text-sm text-white/50">
-                  Don't have an account?{" "}
-                  <Link href="/auth/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                    Sign Up
-                  </Link>
-                </p>
-                
-              </div>
-            </div>
+              {/* Submit */}
+              <motion.button
+                type="submit"
+                disabled={busy}
+                whileHover={!busy ? { scale: 1.01 } : undefined}
+                whileTap={!busy ? { scale: 0.99 } : undefined}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Signing in…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign in</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </motion.button>
+            </form>
 
-            {/* Footer Note */}
-            <p className="text-center text-xs text-white/20 mt-4">
-              By signing in, you agree to our Terms of Service and Privacy Policy.
+            {/* Sign up */}
+            <p className="mt-6 text-center text-sm text-gray-400">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/auth/signup"
+                className="font-semibold text-indigo-400 transition hover:text-indigo-300"
+              >
+                Sign up
+              </Link>
             </p>
-          </div>
-        </div>
-      </div>
+          </motion.div>
 
-      {/* Animation keyframes */}
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
-    </div>
-  )
+          <motion.p
+            variants={itemVariants}
+            className="mt-6 text-center text-xs text-gray-600"
+          >
+            By signing in, you agree to our{" "}
+            <Link href="/terms" className="text-gray-500 hover:text-gray-400">
+              Terms
+            </Link>{" "}
+            &amp;{" "}
+            <Link href="/privacy" className="text-gray-500 hover:text-gray-400">
+              Privacy Policy
+            </Link>
+            .
+          </motion.p>
+        </motion.div>
+      </div>
+    </main>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                       Page export (Suspense wrapper)                        */
+/* -------------------------------------------------------------------------- */
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-900">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
+  );
 }

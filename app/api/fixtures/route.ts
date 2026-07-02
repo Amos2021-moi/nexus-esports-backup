@@ -44,6 +44,60 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // ✅ Get the current active season
+    const activeSeason = await prisma.season.findFirst({
+      where: { isActive: true },
+      include: {
+        leagueSettings: true,
+      },
+    })
+
+    // ✅ If no active season, return empty fixtures
+    if (!activeSeason) {
+      return NextResponse.json([])
+    }
+
+    // ✅ Check if payment is required for this season
+    const paymentRequired = activeSeason.leagueSettings?.paymentRequired || false
+    const entryFee = activeSeason.leagueSettings?.entryFee || 0
+
+    // ✅ If payment is required, check if the player has paid
+    if (paymentRequired) {
+      const playerEntry = await prisma.playerSeasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: activeSeason.id,
+          },
+        },
+      })
+
+      // ✅ Also check SeasonEntry (for M-Pesa payments)
+      const seasonEntry = await prisma.seasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: activeSeason.id,
+          },
+        },
+      })
+
+      const hasPaid = playerEntry?.hasPaid || seasonEntry?.status === "ACTIVE"
+
+      // ✅ If not paid, return empty fixtures with payment info
+      if (!hasPaid) {
+        return NextResponse.json({
+          fixtures: [],
+          paymentRequired: true,
+          hasPaid: false,
+          entryFee: entryFee,
+          seasonName: activeSeason.name,
+          message: "Payment required to view fixtures. Please pay the entry fee.",
+        })
+      }
+    }
+
+    // ✅ Return fixtures (only for paid players or when payment is not required)
     const fixtures = await prisma.fixture.findMany({
       where: {
         OR: [
@@ -99,7 +153,11 @@ export async function GET() {
       orderBy: { scheduledDate: 'asc' }
     })
 
-    return NextResponse.json(fixtures)
+    return NextResponse.json({
+      fixtures: fixtures,
+      paymentRequired: false,
+      hasPaid: true,
+    })
   } catch (error) {
     console.error("Error fetching fixtures:", error)
     return NextResponse.json([])

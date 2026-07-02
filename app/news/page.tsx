@@ -130,10 +130,9 @@ export default function NewsPage() {
                     <p className="text-gray-400 text-sm line-clamp-3 mb-4">
                       {item.content}
                     </p>
-                    
-                    <div className="flex items-center text-indigo-400 text-sm font-medium group-hover:gap-2 transition-all">
+                    <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-indigo-400">
                       Read More
-                      <ArrowRight size={14} className="ml-1 group-hover:ml-2 transition-all" />
+                      <ArrowRight size={16} />
                     </div>
                   </div>
                 </div>

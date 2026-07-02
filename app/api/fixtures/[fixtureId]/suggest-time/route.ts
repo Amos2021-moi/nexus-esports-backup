@@ -25,7 +25,8 @@ export async function POST(
       where: { id: fixtureId },
       include: {
         homePlayer: { include: { profile: true } },
-        awayPlayer: { include: { profile: true } }
+        awayPlayer: { include: { profile: true } },
+        season: true,
       }
     })
 
@@ -42,6 +43,42 @@ export async function POST(
         { error: "You are not part of this fixture" },
         { status: 403 }
       )
+    }
+
+    // ✅ Check payment requirement for this season
+    const leagueSettings = await prisma.leagueSettings.findUnique({
+      where: { seasonId: fixture.seasonId },
+    })
+
+    if (leagueSettings?.paymentRequired) {
+      // ✅ Check PlayerSeasonEntry (admin marked paid)
+      const playerEntry = await prisma.playerSeasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: fixture.seasonId,
+          },
+        },
+      })
+
+      // ✅ Check SeasonEntry (M-Pesa payment)
+      const seasonEntry = await prisma.seasonEntry.findUnique({
+        where: {
+          userId_seasonId: {
+            userId: session.user.id,
+            seasonId: fixture.seasonId,
+          },
+        },
+      })
+
+      const hasPaid = playerEntry?.hasPaid || seasonEntry?.status === "ACTIVE"
+
+      if (!hasPaid) {
+        return NextResponse.json(
+          { error: "You must pay the entry fee to suggest match times. Please pay on your dashboard." },
+          { status: 403 }
+        )
+      }
     }
 
     // Determine opponent

@@ -1,60 +1,105 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import LeagueTable from "@/components/league/LeagueTable"
-import Link from "next/link"
-import { Trophy, Calendar, TrendingUp, Archive, EyeOff } from "lucide-react"
-import { SkeletonLeagueTable, Skeleton } from "@/components/ui/Skeleton"
+import { useEffect, useState } from "react";
+import LeagueTable from "@/components/league/LeagueTable";
+import Link from "next/link";
+import {
+  Trophy,
+  Calendar,
+  TrendingUp,
+  Archive,
+  EyeOff,
+  DollarSign,
+  Crown,
+  Medal,
+  Target,
+  Star,
+  ChevronDown,
+} from "lucide-react";
+import { SkeletonLeagueTable, Skeleton } from "@/components/ui/Skeleton";
+import PrizeDisplay from "@/components/competition/PrizeDisplay";
+import { motion, type Variants } from "framer-motion";
 
 interface Season {
-  id: string
-  name: string
-  isActive: boolean
-  status: string
+  id: string;
+  name: string;
+  isActive: boolean;
+  status: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+};
+
 export default function StandingsPage() {
-  const [seasons, setSeasons] = useState<Season[]>([])
-  const [selectedSeason, setSelectedSeason] = useState<string>("")
-  const [loading, setLoading] = useState(true)
-  const [privacySettings, setPrivacySettings] = useState<{ showStats: boolean }>({ showStats: true })
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [privacySettings, setPrivacySettings] = useState<{ showStats: boolean }>({
+    showStats: true,
+  });
+  const [showPrize, setShowPrize] = useState(false);
 
   useEffect(() => {
     async function fetchSeasons() {
       try {
-        const response = await fetch("/api/seasons")
-        const data = await response.json()
-        const seasonsArray = Array.isArray(data) ? data : []
-        setSeasons(seasonsArray)
-        const activeSeason = seasonsArray.find((s: Season) => s.isActive)
+        const response = await fetch("/api/seasons");
+        const data = await response.json();
+        const seasonsArray = Array.isArray(data) ? data : [];
+        setSeasons(seasonsArray);
+        const activeSeason = seasonsArray.find((s: Season) => s.isActive);
         if (activeSeason) {
-          setSelectedSeason(activeSeason.id)
+          setSelectedSeason(activeSeason.id);
         } else if (seasonsArray.length > 0) {
-          setSelectedSeason(seasonsArray[0].id)
+          setSelectedSeason(seasonsArray[0].id);
         }
       } catch (error) {
-        console.error("Error fetching seasons:", error)
-        setSeasons([])
+        console.error("Error fetching seasons:", error);
+        setSeasons([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchSeasons()
-    fetchPrivacySettings()
-  }, [])
+    fetchSeasons();
+    fetchPrivacySettings();
+    checkPrizeEligibility();
+  }, []);
 
   async function fetchPrivacySettings() {
     try {
-      const res = await fetch("/api/settings?category=privacy")
+      const res = await fetch("/api/settings?category=privacy");
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json();
         setPrivacySettings({
-          showStats: data.showStats !== undefined ? data.showStats : true
-        })
+          showStats: data.showStats !== undefined ? data.showStats : true,
+        });
       }
     } catch (error) {
-      console.error("Error fetching privacy settings:", error)
+      console.error("Error fetching privacy settings:", error);
+    }
+  }
+
+  async function checkPrizeEligibility() {
+    try {
+      const res = await fetch("/api/competition/player-entry");
+      if (res.ok) {
+        const data = await res.json();
+        // ✅ Show prize when payment is required AND player has paid
+        setShowPrize(data.paymentRequired && data.hasPaid && data.hasEntry);
+      }
+    } catch (error) {
+      console.error("Error checking prize eligibility:", error);
     }
   }
 
@@ -67,119 +112,246 @@ export default function StandingsPage() {
         </div>
         <SkeletonLeagueTable />
       </div>
-    )
+    );
   }
 
+  const activeSeasonObj = seasons.find((s) => s.id === selectedSeason);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-          <Trophy className="h-7 w-7 text-yellow-500" />
-          League Standings
-        </h1>
-        <p className="text-gray-400 mt-1">Premier League style rankings</p>
+    <div className="relative">
+      {/* Decorative gradient background */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-yellow-500/10 blur-[120px]" />
       </div>
 
-      {/* ✅ Privacy Warning - Show if stats are hidden */}
-      {!privacySettings.showStats && (
-        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
-          <div className="flex items-start gap-3">
-            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
-            <div>
-              <h3 className="text-yellow-400 font-semibold">Your Stats are Hidden</h3>
-              <p className="text-gray-300 text-sm">
-                Your player statistics are currently private. You can change this in your 
-                <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline ml-1">Privacy Settings</a>.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Season Selector */}
-      {seasons.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-          <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Season:
-          </label>
-          <select
-            value={selectedSeason}
-            onChange={(e) => setSelectedSeason(e.target.value)}
-            className="rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-          >
-            {seasons.map((season) => (
-              <option key={season.id} value={season.id}>
-                {season.name} {season.isActive && "⭐ (Active)"}
-              </option>
-            ))}
-          </select>
-          <div className="flex-1"></div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <TrendingUp className="h-4 w-4" />
-            <span>Last updated: {new Date().toLocaleDateString()}</span>
-          </div>
-        </div>
-      )}
-
-      {/* League Table - ✅ Show or hide based on privacy */}
-      {selectedSeason ? (
-        privacySettings.showStats ? (
-          <div className="bg-gray-800/30 rounded-xl overflow-hidden border border-gray-700">
-            <LeagueTable seasonId={selectedSeason} />
-          </div>
-        ) : (
-          <div className="bg-gray-800/30 rounded-xl p-12 text-center border border-gray-700">
-            <EyeOff className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Stats are Private</h3>
-            <p className="text-gray-400 max-w-md mx-auto">
-              Your player statistics are currently hidden. You can change this in your privacy settings.
-            </p>
-            <Link
-              href="/dashboard/settings/privacy"
-              className="inline-block mt-4 text-indigo-400 hover:text-indigo-300 transition-all"
-            >
-              Go to Privacy Settings →
-            </Link>
-          </div>
-        )
-      ) : (
-        <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400 border border-gray-700">
-          No seasons available.
-        </div>
-      )}
-
-      {/* Season Archive Link */}
-      {selectedSeason && (
-        <div className="flex justify-end">
-          <Link
-            href={`/seasons/${selectedSeason}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-indigo-400 hover:text-indigo-300 transition-colors text-sm border border-gray-700"
-          >
-            <Archive size={16} />
-            View Season Archive →
-          </Link>
-        </div>
-      )}
-
-      {/* Rules Card */}
-      <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20 p-5">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-500/20 rounded-lg">
-            <Trophy className="h-5 w-5 text-blue-400" />
-          </div>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants} className="flex items-start gap-3">
+          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 shadow-lg shadow-orange-500/30">
+            <Trophy className="h-6 w-6 text-white" />
+          </span>
           <div>
-            <h3 className="font-semibold text-blue-400">League Rules</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm text-gray-300">
-              <div>✓ Win = <span className="font-bold text-green-400">3 points</span></div>
-              <div>✓ Draw = <span className="font-bold text-yellow-400">1 point</span></div>
-              <div>✓ Loss = <span className="font-bold text-red-400">0 points</span></div>
-              <div>✓ Ranking: Points → Goal Difference → Goals Scored</div>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">
+              League Standings
+            </h1>
+            <p className="text-gray-400 mt-1">Premier League style rankings</p>
+          </div>
+        </motion.div>
+
+        {/* ✅ Privacy Warning - Show if stats are hidden */}
+        {!privacySettings.showStats && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 backdrop-blur-xl"
+          >
+            <div className="flex items-start gap-3">
+              <EyeOff className="mt-0.5 h-5 w-5 text-yellow-400" />
+              <div>
+                <h3 className="font-semibold text-yellow-400">
+                  Your Stats are Hidden
+                </h3>
+                <p className="text-sm text-gray-300">
+                  Your player statistics are currently private. You can change this
+                  in your
+                  <a
+                    href="/dashboard/settings/privacy"
+                    className="ml-1 text-indigo-400 hover:underline"
+                  >
+                    Privacy Settings
+                  </a>
+                  .
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Season Selector */}
+        {seasons.length > 0 && (
+          <motion.div
+            variants={itemVariants}
+            className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl"
+          >
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-400">
+              <Calendar className="h-4 w-4" />
+              Season:
+            </label>
+            <div className="relative">
+              <select
+                value={selectedSeason}
+                onChange={(e) => setSelectedSeason(e.target.value)}
+                className="min-h-[44px] appearance-none rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2 pr-10 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              >
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name} {season.isActive && "⭐ (Active)"}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            </div>
+
+            {/* Active season star badge */}
+            {activeSeasonObj?.isActive && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-1 text-xs font-semibold text-yellow-300 ring-1 ring-yellow-500/30">
+                <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                Active
+              </span>
+            )}
+
+            <div className="flex-1"></div>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <TrendingUp className="h-4 w-4" />
+              <span>Last updated: {new Date().toLocaleDateString()}</span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* League Table */}
+        <motion.div variants={itemVariants}>
+          {selectedSeason ? (
+            privacySettings.showStats ? (
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 backdrop-blur-xl">
+                {/* Horizontal scroll wrapper for mobile responsiveness */}
+                <div className="overflow-x-auto">
+                  <LeagueTable seasonId={selectedSeason} />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-12 text-center backdrop-blur-xl">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-700/40 ring-1 ring-white/10">
+                  <EyeOff className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="mb-2 text-xl font-semibold text-white">
+                  Stats are Private
+                </h3>
+                <p className="mx-auto max-w-md text-gray-400">
+                  Your player statistics are currently hidden. You can change this
+                  in your privacy settings.
+                </p>
+                <Link
+                  href="/dashboard/settings/privacy"
+                  className="mt-4 inline-flex min-h-[44px] items-center text-indigo-400 transition-all hover:text-indigo-300"
+                >
+                  Go to Privacy Settings →
+                </Link>
+              </div>
+            )
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-8 text-center text-gray-400 backdrop-blur-xl">
+              No seasons available.
+            </div>
+          )}
+        </motion.div>
+
+        {/* ✅ Prize Display - Show when eligible (below the league table) */}
+        {showPrize && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-4 backdrop-blur-xl"
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-yellow-400" />
+              <h3 className="text-sm font-semibold text-white">🏆 Prize Pool</h3>
+            </div>
+            <PrizeDisplay compact={true} />
+          </motion.div>
+        )}
+
+        {/* Prize Breakdown Quick View (when eligible) */}
+        {showPrize && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl"
+          >
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <Trophy className="h-4 w-4 text-yellow-400" />
+              Prize Breakdown
+            </h4>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-2 text-center">
+                <Crown className="mx-auto mb-1 h-4 w-4 text-yellow-400" />
+                <p className="text-xs text-gray-400">Champion</p>
+                <p className="text-sm font-bold text-yellow-400">50%</p>
+              </div>
+              <div className="rounded-xl border border-gray-500/20 bg-gray-500/10 p-2 text-center">
+                <Medal className="mx-auto mb-1 h-4 w-4 text-gray-400" />
+                <p className="text-xs text-gray-400">Runner Up</p>
+                <p className="text-sm font-bold text-gray-300">25%</p>
+              </div>
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2 text-center">
+                <Target className="mx-auto mb-1 h-4 w-4 text-blue-400" />
+                <p className="text-xs text-gray-400">Top Scorer</p>
+                <p className="text-sm font-bold text-blue-400">10%</p>
+              </div>
+              <div className="rounded-xl border border-gray-600 bg-gray-700/30 p-2 text-center">
+                <DollarSign className="mx-auto mb-1 h-4 w-4 text-gray-500" />
+                <p className="text-xs text-gray-400">Reserve</p>
+                <p className="text-sm font-bold text-gray-400">15%</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/prize"
+              className="mt-3 block text-center text-xs text-indigo-400 transition-colors hover:text-indigo-300"
+            >
+              View Full Prize Details →
+            </Link>
+          </motion.div>
+        )}
+
+        {/* Season Archive Link */}
+        {selectedSeason && (
+          <motion.div variants={itemVariants} className="flex justify-end">
+            <Link
+              href={`/seasons/${selectedSeason}`}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-gray-800/40 px-4 py-2 text-sm text-indigo-400 backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-indigo-300"
+            >
+              <Archive size={16} />
+              View Season Archive →
+            </Link>
+          </motion.div>
+        )}
+
+        {/* Rules Card */}
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-5 backdrop-blur-xl"
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-blue-500/20 p-2">
+              <Trophy className="h-5 w-5 text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-400">League Rules</h3>
+              <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm text-gray-300 sm:grid-cols-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
+                  Win = <span className="font-bold text-green-400">3 points</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-yellow-400" />
+                  Draw = <span className="font-bold text-yellow-400">1 point</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                  Loss = <span className="font-bold text-red-400">0 points</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-indigo-400" />
+                  Ranking: Points → Goal Difference → Goals Scored
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
-  )
+  );
 }

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma"
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session) {
       return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
     }
@@ -18,12 +18,39 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Season ID required" }, { status: 400 })
     }
 
-    const entries = await prisma.leagueEntry.findMany({
+    // ✅ Get league settings for this season
+    const leagueSettings = await prisma.leagueSettings.findUnique({
       where: { seasonId },
+    })
+
+    // ✅ Get entries based on payment setting
+    let whereClause: any = { seasonId }
+
+    if (leagueSettings?.paymentRequired) {
+      // ✅ Only show paid players in standings
+      const paidPlayerIds = await prisma.playerSeasonEntry.findMany({
+        where: {
+          seasonId,
+          hasPaid: true,
+        },
+        select: { userId: true },
+      })
+      
+      const paidIds = paidPlayerIds.map(p => p.userId)
+      
+      if (paidIds.length === 0) {
+        return NextResponse.json([])
+      }
+      
+      whereClause.playerId = { in: paidIds }
+    }
+
+    const entries = await prisma.leagueEntry.findMany({
+      where: whereClause,
       include: {
         player: {
-          include: { 
-            profile: true 
+          include: {
+            profile: true
           }
         }
       },

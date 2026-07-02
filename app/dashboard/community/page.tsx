@@ -1,141 +1,240 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { Heart, MessageCircle, Send, Image as ImageIcon, X, Trophy, Shield, Calendar, Trash2, Edit2, Flag, Pin, Filter, EyeOff } from "lucide-react"
-import toast from "react-hot-toast"
-import { SkeletonCommunityPost, Skeleton } from "@/components/ui/Skeleton"
+import EmptyState from "@/components/ui/EmptyState";
+import Image from "next/image";
+import { useEffect, useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import {
+  Heart,
+  MessageCircle,
+  Send,
+  Image as ImageIcon,
+  X,
+  Trophy,
+  Shield,
+  Calendar,
+  Trash2,
+  Edit2,
+  Flag,
+  Pin,
+  Filter,
+  EyeOff,
+  Sparkles,
+  Users,
+  MessageSquare,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { SkeletonCommunityPost, Skeleton } from "@/components/ui/Skeleton";
+import {
+  motion,
+  AnimatePresence,
+  type Variants,
+} from "framer-motion";
 
 interface Post {
-  id: string
-  content: string
-  image: string | null
-  type: string
-  likes: number
-  createdAt: string
-  userId: string
+  id: string;
+  content: string;
+  image: string | null;
+  type: string;
+  likes: number;
+  createdAt: string;
+  userId: string;
   user: {
-    name: string
-    profile: { username: string } | null
-  }
-  comments: Comment[]
-  _count: { comments: number }
+    name: string;
+    profile: { username: string } | null;
+  };
+  comments: Comment[];
+  _count: { comments: number };
 }
 
 interface Comment {
-  id: string
-  content: string
-  createdAt: string
+  id: string;
+  content: string;
+  createdAt: string;
   user: {
-    name: string
-    profile: { username: string } | null
-  }
+    name: string;
+    profile: { username: string } | null;
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.07, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: "easeOut" },
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                          Post type presentation                            */
+/* -------------------------------------------------------------------------- */
+
+const postTypeConfig: Record<
+  string,
+  { label: string; badge: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  GENERAL: {
+    label: "General",
+    badge: "bg-blue-500/15 text-blue-300 ring-blue-500/30",
+    icon: MessageCircle,
+  },
+  SQUAD_SHARE: {
+    label: "Squad Share",
+    badge: "bg-purple-500/15 text-purple-300 ring-purple-500/30",
+    icon: Shield,
+  },
+  ACHIEVEMENT: {
+    label: "Achievement",
+    badge: "bg-yellow-500/15 text-yellow-300 ring-yellow-500/30",
+    icon: Trophy,
+  },
+};
+
+const filterTabs = [
+  { key: "ALL", label: "All" },
+  { key: "GENERAL", label: "General" },
+  { key: "SQUAD_SHARE", label: "Squad Shares" },
+  { key: "ACHIEVEMENT", label: "Achievements" },
+];
+
+/* Relative time helper */
+function relativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const diff = Date.now() - date.getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  return date.toLocaleDateString();
 }
 
 export default function CommunityPage() {
-  const { data: session } = useSession()
-  const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(true)
-  const [newPost, setNewPost] = useState("")
-  const [newPostImage, setNewPostImage] = useState<string | null>(null)
-  const [newPostType, setNewPostType] = useState<string>("GENERAL")
-  const [posting, setPosting] = useState(false)
-  const [commenting, setCommenting] = useState<string | null>(null)
-  const [commentText, setCommentText] = useState("")
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
-  const [editingPost, setEditingPost] = useState<string | null>(null)
-  const [editContent, setEditContent] = useState("")
-  const [filterType, setFilterType] = useState<string>("ALL")
-  const [privacySettings, setPrivacySettings] = useState<{ allowComments: boolean }>({ allowComments: true })
+  const { data: session } = useSession();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newPost, setNewPost] = useState("");
+  const [newPostImage, setNewPostImage] = useState<string | null>(null);
+  const [newPostType, setNewPostType] = useState<string>("GENERAL");
+  const [posting, setPosting] = useState(false);
+  const [commenting, setCommenting] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [editingPost, setEditingPost] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [filterType, setFilterType] = useState<string>("ALL");
+  const [privacySettings, setPrivacySettings] = useState<{
+    allowComments: boolean;
+  }>({ allowComments: true });
+
+  // UI-only lightbox state (does not alter any data/state shape or API)
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPosts()
-    fetchPrivacySettings()
-  }, [])
+    fetchPosts();
+    fetchPrivacySettings();
+  }, []);
 
   async function fetchPosts() {
-    const res = await fetch("/api/community/posts")
-    const data = await res.json()
-    setPosts(Array.isArray(data) ? data : [])
-    setLoading(false)
+    const res = await fetch("/api/community/posts");
+    const data = await res.json();
+    setPosts(Array.isArray(data) ? data : []);
+    setLoading(false);
   }
 
   async function fetchPrivacySettings() {
     try {
-      const res = await fetch("/api/settings?category=privacy")
+      const res = await fetch("/api/settings?category=privacy");
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json();
         setPrivacySettings({
-          allowComments: data.allowComments !== undefined ? data.allowComments : true
-        })
+          allowComments:
+            data.allowComments !== undefined ? data.allowComments : true,
+        });
       }
     } catch (error) {
-      console.error("Error fetching privacy settings:", error)
+      console.error("Error fetching privacy settings:", error);
     }
   }
 
   async function handleCreatePost(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!newPost.trim()) {
-      toast.error("Please enter some content")
-      return
+      toast.error("Please enter some content");
+      return;
     }
 
-    setPosting(true)
+    setPosting(true);
     const res = await fetch("/api/community/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         content: newPost,
         image: newPostImage,
-        type: newPostType
-      })
-    })
+        type: newPostType,
+      }),
+    });
 
     if (res.ok) {
-      toast.success("Post shared!")
-      setNewPost("")
-      setNewPostImage(null)
-      setNewPostType("GENERAL")
-      fetchPosts()
+      toast.success("Post shared!");
+      setNewPost("");
+      setNewPostImage(null);
+      setNewPostType("GENERAL");
+      fetchPosts();
     } else {
-      toast.error("Failed to post")
+      toast.error("Failed to post");
     }
-    setPosting(false)
+    setPosting(false);
   }
 
   async function handleLike(postId: string) {
     const res = await fetch("/api/community/like", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postId })
-    })
+      body: JSON.stringify({ postId }),
+    });
 
     if (res.ok) {
-      const data = await res.json()
+      const data = await res.json();
       if (data.liked) {
-        setLikedPosts(prev => new Set(prev).add(postId))
+        setLikedPosts((prev) => new Set(prev).add(postId));
       } else {
-        setLikedPosts(prev => {
-          const next = new Set(prev)
-          next.delete(postId)
-          return next
-        })
+        setLikedPosts((prev) => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
       }
-      fetchPosts()
+      fetchPosts();
     }
   }
 
   // ✅ Phase 1: Check if commenting is allowed
   async function handleComment(postId: string) {
     if (!privacySettings.allowComments) {
-      toast.error("Comments are disabled for this post")
-      return
+      toast.error("Comments are disabled for this post");
+      return;
     }
 
     if (!commentText.trim()) {
-      toast.error("Please enter a comment")
-      return
+      toast.error("Please enter a comment");
+      return;
     }
 
     const res = await fetch("/api/community/comment", {
@@ -143,419 +242,662 @@ export default function CommunityPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         postId,
-        content: commentText
-      })
-    })
+        content: commentText,
+      }),
+    });
 
     if (res.ok) {
-      toast.success("Comment added!")
-      setCommentText("")
-      setCommenting(null)
-      fetchPosts()
+      toast.success("Comment added!");
+      setCommentText("");
+      setCommenting(null);
+      fetchPosts();
     } else {
-      toast.error("Failed to add comment")
+      toast.error("Failed to add comment");
     }
   }
 
   async function handleDeletePost(postId: string) {
-    if (!confirm("Are you sure you want to delete this post?")) return
+    if (!confirm("Are you sure you want to delete this post?")) return;
 
     try {
       const res = await fetch(`/api/community/posts?id=${postId}`, {
-        method: "DELETE"
-      })
+        method: "DELETE",
+      });
 
       if (res.ok) {
-        toast.success("Post deleted")
-        fetchPosts()
+        toast.success("Post deleted");
+        fetchPosts();
       } else {
-        toast.error("Failed to delete post")
+        toast.error("Failed to delete post");
       }
     } catch (error) {
-      console.error("Error deleting post:", error)
-      toast.error("Failed to delete post")
+      console.error("Error deleting post:", error);
+      toast.error("Failed to delete post");
     }
   }
 
   async function handleEditPost(postId: string) {
     if (!editContent.trim()) {
-      toast.error("Please enter some content")
-      return
+      toast.error("Please enter some content");
+      return;
     }
 
     try {
       const res = await fetch(`/api/community/posts/${postId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: editContent })
-      })
+        body: JSON.stringify({ content: editContent }),
+      });
 
       if (res.ok) {
-        toast.success("Post updated!")
-        setEditingPost(null)
-        setEditContent("")
-        fetchPosts()
+        toast.success("Post updated!");
+        setEditingPost(null);
+        setEditContent("");
+        fetchPosts();
       } else {
-        toast.error("Failed to update post")
+        toast.error("Failed to update post");
       }
     } catch (error) {
-      console.error("Error editing post:", error)
-      toast.error("Failed to update post")
+      console.error("Error editing post:", error);
+      toast.error("Failed to update post");
     }
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be less than 2MB")
-      return
+      toast.error("Image must be less than 2MB");
+      return;
     }
 
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onloadend = () => {
-      setNewPostImage(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+      setNewPostImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   }
 
   // Filter posts by type
-  const filteredPosts = filterType === "ALL" 
-    ? posts 
-    : posts.filter(post => post.type === filterType)
+  const filteredPosts =
+    filterType === "ALL"
+      ? posts
+      : posts.filter((post) => post.type === filterType);
 
   // Check if user can comment on a post
-  const canComment = privacySettings.allowComments || false
+  const canComment = privacySettings.allowComments || false;
+
+  // Engagement stats (UI summary derived from posts — read-only)
+  const totalPosts = posts.length;
+  const totalComments = useMemo(
+    () => posts.reduce((acc, p) => acc + (p._count?.comments || 0), 0),
+    [posts]
+  );
+  const myPosts = useMemo(
+    () => posts.filter((p) => p.userId === session?.user?.id).length,
+    [posts, session?.user?.id]
+  );
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div>
-          <Skeleton variant="text" className="w-48 h-8" />
-          <Skeleton variant="text" className="w-64 h-4 mt-1" />
-        </div>
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-          <Skeleton variant="text" className="w-full h-20" />
-          <div className="flex justify-between items-center mt-3">
-            <Skeleton variant="text" className="w-24 h-4" />
-            <Skeleton variant="text" className="w-16 h-8" />
+      <div className="relative">
+        <DecorBackground />
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div>
+            <Skeleton variant="text" className="h-8 w-48" />
+            <Skeleton variant="text" className="mt-1 h-4 w-64" />
           </div>
+          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl">
+            <Skeleton variant="text" className="h-20 w-full" />
+            <div className="mt-3 flex items-center justify-between">
+              <Skeleton variant="text" className="h-4 w-24" />
+              <Skeleton variant="text" className="h-8 w-16" />
+            </div>
+          </div>
+          {[...Array(3)].map((_, i) => (
+            <SkeletonCommunityPost key={i} />
+          ))}
         </div>
-        {[...Array(3)].map((_, i) => (
-          <SkeletonCommunityPost key={i} />
-        ))}
       </div>
-    )
+    );
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Community Feed</h1>
-        <p className="text-gray-400 mt-1">Share updates, celebrate achievements, and connect with players</p>
-      </div>
+    <div className="relative">
+      <DecorBackground />
 
-      {/* ✅ Privacy Warning - Show if comments are disabled */}
-      {!privacySettings.allowComments && (
-        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
-          <div className="flex items-start gap-3">
-            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+      {/* Image Lightbox */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxImage(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          >
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 transition hover:bg-white/20"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              src={lightboxImage}
+              alt="Post preview"
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-3xl space-y-6"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
+              <Users className="h-6 w-6 text-white" />
+            </span>
             <div>
-              <h3 className="text-yellow-400 font-semibold">Comments are Disabled</h3>
-              <p className="text-gray-300 text-sm">
-                Comments on your posts are currently disabled. You can change this in your 
-                <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline ml-1">Privacy Settings</a>.
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                Community Feed
+              </h1>
+              <p className="mt-1 text-gray-400">
+                Share updates, celebrate achievements, and connect with players
               </p>
             </div>
           </div>
-        </div>
-      )}
+        </motion.div>
 
-      {/* Create Post */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <form onSubmit={handleCreatePost} className="space-y-3">
-          <textarea
-            value={newPost}
-            onChange={(e) => setNewPost(e.target.value)}
-            placeholder="Share something with the community..."
-            rows={3}
-            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-indigo-500"
+        {/* Engagement Stats */}
+        <motion.div
+          variants={itemVariants}
+          className="grid grid-cols-3 gap-3"
+        >
+          <StatChip
+            icon={MessageSquare}
+            label="Posts"
+            value={totalPosts}
+            accent="text-indigo-400"
           />
-          
-          {newPostImage && (
-            <div className="relative inline-block">
-              <img src={newPostImage} alt="Preview" className="h-24 w-auto rounded-lg" />
-              <button
-                type="button"
-                onClick={() => setNewPostImage(null)}
-                className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1"
-              >
-                <X size={14} className="text-white" />
-              </button>
-            </div>
-          )}
-          
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="cursor-pointer text-gray-400 hover:text-white transition-colors">
-              <ImageIcon size={20} />
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            </label>
-            
-            <select
-              value={newPostType}
-              onChange={(e) => setNewPostType(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="GENERAL">General</option>
-              <option value="SQUAD_SHARE">Squad Share</option>
-              <option value="ACHIEVEMENT">Achievement</option>
-            </select>
+          <StatChip
+            icon={MessageCircle}
+            label="Comments"
+            value={totalComments}
+            accent="text-purple-400"
+          />
+          <StatChip
+            icon={Sparkles}
+            label="Your Posts"
+            value={myPosts}
+            accent="text-pink-400"
+          />
+        </motion.div>
 
-            <button
-              type="submit"
-              disabled={posting || !newPost.trim()}
-              className="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all"
-            >
-              {posting ? "Posting..." : "Post"}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Category Filter */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilterType("ALL")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            filterType === "ALL" 
-              ? "bg-indigo-600 text-white" 
-              : "bg-gray-700 text-gray-400 hover:text-white"
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilterType("GENERAL")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            filterType === "GENERAL" 
-              ? "bg-indigo-600 text-white" 
-              : "bg-gray-700 text-gray-400 hover:text-white"
-          }`}
-        >
-          General
-        </button>
-        <button
-          onClick={() => setFilterType("SQUAD_SHARE")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            filterType === "SQUAD_SHARE" 
-              ? "bg-indigo-600 text-white" 
-              : "bg-gray-700 text-gray-400 hover:text-white"
-          }`}
-        >
-          Squad Shares
-        </button>
-        <button
-          onClick={() => setFilterType("ACHIEVEMENT")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-            filterType === "ACHIEVEMENT" 
-              ? "bg-indigo-600 text-white" 
-              : "bg-gray-700 text-gray-400 hover:text-white"
-          }`}
-        >
-          Achievements
-        </button>
-      </div>
-
-      {/* Posts Feed */}
-      {filteredPosts.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-          <MessageCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Posts Yet</h3>
-          <p className="text-gray-400">Be the first to share something with the community!</p>
-        </div>
-      ) : (
-        filteredPosts.map((post) => {
-          const username = post.user.profile?.username || post.user.name || "Player"
-          const isLiked = likedPosts.has(post.id)
-          const isOwnPost = post.userId === session?.user?.id
-          const postTypeColors = {
-            GENERAL: "bg-blue-500/20 text-blue-400",
-            SQUAD_SHARE: "bg-purple-500/20 text-purple-400",
-            ACHIEVEMENT: "bg-yellow-500/20 text-yellow-400"
-          }
-          
-          return (
-            <div key={post.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-              {/* Post Header */}
-              <div className="p-4 border-b border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                      {username.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white">{username}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-500">
-                          {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
-                        </p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${postTypeColors[post.type as keyof typeof postTypeColors] || "bg-gray-500/20 text-gray-400"}`}>
-                          {post.type.replace("_", " ")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {isOwnPost && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingPost(post.id)
-                          setEditContent(post.content)
-                        }}
-                        className="text-gray-400 hover:text-blue-400 transition-all"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="text-gray-400 hover:text-red-400 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+        {/* ✅ Privacy Warning - Show if comments are disabled */}
+        {!privacySettings.allowComments && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 backdrop-blur-xl"
+          >
+            <div className="flex items-start gap-3">
+              <EyeOff className="mt-0.5 h-5 w-5 text-yellow-400" />
+              <div>
+                <h3 className="font-semibold text-yellow-400">
+                  Comments are Disabled
+                </h3>
+                <p className="text-sm text-gray-300">
+                  Comments on your posts are currently disabled. You can change
+                  this in your
+                  <a
+                    href="/dashboard/settings/privacy"
+                    className="ml-1 text-indigo-400 hover:underline"
+                  >
+                    Privacy Settings
+                  </a>
+                  .
+                </p>
               </div>
-              
-              {/* Post Content */}
-              <div className="p-4">
-                {editingPost === post.id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      rows={3}
-                      className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditPost(post.id)}
-                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingPost(null)}
-                        className="bg-gray-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-gray-500"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Create Post */}
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl"
+        >
+          <form onSubmit={handleCreatePost} className="space-y-3">
+            <div className="flex gap-3">
+              <span className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-sm font-bold text-white sm:flex">
+                {(
+                  session?.user?.name?.charAt(0) || "Y"
+                ).toUpperCase()}
+              </span>
+              <textarea
+                value={newPost}
+                onChange={(e) => setNewPost(e.target.value)}
+                placeholder="Share something with the community..."
+                rows={3}
+                maxLength={1000}
+                className="w-full rounded-xl border border-white/10 bg-gray-900/60 p-3 text-white placeholder-gray-500 transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              />
+            </div>
+
+            <AnimatePresence>
+              {newPostImage && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="relative inline-block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={newPostImage}
+                    alt="Preview"
+                    className="h-28 w-auto rounded-xl ring-1 ring-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewPostImage(null)}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 shadow-lg transition hover:bg-red-600"
+                  >
+                    <X size={14} className="text-white" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-gray-900/40 px-3 text-gray-400 transition-colors hover:text-white">
+                <ImageIcon size={20} />
+                <span className="text-sm">Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+
+              <select
+                value={newPostType}
+                onChange={(e) => setNewPostType(e.target.value)}
+                className="min-h-[44px] rounded-xl border border-white/10 bg-gray-900/60 px-3 py-1.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              >
+                <option value="GENERAL">General</option>
+                <option value="SQUAD_SHARE">Squad Share</option>
+                <option value="ACHIEVEMENT">Achievement</option>
+              </select>
+
+              {/* Character count */}
+              <span className="text-xs text-gray-500">{newPost.length}/1000</span>
+
+              <button
+                type="submit"
+                disabled={posting || !newPost.trim()}
+                className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2 font-medium text-white shadow-lg shadow-indigo-500/30 transition-all hover:shadow-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {posting ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Posting...
+                  </>
                 ) : (
                   <>
-                    <p className="text-gray-200 whitespace-pre-wrap">{post.content}</p>
-                    {post.image && (
-                      <img src={post.image} alt="Post" className="mt-3 rounded-lg max-h-96 w-full object-contain" />
-                    )}
+                    <Send size={16} />
+                    Post
                   </>
                 )}
-              </div>
-              
-              {/* Post Actions */}
-              <div className="px-4 pb-3 flex flex-wrap gap-4 border-b border-gray-700">
-                <button
-                  onClick={() => handleLike(post.id)}
-                  className={`flex items-center gap-2 text-sm transition-colors ${
-                    isLiked ? "text-red-500" : "text-gray-400 hover:text-red-500"
-                  }`}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+
+        {/* Category Filter */}
+        <motion.div variants={itemVariants} className="flex flex-wrap gap-2">
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterType(tab.key)}
+              className={`min-h-[44px] rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                filterType === tab.key
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30"
+                  : "border border-white/10 bg-gray-800/40 text-gray-400 backdrop-blur-xl hover:text-white"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* Posts Feed */}
+        {posts.length === 0 ? (
+          <motion.div variants={itemVariants}>
+            <EmptyState
+              title="No Posts Yet"
+              message="Be the first to share something with the community!"
+              icon={MessageCircle}
+              buttonText={session ? "Create Post" : "Sign In to Post"}
+              buttonLink={session ? "/dashboard/community" : "/auth/signin"}
+            />
+          </motion.div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filteredPosts.map((post) => {
+              const username =
+                post.user.profile?.username || post.user.name || "Player";
+              const isLiked = likedPosts.has(post.id);
+              const isOwnPost = post.userId === session?.user?.id;
+              const typeCfg =
+                postTypeConfig[post.type] || {
+                  label: post.type.replace("_", " "),
+                  badge: "bg-gray-500/15 text-gray-300 ring-gray-500/30",
+                  icon: MessageCircle,
+                };
+              const TypeIcon = typeCfg.icon;
+
+              return (
+                <motion.div
+                  key={post.id}
+                  layout
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit={{ opacity: 0, y: -10 }}
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
                 >
-                  <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
-                  <span>{post.likes} likes</span>
-                </button>
-                <button
-                  onClick={() => {
-                    // ✅ Only allow if comments are enabled
-                    if (!privacySettings.allowComments) {
-                      toast.error("Comments are disabled for this post")
-                      return
-                    }
-                    setCommenting(commenting === post.id ? null : post.id)
-                  }}
-                  className={`flex items-center gap-2 text-sm transition-colors ${
-                    privacySettings.allowComments 
-                      ? "text-gray-400 hover:text-indigo-400" 
-                      : "text-gray-600 cursor-not-allowed"
-                  }`}
-                >
-                  <MessageCircle size={18} />
-                  <span>{post._count.comments} comments</span>
-                </button>
-                <button
-                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-yellow-400 transition-colors"
-                >
-                  <Flag size={16} />
-                  <span>Report</span>
-                </button>
-              </div>
-              
-              {/* Comments Section - ✅ Only show if comments are allowed */}
-              {commenting === post.id && (
-                <div className="p-4 bg-gray-700/30">
-                  {canComment ? (
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Write a comment..."
-                        className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
-                      />
-                      <button
-                        onClick={() => handleComment(post.id)}
-                        className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-all"
-                      >
-                        <Send size={16} />
-                      </button>
+                  {/* Post Header */}
+                  <div className="border-b border-white/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 font-bold text-white ring-2 ring-white/10">
+                          {username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white">{username}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs text-gray-500">
+                              {relativeTime(post.createdAt)}
+                            </p>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${typeCfg.badge}`}
+                            >
+                              <TypeIcon className="h-3 w-3" />
+                              {typeCfg.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {isOwnPost && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingPost(post.id);
+                              setEditContent(post.content);
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-blue-500/10 hover:text-blue-400"
+                            aria-label="Edit post"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePost(post.id)}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-red-500/10 hover:text-red-400"
+                            aria-label="Delete post"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-center py-2 text-gray-400 text-sm flex items-center justify-center gap-2">
-                      <EyeOff size={16} />
-                      Comments are disabled
+                  </div>
+
+                  {/* Post Content */}
+                  <div className="p-4">
+                    {editingPost === post.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          rows={3}
+                          className="w-full rounded-xl border border-white/10 bg-gray-900/60 p-3 text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditPost(post.id)}
+                            className="rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-sm font-medium text-white transition hover:shadow-lg hover:shadow-indigo-500/30"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingPost(null)}
+                            className="rounded-lg border border-white/10 bg-gray-700/40 px-4 py-1.5 text-sm text-white transition hover:bg-gray-600/40"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="whitespace-pre-wrap text-gray-200">
+                          {post.content}
+                        </p>
+                        {post.image && (
+                          <button
+                            type="button"
+                            onClick={() => setLightboxImage(post.image)}
+                            className="mt-3 block w-full overflow-hidden rounded-xl ring-1 ring-white/10 transition hover:ring-indigo-500/40"
+                          >
+                            <Image
+                              src={post.image}
+                              alt="Post"
+                              width={600}
+                              height={400}
+                              className="max-h-96 w-full object-contain"
+                              loading="lazy"
+                            />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Post Actions */}
+                  <div className="flex flex-wrap gap-2 border-b border-white/5 px-4 pb-3">
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => handleLike(post.id)}
+                      className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm transition-colors ${
+                        isLiked
+                          ? "text-red-500"
+                          : "text-gray-400 hover:text-red-500"
+                      }`}
+                    >
+                      <motion.span
+                        key={isLiked ? "liked" : "unliked"}
+                        initial={{ scale: 0.6 }}
+                        animate={{ scale: 1 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 15,
+                        }}
+                      >
+                        <Heart
+                          size={18}
+                          fill={isLiked ? "currentColor" : "none"}
+                        />
+                      </motion.span>
+                      <span>{post.likes} likes</span>
+                    </motion.button>
+                    <button
+                      onClick={() => {
+                        // ✅ Only allow if comments are enabled
+                        if (!privacySettings.allowComments) {
+                          toast.error("Comments are disabled for this post");
+                          return;
+                        }
+                        setCommenting(
+                          commenting === post.id ? null : post.id
+                        );
+                      }}
+                      className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm transition-colors ${
+                        privacySettings.allowComments
+                          ? "text-gray-400 hover:text-indigo-400"
+                          : "cursor-not-allowed text-gray-600"
+                      }`}
+                    >
+                      <MessageCircle size={18} />
+                      <span>{post._count.comments} comments</span>
+                    </button>
+                    <button className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm text-gray-400 transition-colors hover:text-yellow-400">
+                      <Flag size={16} />
+                      <span>Report</span>
+                    </button>
+                  </div>
+
+                  {/* Comments Section - ✅ Only show if comments are allowed */}
+                  <AnimatePresence>
+                    {commenting === post.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden bg-gray-900/40 p-4"
+                      >
+                        {canComment ? (
+                          <div className="mb-3 flex gap-2">
+                            <span className="hidden h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white sm:flex">
+                              {(
+                                session?.user?.name?.charAt(0) || "Y"
+                              ).toUpperCase()}
+                            </span>
+                            <input
+                              type="text"
+                              value={commentText}
+                              onChange={(e) => setCommentText(e.target.value)}
+                              placeholder="Write a comment..."
+                              className="min-h-[44px] flex-1 rounded-xl border border-white/10 bg-gray-900/60 p-2 px-3 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                            />
+                            <button
+                              onClick={() => handleComment(post.id)}
+                              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-3 text-white transition hover:shadow-lg hover:shadow-indigo-500/30"
+                            >
+                              <Send size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 py-2 text-center text-sm text-gray-400">
+                            <EyeOff size={16} />
+                            Comments are disabled
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Comments List - ✅ Only show if comments exist */}
+                  {post.comments.length > 0 && (
+                    <div className="space-y-3 bg-gray-900/20 p-4">
+                      {post.comments.map((comment) => (
+                        <motion.div
+                          key={comment.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex gap-2"
+                        >
+                          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-600 to-gray-700 text-xs font-bold text-white ring-1 ring-white/10">
+                            {(
+                              comment.user.profile?.username?.charAt(0) ||
+                              comment.user.name?.charAt(0) ||
+                              "U"
+                            ).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1 rounded-xl bg-white/[0.03] px-3 py-2 ring-1 ring-white/5">
+                            <p className="text-sm">
+                              <span className="font-semibold text-white">
+                                {comment.user.profile?.username ||
+                                  comment.user.name ||
+                                  "Player"}
+                              </span>
+                              <span className="ml-2 text-gray-300">
+                                {comment.content}
+                              </span>
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {relativeTime(comment.createdAt)}
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   )}
-                </div>
-              )}
-              
-              {/* Comments List - ✅ Only show if comments exist */}
-              {post.comments.length > 0 && (
-                <div className="p-4 space-y-3 bg-gray-700/20">
-                  {post.comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-2">
-                      <div className="h-6 w-6 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs font-bold">
-                        {(comment.user.profile?.username?.charAt(0) || comment.user.name?.charAt(0) || "U").toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm">
-                          <span className="font-semibold text-white">
-                            {comment.user.profile?.username || comment.user.name || "Player"}
-                          </span>
-                          <span className="text-gray-300 ml-2">{comment.content}</span>
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })
-      )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </motion.div>
     </div>
-  )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                       Reusable presentational bits                          */
+/* -------------------------------------------------------------------------- */
+
+function StatChip({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  accent: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-3 backdrop-blur-xl">
+      <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${accent}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-lg font-bold text-white">{value}</p>
+        <p className="text-[11px] text-gray-400">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* Decorative animated gradient background with blur orbs + grid overlay */
+function DecorBackground() {
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[120px]" />
+      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
+      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-[120px]" />
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+    </div>
+  );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { Trophy, Users, Calendar, Award, CheckCircle, Medal, ChevronLeft, TrendingUp, Crown, Star } from "lucide-react"
 import Link from "next/link"
-
+import Image from "next/image"
 interface TournamentStats {
   tournament: {
     name: string
@@ -162,8 +162,14 @@ export default function TournamentStatsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {player.profilePicture ? (
-                          <img src={player.profilePicture} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
+<Image
+  src={player.profilePicture || "/default-avatar.png"}
+  alt={player.name || "Player"}
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-full object-cover"
+  loading="lazy"
+/>                        ) : (
                           <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold">
                             {player.name.charAt(0).toUpperCase()}
                           </div>

@@ -1,50 +1,91 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { Shield, Plus, Trash2, Calendar, Trophy, X, Eye, EyeOff, Lock } from "lucide-react"
-import toast from "react-hot-toast"
+import EmptyState from "@/components/ui/EmptyState";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import Image from "next/image";
+import {
+  Shield,
+  Plus,
+  Trash2,
+  Calendar,
+  Trophy,
+  X,
+  Eye,
+  EyeOff,
+  Upload,
+  Sparkles,
+  Activity,
+  Loader2,
+} from "lucide-react";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import toast from "react-hot-toast";
 
 interface Squad {
-  id: string
-  type: string
-  screenshot: string
-  formation: string
-  teamStrength: number
-  playstyle: string
-  description: string
-  isActive: boolean
-  createdAt: string
-  userId: string
+  id: string;
+  type: string;
+  screenshot: string;
+  formation: string;
+  teamStrength: number;
+  playstyle: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  userId: string;
 }
 
 const squadTypes = [
   { value: "MAIN", label: "Main Squad", icon: Shield, color: "bg-yellow-500" },
   { value: "SEASONAL", label: "Seasonal Squad", icon: Calendar, color: "bg-green-500" },
   { value: "TOURNAMENT", label: "Tournament Squad", icon: Trophy, color: "bg-purple-500" },
-]
+];
 
 // Formation options
 const formations = [
   "4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2", "5-4-1",
-  "4-1-2-1-2", "4-5-1", "3-6-1", "4-3-2-1", "3-4-1-2", "4-4-1-1"
-]
+  "4-1-2-1-2", "4-5-1", "3-6-1", "4-3-2-1", "3-4-1-2", "4-4-1-1",
+];
 
 // Playstyle options
 const playstyles = [
-  "Possession", "Counter Attack", "Long Ball", "Wing Play", 
-  "Tiki-Taka", "Quick Counter", "Out Wide", "Long Ball Counter", "Control"
-]
+  "Possession", "Counter Attack", "Long Ball", "Wing Play",
+  "Tiki-Taka", "Quick Counter", "Out Wide", "Long Ball Counter", "Control",
+];
+
+/* Badge styling per squad type (additive — visual only). */
+const typeBadgeClasses: Record<string, string> = {
+  MAIN: "bg-yellow-500/15 text-yellow-300 ring-yellow-500/30",
+  SEASONAL: "bg-green-500/15 text-green-300 ring-green-500/30",
+  TOURNAMENT: "bg-purple-500/15 text-purple-300 ring-purple-500/30",
+};
+
+const DESCRIPTION_MAX = 300;
+
+/* -------------------------------------------------------------------------- */
+/*                            Animation variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+};
 
 export default function SquadsPage() {
-  const { data: session } = useSession()
-  const [squads, setSquads] = useState<Squad[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [privacySettings, setPrivacySettings] = useState<{ showSquad: boolean }>({ showSquad: true })
-  const [isOwnProfile, setIsOwnProfile] = useState(true)
+  const { data: session } = useSession();
+  const [squads, setSquads] = useState<Squad[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [privacySettings, setPrivacySettings] = useState<{ showSquad: boolean }>({
+    showSquad: true,
+  });
+  const [isOwnProfile, setIsOwnProfile] = useState(true);
   const [formData, setFormData] = useState({
     type: "MAIN",
     screenshot: "",
@@ -52,434 +93,673 @@ export default function SquadsPage() {
     teamStrength: "",
     playstyle: "",
     description: "",
-  })
+  });
 
   useEffect(() => {
-    fetchSquads()
-    fetchPrivacySettings()
-  }, [])
+    fetchSquads();
+    fetchPrivacySettings();
+  }, []);
 
   async function fetchSquads() {
     try {
-      const res = await fetch("/api/squads")
-      const data = await res.json()
-      setSquads(Array.isArray(data) ? data : [])
+      const res = await fetch("/api/squads");
+      const data = await res.json();
+      setSquads(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Error fetching squads:", error)
+      console.error("Error fetching squads:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function fetchPrivacySettings() {
     try {
-      const res = await fetch("/api/settings?category=privacy")
+      const res = await fetch("/api/settings?category=privacy");
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json();
         setPrivacySettings({
-          showSquad: data.showSquad !== undefined ? data.showSquad : true
-        })
+          showSquad: data.showSquad !== undefined ? data.showSquad : true,
+        });
       }
     } catch (error) {
-      console.error("Error fetching privacy settings:", error)
+      console.error("Error fetching privacy settings:", error);
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!formData.screenshot) {
-      toast.error("Please upload your squad screenshot")
-      return
+      toast.error("Please upload your squad screenshot");
+      return;
     }
     if (!formData.formation) {
-      toast.error("Please select a formation")
-      return
+      toast.error("Please select a formation");
+      return;
     }
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       const res = await fetch("/api/squads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-      })
+      });
 
       if (res.ok) {
-        toast.success("Squad uploaded successfully!")
-        setShowForm(false)
-        setFormData({ type: "MAIN", screenshot: "", formation: "", teamStrength: "", playstyle: "", description: "" })
-        fetchSquads()
+        toast.success("Squad uploaded successfully!");
+        setShowForm(false);
+        setFormData({
+          type: "MAIN",
+          screenshot: "",
+          formation: "",
+          teamStrength: "",
+          playstyle: "",
+          description: "",
+        });
+        fetchSquads();
       } else {
-        const error = await res.json()
-        toast.error(error.error || "Failed to upload squad")
+        const error = await res.json();
+        toast.error(error.error || "Failed to upload squad");
       }
     } catch (error) {
-      toast.error("Failed to upload squad")
+      toast.error("Failed to upload squad");
     }
-    setSubmitting(false)
+    setSubmitting(false);
   }
 
   async function handleDelete(id: string) {
     if (confirm("Are you sure you want to remove this squad?")) {
       try {
-        const res = await fetch(`/api/squads?id=${id}`, { method: "DELETE" })
+        const res = await fetch(`/api/squads?id=${id}`, { method: "DELETE" });
         if (res.ok) {
-          toast.success("Squad removed")
-          fetchSquads()
+          toast.success("Squad removed");
+          fetchSquads();
         } else {
-          toast.error("Failed to remove")
+          toast.error("Failed to remove");
         }
       } catch (error) {
-        toast.error("Failed to remove")
+        toast.error("Failed to remove");
       }
     }
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB")
-      return
+      toast.error("Image must be less than 5MB");
+      return;
     }
 
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image()
+      const img = new window.Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const MAX_WIDTH = 800
-        const MAX_HEIGHT = 800
-        let width = img.width
-        let height = img.height
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
 
         if (width > height) {
           if (width > MAX_WIDTH) {
-            height = height * (MAX_WIDTH / width)
-            width = MAX_WIDTH
+            height = height * (MAX_WIDTH / width);
+            width = MAX_WIDTH;
           }
         } else {
           if (height > MAX_HEIGHT) {
-            width = width * (MAX_HEIGHT / height)
-            height = MAX_HEIGHT
+            width = width * (MAX_HEIGHT / height);
+            height = MAX_HEIGHT;
           }
         }
 
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+
         if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height)
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7)
-          setFormData((prev) => ({ ...prev, screenshot: compressedDataUrl }))
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          setFormData((prev) => ({ ...prev, screenshot: compressedDataUrl }));
         }
-      }
+      };
       if (event?.target?.result) {
-        img.src = event.target.result as string
+        img.src = event.target.result as string;
       }
-    }
-    reader.readAsDataURL(file)
-  }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // ✅ Check if squads should be shown based on privacy
-  const canViewSquads = privacySettings.showSquad || isOwnProfile
+  const canViewSquads = privacySettings.showSquad || isOwnProfile;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading squads...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <div className="text-gray-400">Loading squads...</div>
+        </div>
       </div>
-    )
+    );
   }
 
+  const descLength = formData.description.length;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">My Squads</h1>
-          <p className="text-gray-400 mt-1">Upload and showcase your eFootball squads</p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-all"
-        >
-          <Plus size={18} />
-          Upload Squad
-        </button>
+    <div className="relative">
+      {/* Decorative gradient background */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/15 blur-[120px]" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
       </div>
 
-      {/* Privacy Warning - ✅ Show if squads are private */}
-      {!privacySettings.showSquad && (
-        <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
+        {/* Header */}
+        <motion.div
+          variants={itemVariants}
+          className="flex flex-wrap justify-between items-center gap-4"
+        >
+          <div>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">My Squads</h1>
+            <p className="text-gray-400 mt-1">
+              Upload and showcase your eFootball squads
+            </p>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500"
+          >
+            <Plus size={18} />
+            Upload Squad
+          </button>
+        </motion.div>
+
+        {/* Privacy Warning - ✅ Show if squads are private */}
+        {!privacySettings.showSquad && (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 backdrop-blur-xl"
+          >
+            <div className="flex items-start gap-3">
+              <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-yellow-400">Squads are Hidden</h3>
+                <p className="text-sm text-gray-300">
+                  Your squads are currently private. Other players cannot see your
+                  squads. You can change this in your{" "}
+                  <a
+                    href="/dashboard/settings/privacy"
+                    className="text-indigo-400 hover:underline"
+                  >
+                    Privacy Settings
+                  </a>
+                  .
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Info Box */}
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 backdrop-blur-xl"
+        >
           <div className="flex items-start gap-3">
-            <EyeOff className="h-5 w-5 text-yellow-400 mt-0.5" />
+            <Shield className="h-5 w-5 text-blue-400 mt-0.5" />
             <div>
-              <h3 className="text-yellow-400 font-semibold">Squads are Hidden</h3>
-              <p className="text-gray-300 text-sm">
-                Your squads are currently private. Other players cannot see your squads. 
-                You can change this in your <a href="/dashboard/settings/privacy" className="text-indigo-400 hover:underline">Privacy Settings</a>.
+              <h3 className="font-semibold text-blue-400">Showcase Your Squad</h3>
+              <p className="text-sm text-gray-300">
+                Upload screenshots of your eFootball squad. Other players can view
+                your team formation, playstyle, and team strength. Share your best
+                Main, Seasonal, or Tournament squads!
               </p>
             </div>
           </div>
-        </div>
-      )}
+        </motion.div>
 
-      {/* Info Box */}
-      <div className="bg-blue-500/10 rounded-xl border border-blue-500/20 p-4">
-        <div className="flex items-start gap-3">
-          <Shield className="h-5 w-5 text-blue-400 mt-0.5" />
-          <div>
-            <h3 className="text-blue-400 font-semibold">Showcase Your Squad</h3>
-            <p className="text-gray-300 text-sm">
-              Upload screenshots of your eFootball squad. Other players can view your team formation, 
-              playstyle, and team strength. Share your best Main, Seasonal, or Tournament squads!
+        {/* Squad Grid - ✅ Show or hide based on privacy */}
+        {!canViewSquads ? (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center backdrop-blur-xl"
+          >
+            <EyeOff className="mx-auto mb-4 h-16 w-16 text-gray-600" />
+            <h3 className="mb-2 text-xl font-semibold text-white">
+              Squads are Private
+            </h3>
+            <p className="text-gray-400">
+              This player has chosen to keep their squads private.
             </p>
-          </div>
-        </div>
-      </div>
+            <a
+              href="/dashboard/settings/privacy"
+              className="mt-4 inline-block text-indigo-400 hover:text-indigo-300"
+            >
+              Change Privacy Settings →
+            </a>
+          </motion.div>
+        ) : squads.length === 0 ? (
+          <motion.div variants={itemVariants}>
+            <EmptyState
+              title="No Squads Uploaded Yet"
+              message="Upload your eFootball squad to share with the community."
+              icon={Shield}
+              buttonText="Upload Squad"
+              buttonAction={() => setShowForm(true)}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            variants={containerVariants}
+            className="grid grid-cols-1 gap-6 md:grid-cols-2"
+          >
+            {squads.map((squad) => {
+              const SquadIcon =
+                squadTypes.find((t) => t.value === squad.type)?.icon || Shield;
+              const iconColor =
+                squadTypes.find((t) => t.value === squad.type)?.color ||
+                "bg-gray-500";
+              const badgeClass =
+                typeBadgeClasses[squad.type] ||
+                "bg-gray-500/15 text-gray-300 ring-gray-500/30";
 
-      {/* Squad Grid - ✅ Show or hide based on privacy */}
-      {!canViewSquads ? (
-        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-          <EyeOff className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">Squads are Private</h3>
-          <p className="text-gray-400">This player has chosen to keep their squads private.</p>
-          <a href="/dashboard/settings/privacy" className="inline-block mt-4 text-indigo-400 hover:text-indigo-300">
-            Change Privacy Settings →
-          </a>
-        </div>
-      ) : squads.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-          <Shield className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Squads Uploaded Yet</h3>
-          <p className="text-gray-400">Click "Upload Squad" to share your eFootball squad with the community.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {squads.map((squad) => {
-            const SquadIcon = squadTypes.find(t => t.value === squad.type)?.icon || Shield
-            const iconColor = squadTypes.find(t => t.value === squad.type)?.color || "bg-gray-500"
-            
-            return (
-              <div key={squad.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden hover:border-gray-600 transition-all group">
-                {/* Image Preview */}
-                <div 
-                  className="relative h-52 bg-gray-900 cursor-pointer overflow-hidden" 
-                  onClick={() => setSelectedImage(squad.screenshot)}
+              return (
+                <motion.div
+                  key={squad.id}
+                  variants={itemVariants}
+                  whileHover={{ y: -4 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                  className="group overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 backdrop-blur-xl transition-colors hover:border-indigo-500/40"
                 >
-                  <img
-                    src={squad.screenshot}
-                    alt="Squad"
-                    className="w-full h-full object-contain transition-transform group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Eye className="text-white h-8 w-8" />
-                  </div>
-                </div>
-                
-                {/* Squad Info */}
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${iconColor}`}>
-                        <SquadIcon size={14} className="text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-white">
-                        {squadTypes.find(t => t.value === squad.type)?.label}
+                  {/* Image Preview */}
+                  <div
+                    className="relative h-52 cursor-pointer overflow-hidden bg-gray-900"
+                    onClick={() => setSelectedImage(squad.screenshot)}
+                  >
+                    <Image
+                      src={squad.screenshot}
+                      alt="Squad"
+                      width={400}
+                      height={208}
+                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Eye className="h-8 w-8 text-white" />
+                    </div>
+                    {/* Type + Active badges overlaid */}
+                    <div className="absolute left-3 top-3 flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 backdrop-blur-sm ${badgeClass}`}
+                      >
+                        <SquadIcon size={12} />
+                        {squad.type}
                       </span>
                       {squad.isActive && (
-                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Active</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30 backdrop-blur-sm">
+                          <Sparkles size={12} />
+                          Active
+                        </span>
                       )}
                     </div>
-                    {/* ✅ Only show delete button for own squads */}
-                    {session?.user?.id === squad.userId && (
-                      <button
-                        onClick={() => handleDelete(squad.id)}
-                        className="text-gray-500 hover:text-red-400 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="text-gray-500 text-xs">FORMATION</span>
-                      <p className="text-white font-semibold">{squad.formation || "—"}</p>
+
+                  {/* Squad Info */}
+                  <div className="p-4">
+                    <div className="mb-3 flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`rounded-lg p-1.5 ${iconColor}`}>
+                          <SquadIcon size={14} className="text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-white">
+                          {squadTypes.find((t) => t.value === squad.type)?.label}
+                        </span>
+                      </div>
+                      {/* ✅ Only show delete button for own squads */}
+                      {session?.user?.id === squad.userId && (
+                        <button
+                          onClick={() => handleDelete(squad.id)}
+                          aria-label="Remove squad"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-red-500/10 hover:text-red-400"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-gray-500 text-xs">TEAM STRENGTH</span>
-                      <p className="text-white font-semibold">{squad.teamStrength || "—"}</p>
+
+                    {/* Metadata chips */}
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+                        <Activity size={12} className="text-pink-400" />
+                        <span className="text-gray-500">Formation:</span>
+                        <span className="font-semibold text-white">
+                          {squad.formation || "—"}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+                        <Shield size={12} className="text-indigo-400" />
+                        <span className="text-gray-500">Strength:</span>
+                        <span className="font-semibold text-white">
+                          {squad.teamStrength || "—"}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+                        <Trophy size={12} className="text-yellow-400" />
+                        <span className="text-gray-500">Playstyle:</span>
+                        <span className="font-semibold text-white">
+                          {squad.playstyle || "—"}
+                        </span>
+                      </span>
                     </div>
-                    <div className="col-span-2">
-                      <span className="text-gray-500 text-xs">PLAYSTYLE</span>
-                      <p className="text-white font-semibold">{squad.playstyle || "—"}</p>
-                    </div>
+
                     {squad.description && (
-                      <div className="col-span-2">
-                        <span className="text-gray-500 text-xs">NOTES</span>
-                        <p className="text-gray-300 text-sm mt-1">{squad.description}</p>
+                      <div className="mt-3">
+                        <span className="text-xs text-gray-500">NOTES</span>
+                        <p className="mt-1 text-sm text-gray-300">
+                          {squad.description}
+                        </p>
                       </div>
                     )}
+
+                    <div className="mt-3 border-t border-white/10 pt-3 text-xs text-gray-500">
+                      Uploaded: {new Date(squad.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
-                  
-                  <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-500">
-                    Uploaded: {new Date(squad.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+      </motion.div>
 
       {/* Image Modal */}
-      {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setSelectedImage(null)}>
-          <div className="relative max-w-4xl max-h-[90vh] p-4">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-all"
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setSelectedImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="relative max-h-[90vh] max-w-4xl p-4"
             >
-              <X size={24} />
-            </button>
-            <img src={selectedImage} alt="Squad Full View" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
-          </div>
-        </div>
-      )}
+              <button
+                onClick={() => setSelectedImage(null)}
+                aria-label="Close preview"
+                className="absolute -top-10 right-0 text-white transition hover:text-gray-300"
+              >
+                <X size={24} />
+              </button>
+              <Image
+                src={selectedImage}
+                alt="Squad Full View"
+                width={800}
+                height={600}
+                className="max-h-[85vh] max-w-full rounded-lg object-contain"
+                loading="lazy"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Upload Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-gray-800 rounded-xl w-full max-w-md p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Upload Your Squad</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white transition-all">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Squad Type</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {squadTypes.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Squad Screenshot</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-2 file:px-3 file:py-1 file:bg-indigo-600 file:text-white file:rounded file:border-0 file:cursor-pointer hover:file:bg-indigo-700"
-                />
-                {formData.screenshot && (
-                  <div className="mt-2 relative">
-                    <img src={formData.screenshot} alt="Preview" className="h-32 w-full object-cover rounded-lg" />
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, screenshot: "" })}
-                      className="absolute top-1 right-1 bg-red-500 rounded-full p-1"
-                    >
-                      <X size={12} className="text-white" />
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Formation</label>
-                <select
-                  value={formData.formation}
-                  onChange={(e) => setFormData({ ...formData, formation: e.target.value })}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Formation</option>
-                  {formations.map(f => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Team Strength <span className="text-xs text-gray-500">(1000 - 4000)</span>
-                </label>
-                <input
-                  type="number"
-                  value={formData.teamStrength}
-                  onChange={(e) => {
-                    let val = parseInt(e.target.value)
-                    if (isNaN(val)) val = 1000
-                    if (val < 1000) val = 1000
-                    if (val > 4000) val = 4000
-                    setFormData({ ...formData, teamStrength: val.toString() })
-                  }}
-                  min="1000"
-                  max="4000"
-                  step="10"
-                  placeholder="e.g., 2800"
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Team strength rating from 1000 to 4000</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Playstyle</label>
-                <select
-                  value={formData.playstyle}
-                  onChange={(e) => setFormData({ ...formData, playstyle: e.target.value })}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Playstyle</option>
-                  {playstyles.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Notes (Optional)</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                  placeholder="Any additional info about your squad..."
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              
-              <div className="flex gap-3 pt-2">
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={() => setShowForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-gray-800/90 p-6 shadow-2xl backdrop-blur-xl"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600">
+                    <Upload className="h-4 w-4 text-white" />
+                  </span>
+                  Upload Your Squad
+                </h2>
                 <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {submitting ? "Uploading..." : "Upload Squad"}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-600 transition-all"
+                  aria-label="Close"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-white/5 hover:text-white"
                 >
-                  Cancel
+                  <X size={20} />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Squad Type — visual cards */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                    Squad Type
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {squadTypes.map((t) => {
+                      const TypeIcon = t.icon;
+                      const active = formData.type === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() =>
+                            setFormData({ ...formData, type: t.value })
+                          }
+                          className={`flex min-h-[44px] flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium transition ${
+                            active
+                              ? "border-indigo-500/60 bg-indigo-500/15 text-white"
+                              : "border-white/10 bg-gray-900/50 text-gray-400 hover:border-white/20 hover:text-white"
+                          }`}
+                        >
+                          <TypeIcon size={16} />
+                          {t.value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Screenshot upload */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                    Squad Screenshot <span className="text-pink-400">*</span>
+                  </label>
+                  {!formData.screenshot ? (
+                    <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/15 bg-gray-900/40 p-4 text-center transition hover:border-indigo-500/50 hover:bg-gray-900/60">
+                      <Upload className="h-6 w-6 text-indigo-400" />
+                      <span className="text-sm text-gray-300">
+                        Click to upload screenshot
+                      </span>
+                      <span className="text-xs text-gray-500">PNG or JPG, max 5MB</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  ) : (
+                    <div className="relative">
+                      <Image
+                        src={formData.screenshot}
+                        alt="Preview"
+                        width={400}
+                        height={128}
+                        className="h-32 w-full rounded-xl object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, screenshot: "" })
+                        }
+                        aria-label="Remove image"
+                        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-500 shadow-lg transition hover:bg-red-600"
+                      >
+                        <X size={14} className="text-white" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Formation */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                    Formation <span className="text-pink-400">*</span>
+                  </label>
+                  <select
+                    value={formData.formation}
+                    onChange={(e) =>
+                      setFormData({ ...formData, formation: e.target.value })
+                    }
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Formation</option>
+                    {formations.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Team Strength */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                    Team Strength{" "}
+                    <span className="text-xs text-gray-500">(1000 - 4000)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.teamStrength}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value);
+                      if (isNaN(val)) val = 1000;
+                      if (val < 1000) val = 1000;
+                      if (val > 4000) val = 4000;
+                      setFormData({ ...formData, teamStrength: val.toString() });
+                    }}
+                    min="1000"
+                    max="4000"
+                    step="10"
+                    placeholder="e.g., 2800"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  />
+                  {/* Range slider mirrors the numeric value (visual aid only) */}
+                  <input
+                    type="range"
+                    min="1000"
+                    max="4000"
+                    step="10"
+                    value={formData.teamStrength || 1000}
+                    onChange={(e) =>
+                      setFormData({ ...formData, teamStrength: e.target.value })
+                    }
+                    className="mt-2 w-full accent-indigo-500"
+                    aria-label="Team strength slider"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Team strength rating from 1000 to 4000
+                  </p>
+                </div>
+
+                {/* Playstyle */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                    Playstyle
+                  </label>
+                  <select
+                    value={formData.playstyle}
+                    onChange={(e) =>
+                      setFormData({ ...formData, playstyle: e.target.value })
+                    }
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Playstyle</option>
+                    {playstyles.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="mb-1.5 block text-sm font-medium text-gray-300">
+                      Notes (Optional)
+                    </label>
+                    <span className="text-xs text-gray-500">
+                      {descLength}/{DESCRIPTION_MAX}
+                    </span>
+                  </div>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    rows={2}
+                    maxLength={DESCRIPTION_MAX}
+                    placeholder="Any additional info about your squad..."
+                    className="w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Upload Squad
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="min-h-[44px] flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
-  )
+  );
 }

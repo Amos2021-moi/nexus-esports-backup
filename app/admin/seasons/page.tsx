@@ -1,355 +1,782 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Plus, Edit, Trash2, Calendar, Trophy, X, CheckCircle, AlertCircle, ArrowRight, Play, Pause, Users, Archive } from "lucide-react"
-import toast from "react-hot-toast"
+import { useEffect, useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Trophy,
+  X,
+  CheckCircle,
+  AlertCircle,
+  ArrowRight,
+  Play,
+  Pause,
+  Users,
+  Archive,
+  Search,
+  Filter,
+  Sparkles,
+  Clock,
+  Shield,
+  Zap,
+  Crown,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Hash,
+  List,
+  LayoutGrid,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 interface Season {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
-  isActive: boolean
-  status: string
-  createdAt: string
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  status: string;
+  createdAt: string;
+  _count?: {
+    leagueEntries?: number;
+    fixtures?: number;
+    tournaments?: number;
+  };
 }
 
 const statusOptions = [
-  { value: "PRESEASON", label: "Preseason", color: "bg-gray-500/20 text-gray-400" },
-  { value: "REGISTRATION", label: "Registration Open", color: "bg-blue-500/20 text-blue-400" },
-  { value: "FIXTURE_LOCK", label: "Fixtures Locked", color: "bg-yellow-500/20 text-yellow-400" },
-  { value: "LIVE", label: "Live", color: "bg-green-500/20 text-green-400" },
-  { value: "ENDED", label: "Ended", color: "bg-orange-500/20 text-orange-400" },
-  { value: "ARCHIVED", label: "Archived", color: "bg-gray-500/20 text-gray-400" },
-]
+  { value: "PRESEASON", label: "Preseason", color: "border-yellow-400/20 bg-yellow-500/15 text-yellow-300", icon: Clock },
+  { value: "REGISTRATION", label: "Registration", color: "border-blue-400/20 bg-blue-500/15 text-blue-300", icon: Users },
+  { value: "FIXTURE_LOCK", label: "Fixtures Locked", color: "border-orange-400/20 bg-orange-500/15 text-orange-300", icon: Archive },
+  { value: "LIVE", label: "Live", color: "border-green-400/20 bg-green-500/15 text-green-300", icon: Play },
+  { value: "ENDED", label: "Ended", color: "border-red-400/20 bg-red-500/15 text-red-300", icon: CheckCircle },
+  { value: "ARCHIVED", label: "Archived", color: "border-gray-400/20 bg-gray-500/15 text-gray-400", icon: Archive },
+];
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: "easeOut" },
+  },
+};
+
+function DecorBackground() {
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-emerald-950">
+      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-emerald-600/20 blur-[120px]" />
+      <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-green-600/15 blur-[120px]" />
+      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-teal-600/15 blur-[120px]" />
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+    </div>
+  );
+}
+
+function getStatusBadge(status: string) {
+  const option = statusOptions.find((s) => s.value === status) || statusOptions[0];
+  const Icon = option.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${option.color}`}
+    >
+      <Icon className="h-3 w-3" />
+      {option.label}
+    </span>
+  );
+}
+
+function getSeasonProgress(season: Season) {
+  if (season.status === "ARCHIVED" || season.status === "ENDED") return 100;
+  if (season.status === "LIVE") return 75;
+  if (season.status === "FIXTURE_LOCK") return 50;
+  if (season.status === "REGISTRATION") return 25;
+  return 10;
+}
+
+function getStatusColor(status: string) {
+  const colors: Record<string, string> = {
+    PRESEASON: "from-yellow-500 to-amber-500",
+    REGISTRATION: "from-blue-500 to-cyan-500",
+    FIXTURE_LOCK: "from-orange-500 to-amber-500",
+    LIVE: "from-green-500 to-emerald-500",
+    ENDED: "from-red-500 to-rose-500",
+    ARCHIVED: "from-gray-500 to-gray-600",
+  };
+  return colors[status] || "from-gray-500 to-gray-600";
+}
+
+function formatDate(date: string) {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function AdminSeasonsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const [seasons, setSeasons] = useState<Season[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editingSeason, setEditingSeason] = useState<Season | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingSeason, setEditingSeason] = useState<Season | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     startDate: "",
     endDate: "",
     isActive: false,
-    status: "PRESEASON"
-  })
+    status: "PRESEASON",
+  });
 
   useEffect(() => {
-    if (status === "loading") return
+    if (status === "loading") return;
     if (!session || session.user?.role !== "ADMIN") {
-      router.push("/dashboard")
+      router.push("/dashboard");
     }
-  }, [session, status, router])
+  }, [session, status, router]);
 
   useEffect(() => {
     if (session?.user?.role === "ADMIN") {
-      fetchSeasons()
+      fetchSeasons();
     }
-  }, [session])
+  }, [session]);
 
   async function fetchSeasons() {
-    const res = await fetch("/api/seasons", { credentials: "include" })
-    const data = await res.json()
-    setSeasons(Array.isArray(data) ? data : [])
-    setLoading(false)
+    const res = await fetch("/api/seasons", { credentials: "include" });
+    const data = await res.json();
+    setSeasons(Array.isArray(data) ? data : []);
+    setLoading(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!formData.name || !formData.startDate || !formData.endDate) {
-      toast.error("Please fill all fields")
-      return
+      toast.error("Please fill all fields");
+      return;
     }
 
-    setSubmitting(true)
-    
-    const url = editingSeason ? `/api/seasons/${editingSeason.id}` : "/api/seasons"
-    const method = editingSeason ? "PUT" : "POST"
-    
+    setSubmitting(true);
+
+    const url = editingSeason ? `/api/seasons/${editingSeason.id}` : "/api/seasons";
+    const method = editingSeason ? "PUT" : "POST";
+
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(formData)
-    })
+      body: JSON.stringify(formData),
+    });
 
     if (res.ok) {
-      toast.success(editingSeason ? "Season updated!" : "Season created!")
-      setShowForm(false)
-      setEditingSeason(null)
-      setFormData({ name: "", startDate: "", endDate: "", isActive: false, status: "PRESEASON" })
-      fetchSeasons()
+      toast.success(editingSeason ? "Season updated!" : "Season created!");
+      setShowForm(false);
+      setEditingSeason(null);
+      setFormData({ name: "", startDate: "", endDate: "", isActive: false, status: "PRESEASON" });
+      fetchSeasons();
     } else {
-      const error = await res.json()
-      toast.error(error.error || "Failed to save season")
+      const error = await res.json();
+      toast.error(error.error || "Failed to save season");
     }
-    setSubmitting(false)
+    setSubmitting(false);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure? This will delete all fixtures and results for this season.")) return
-    
-    const res = await fetch(`/api/seasons/${id}`, { 
+    if (!confirm("Are you sure? This will delete all fixtures and results for this season.")) return;
+
+    setDeleting(id);
+    const res = await fetch(`/api/seasons/${id}`, {
       method: "DELETE",
-      credentials: "include"
-    })
-    
+      credentials: "include",
+    });
+
     if (res.ok) {
-      toast.success("Season deleted")
-      fetchSeasons()
+      toast.success("Season deleted");
+      fetchSeasons();
     } else {
-      toast.error("Failed to delete")
+      toast.error("Failed to delete");
     }
+    setDeleting(null);
   }
 
   async function handleUpdateStatus(id: string, newStatus: string) {
-    // Confirm before changing to certain statuses
-    if (newStatus === "ARCHIVED") {
-      if (!confirm("Are you sure you want to archive this season? This will make it read-only.")) return
-    }
-    if (newStatus === "ENDED") {
-      if (!confirm("Are you sure you want to end this season? No more results can be submitted.")) return
-    }
-    if (newStatus === "LIVE") {
-      if (!confirm("Are you sure you want to start this season? Results can now be submitted.")) return
+    const confirmMessages: Record<string, string> = {
+      ARCHIVED: "Are you sure you want to archive this season? This will make it read-only.",
+      ENDED: "Are you sure you want to end this season? No more results can be submitted.",
+      LIVE: "Are you sure you want to start this season? Results can now be submitted.",
+    };
+
+    if (confirmMessages[newStatus]) {
+      if (!confirm(confirmMessages[newStatus])) return;
     }
 
-    const res = await fetch(`/api/seasons/${id}/status`, { 
+    setUpdating(id);
+    const res = await fetch(`/api/seasons/${id}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ status: newStatus })
-    })
-    
+      body: JSON.stringify({ status: newStatus }),
+    });
+
     if (res.ok) {
-      toast.success(`Season status updated to ${newStatus}`)
-      fetchSeasons()
+      toast.success(`Season status updated to ${newStatus}`);
+      fetchSeasons();
     } else {
-      const error = await res.json()
-      toast.error(error.error || "Failed to update status")
+      const error = await res.json();
+      toast.error(error.error || "Failed to update status");
     }
+    setUpdating(null);
   }
+
+  const filteredSeasons = useMemo(() => {
+    return seasons.filter((season) => {
+      const matchesSearch = season.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = filterStatus === "ALL" || season.status === filterStatus;
+      return matchesSearch && matchesStatus;
+    });
+  }, [seasons, searchTerm, filterStatus]);
+
+  const stats = [
+    {
+      label: "Total Seasons",
+      value: seasons.length,
+      icon: Calendar,
+      accent: "text-emerald-400",
+      ring: "border-emerald-500/20",
+      glow: "from-emerald-500/20",
+    },
+    {
+      label: "Active",
+      value: seasons.filter((s) => s.isActive).length,
+      icon: Zap,
+      accent: "text-green-400",
+      ring: "border-green-500/20",
+      glow: "from-green-500/20",
+    },
+    {
+      label: "Live",
+      value: seasons.filter((s) => s.status === "LIVE").length,
+      icon: Play,
+      accent: "text-blue-400",
+      ring: "border-blue-500/20",
+      glow: "from-blue-500/20",
+    },
+    {
+      label: "Archived",
+      value: seasons.filter((s) => s.status === "ARCHIVED").length,
+      icon: Archive,
+      accent: "text-gray-400",
+      ring: "border-gray-500/20",
+      glow: "from-gray-500/20",
+    },
+  ];
 
   if (status === "loading" || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading...</div>
-      </div>
-    )
+      <>
+        <DecorBackground />
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-emerald-500 border-t-transparent" />
+            <p className="text-gray-400">Loading seasons...</p>
+          </div>
+        </div>
+      </>
+    );
   }
 
   if (session?.user?.role !== "ADMIN") {
-    return null
+    return null;
   }
 
-  const getStatusBadge = (status: string) => {
-    const option = statusOptions.find(s => s.value === status) || statusOptions[0]
-    return <span className={`px-2 py-1 rounded-full text-xs ${option.color}`}>{option.label}</span>
-  }
+  const filterButtons = [
+    { value: "ALL", label: "All", count: seasons.length },
+    ...statusOptions.map((opt) => ({
+      value: opt.value,
+      label: opt.label,
+      count: seasons.filter((s) => s.status === opt.value).length,
+    })),
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Manage Seasons</h1>
-          <p className="text-gray-400 mt-1">Create and manage league seasons with lifecycle tracking</p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingSeason(null)
-            setFormData({ name: "", startDate: "", endDate: "", isActive: false, status: "PRESEASON" })
-            setShowForm(true)
-          }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-all"
+    <>
+      <DecorBackground />
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-5 sm:space-y-6"
+      >
+        {/* Header */}
+        <motion.div
+          variants={itemVariants}
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-emerald-600/20 via-green-600/20 to-teal-600/20 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
-          <Plus size={18} />
-          Create Season
-        </button>
-      </div>
-
-      {seasons.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800 rounded-xl border border-gray-700">
-          <Calendar className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Seasons Yet</h3>
-          <p className="text-gray-400">Click "Create Season" to start your first league season.</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {seasons.map((season) => (
-            <div key={season.id} className="bg-gray-800 rounded-xl border border-gray-700 p-5 hover:border-gray-600 transition-all">
-              <div className="flex flex-wrap justify-between items-start gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h2 className="text-xl font-semibold text-white">{season.name}</h2>
-                    {getStatusBadge(season.status)}
-                    {season.isActive && (
-                      <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
-                        <CheckCircle size={12} />
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <span className="text-gray-400">
-                      <Calendar size={14} className="inline mr-1" />
-                      Start: {new Date(season.startDate).toLocaleDateString()}
-                    </span>
-                    <span className="text-gray-400">
-                      <Calendar size={14} className="inline mr-1" />
-                      End: {new Date(season.endDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-{/* Status Update Buttons */}
-<div className="mt-3 flex flex-wrap gap-2">
-  {statusOptions.map((opt) => (
-    <button
-      key={opt.value}
-      onClick={() => handleUpdateStatus(season.id, opt.value)}
-      disabled={season.status === opt.value}
-      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-        season.status === opt.value
-          ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-          : "bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white"
-      }`}
-    >
-      {opt.label}
-    </button>
-  ))}
-</div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingSeason(season)
-                      setFormData({
-                        name: season.name,
-                        startDate: season.startDate.split('T')[0],
-                        endDate: season.endDate.split('T')[0],
-                        isActive: season.isActive,
-                        status: season.status
-                      })
-                      setShowForm(true)
-                    }}
-                    className="text-blue-400 hover:text-blue-300 p-2 transition-all"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(season.id)}
-                    className="text-red-400 hover:text-red-300 p-2 transition-all"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/30 sm:h-12 sm:w-12">
+                <Calendar className="h-5 w-5 text-white sm:h-6 sm:w-6" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                  📅 Season Management
+                </h1>
+                <p className="mt-0.5 text-xs text-gray-300 sm:text-sm">
+                  Create and manage league seasons with lifecycle tracking
+                </p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create/Edit Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-gray-800 rounded-xl w-full max-w-md p-6 border border-gray-700">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">
-                {editingSeason ? "Edit Season" : "Create New Season"}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white">
-                <X size={20} />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <span className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 sm:w-auto">
+                <Sparkles className="h-3.5 w-3.5" />
+                {seasons.length} seasons
+              </span>
+              <button
+                onClick={() => {
+                  setEditingSeason(null);
+                  setFormData({ name: "", startDate: "", endDate: "", isActive: false, status: "PRESEASON" });
+                  setShowForm(true);
+                }}
+                className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition-all hover:from-emerald-700 hover:to-green-700 sm:w-auto"
+              >
+                <Plus size={18} />
+                Create Season
               </button>
             </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Season Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  placeholder="e.g., Spring 2025 Season"
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    required
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
+          </div>
+        </motion.div>
+
+        {/* Stats */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <motion.div
+              key={stat.label}
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className={`group relative min-h-[44px] overflow-hidden rounded-2xl border bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 ${stat.ring}`}
+            >
+              <div
+                className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity group-hover:opacity-70`}
+              />
+              <div className="relative flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    required
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Initial Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                <span
+                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}
                 >
-                  {statusOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <stat.icon className="h-5 w-5" />
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Search & Filter */}
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search seasons..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 sm:w-48">
+                <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-8 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                >
+                  {filterButtons.map((btn) => (
+                    <option key={btn.value} value={btn.value}>
+                      {btn.label} ({btn.count})
+                    </option>
                   ))}
                 </select>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-indigo-600"
-                />
-                <label htmlFor="isActive" className="text-sm text-gray-300">
-                  Activate this season immediately
-                </label>
-              </div>
-              
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-1 rounded-xl border border-white/10 bg-gray-900/50 p-1">
                 <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-all disabled:opacity-50"
+                  onClick={() => setViewMode("grid")}
+                  className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg transition-all ${
+                    viewMode === "grid" ? "bg-emerald-500/20 text-emerald-300" : "text-gray-400 hover:text-white"
+                  }`}
+                  title="Grid view"
                 >
-                  {submitting ? "Saving..." : editingSeason ? "Update Season" : "Create Season"}
+                  <LayoutGrid size={16} />
                 </button>
                 <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-600 transition-all"
+                  onClick={() => setViewMode("list")}
+                  className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg transition-all ${
+                    viewMode === "list" ? "bg-emerald-500/20 text-emerald-300" : "text-gray-400 hover:text-white"
+                  }`}
+                  title="List view"
                 >
-                  Cancel
+                  <List size={16} />
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  )
+        </motion.div>
+
+        {/* Seasons */}
+        {filteredSeasons.length === 0 ? (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center shadow-2xl backdrop-blur-xl"
+          >
+            <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-600" />
+            <h3 className="mb-2 text-xl font-semibold text-white">
+              {searchTerm || filterStatus !== "ALL" ? "No Matching Seasons" : "No Seasons Yet"}
+            </h3>
+            <p className="px-4 text-gray-400">
+              {searchTerm || filterStatus !== "ALL"
+                ? "Try adjusting your search or filter."
+                : 'Click "Create Season" to start your first league season.'}
+            </p>
+          </motion.div>
+        ) : viewMode === "grid" ? (
+          <motion.div variants={containerVariants} className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {filteredSeasons.map((season) => {
+              const progress = getSeasonProgress(season);
+              const statusColor = getStatusColor(season.status);
+
+              return (
+                <motion.div
+                  key={season.id}
+                  variants={itemVariants}
+                  whileHover={{ y: -3 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 sm:p-5"
+                >
+                  <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-emerald-500/10 blur-3xl transition-opacity group-hover:opacity-100" />
+                  <div className="relative">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-lg font-semibold text-white sm:text-xl">
+                            {season.name}
+                          </h2>
+                          {getStatusBadge(season.status)}
+                          {season.isActive && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-green-400/20 bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-300">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-sm text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={14} className="text-emerald-400" />
+                            {formatDate(season.startDate)}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Calendar size={14} className="text-red-400" />
+                            {formatDate(season.endDate)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingSeason(season);
+                            setFormData({
+                              name: season.name,
+                              startDate: season.startDate.split("T")[0],
+                              endDate: season.endDate.split("T")[0],
+                              isActive: season.isActive,
+                              status: season.status,
+                            });
+                            setShowForm(true);
+                          }}
+                          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 text-blue-300 transition-all hover:bg-blue-500/20"
+                          title="Edit season"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(season.id)}
+                          disabled={deleting === season.id}
+                          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-red-400/20 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20 disabled:opacity-50"
+                          title="Delete season"
+                        >
+                          {deleting === season.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress */}
+                    <div className="mt-4">
+                      <div className="mb-1.5 flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Season Progress</span>
+                        <span className="font-medium text-emerald-300">{progress}%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-900/70">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${statusColor}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status Quick Actions */}
+                    <div className="mt-4 flex flex-wrap gap-1.5 border-t border-white/10 pt-4">
+                      {statusOptions.map((opt) => {
+                        const Icon = opt.icon;
+                        const isActive = season.status === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleUpdateStatus(season.id, opt.value)}
+                            disabled={isActive || updating === season.id}
+                            className={`flex min-h-[32px] items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                              isActive
+                                ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
+                                : "bg-gray-700/50 text-gray-300 hover:bg-emerald-600/30 hover:text-white"
+                            }`}
+                          >
+                            {updating === season.id && !isActive ? (
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <Icon className="h-3 w-3" />
+                            )}
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        ) : (
+          // List View
+          <motion.div variants={containerVariants} className="space-y-3">
+            {filteredSeasons.map((season) => (
+              <motion.div
+                key={season.id}
+                variants={itemVariants}
+                className="group overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 sm:p-5"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-semibold text-white">{season.name}</h3>
+                      {getStatusBadge(season.status)}
+                      {season.isActive && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-green-400/20 bg-green-500/15 px-2 py-0.5 text-[10px] font-medium text-green-300">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-4 text-xs text-gray-400">
+                      <span>{formatDate(season.startDate)} → {formatDate(season.endDate)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingSeason(season);
+                          setFormData({
+                            name: season.name,
+                            startDate: season.startDate.split("T")[0],
+                            endDate: season.endDate.split("T")[0],
+                            isActive: season.isActive,
+                            status: season.status,
+                          });
+                          setShowForm(true);
+                        }}
+                        className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-blue-400/20 bg-blue-500/10 text-blue-300 transition-all hover:bg-blue-500/20"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(season.id)}
+                        disabled={deleting === season.id}
+                        className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-red-400/20 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20 disabled:opacity-50"
+                      >
+                        {deleting === season.id ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </motion.div>
+
+      {/* Create/Edit Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+            onClick={() => setShowForm(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 28, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 28, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-gray-800/95 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-white sm:text-xl">
+                  {editingSeason ? "✏️ Edit Season" : "📅 Create New Season"}
+                </h2>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                  aria-label="Close modal"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-300">Season Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    placeholder="e.g., Spring 2025 Season"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-300">Start Date</label>
+                    <input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      required
+                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-300">End Date</label>
+                    <input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      required
+                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-300">Initial Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  >
+                    {statusOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-gray-900/40 px-4 py-2.5 transition-colors hover:bg-gray-900/60">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-300">Activate this season immediately</span>
+                </label>
+
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-emerald-900/30 transition-all hover:from-emerald-700 hover:to-green-700 disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Saving...
+                      </>
+                    ) : editingSeason ? (
+                      "Update Season"
+                    ) : (
+                      "Create Season"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-gray-700 px-6 py-2.5 font-semibold text-gray-300 transition-all hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

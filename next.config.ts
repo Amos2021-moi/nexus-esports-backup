@@ -2,14 +2,6 @@
 const nextConfig = {
   allowedDevOrigins: ['192.168.100.24', 'localhost'],
 
-  // ✅ Add optimization for development
-  swcMinify: true,
-  compress: true,
-
-  // ✅ Reduce bundle size
-  optimizeFonts: true,
-  optimizeCss: true,
-
   env: {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -19,19 +11,43 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '200mb',
     },
-    // ✅ Improve development performance
-    optimizePackageImports: ['lucide-react', 'framer-motion', 'chart.js'],
+    optimizePackageImports: [
+      'lucide-react',
+      'framer-motion',
+      'chart.js',
+      'react-hot-toast',
+      '@tanstack/react-query',
+    ],
+    clientRouterFilter: true,
+    clientRouterFilterRedirects: false,
   },
 
-  // ✅ Exclude large packages from being watched
-  watchOptions: {
-    ignored: [
-      '**/node_modules/**',
-      '**/.next/**',
-      '**/backups/**',
-      '**/dist/**',
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
     ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60,
   },
+
+  compress: true,
+
+  // ✅ REMOVED: swcMinify - not supported in Next.js 16
+
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+
+  productionBrowserSourceMaps: false,
 
   outputFileTracingIncludes: {
     '**/*': [

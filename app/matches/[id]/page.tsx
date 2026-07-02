@@ -7,9 +7,10 @@ import Link from "next/link"
 import { 
   Trophy, Calendar, Users, Award, Clock, CheckCircle, 
   MessageCircle, Eye, TrendingUp, Shield, ArrowLeft,
-  Share2, Activity
+  Share2, Activity, Lock
 } from "lucide-react"
 import toast from "react-hot-toast"
+import Image from "next/image"
 
 interface MatchData {
   match: {
@@ -72,6 +73,9 @@ interface MatchData {
   }
   homeForm: string[]
   awayForm: string[]
+  paymentRequired?: boolean
+  hasPaid?: boolean
+  message?: string
 }
 
 export default function MatchCenterPage() {
@@ -122,6 +126,37 @@ export default function MatchCenterPage() {
     )
   }
 
+  // ✅ Check if payment is required and not paid
+  if (matchData.paymentRequired && !matchData.hasPaid) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <Link 
+          href="/dashboard/fixtures" 
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+        >
+          <ArrowLeft size={18} />
+          Back to Fixtures
+        </Link>
+        <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8 text-center">
+          <Lock className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">🔒 Payment Required</h2>
+          <p className="text-gray-400">
+            You need to pay the entry fee to view match details.
+          </p>
+          <p className="text-gray-500 text-sm mt-2">
+            {matchData.message || "Please pay on your dashboard to access this match."}
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-block mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all"
+          >
+            Go to Dashboard to Pay
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   const { match, headToHead, homeForm, awayForm } = matchData
   const homeName = match.homePlayer.profile?.username || match.homePlayer.name
   const awayName = match.awayPlayer.profile?.username || match.awayPlayer.name
@@ -145,7 +180,6 @@ export default function MatchCenterPage() {
         await navigator.clipboard.writeText(url)
         toast.success("Match link copied!")
       } else {
-        // Fallback for older browsers
         const textArea = document.createElement('textarea')
         textArea.value = url
         document.body.appendChild(textArea)
@@ -283,7 +317,14 @@ export default function MatchCenterPage() {
               {homeSquad && (
                 <div className="bg-gray-700/30 rounded-xl p-4">
                   <p className="text-sm font-medium text-white mb-2">{homeName}'s Squad</p>
-                  <img src={homeSquad.screenshot} alt="Home Squad" className="w-full h-32 object-cover rounded-lg" />
+                  <Image
+                    src={homeSquad.screenshot}
+                    alt="Home Squad"
+                    width={400}
+                    height={128}
+                    className="w-full h-32 object-cover rounded-lg"
+                    loading="lazy"
+                  />
                   <div className="flex gap-4 mt-2 text-xs text-gray-400">
                     <span>Formation: {homeSquad.formation}</span>
                     <span>Strength: {homeSquad.teamStrength}</span>
@@ -294,7 +335,14 @@ export default function MatchCenterPage() {
               {awaySquad && (
                 <div className="bg-gray-700/30 rounded-xl p-4">
                   <p className="text-sm font-medium text-white mb-2">{awayName}'s Squad</p>
-                  <img src={awaySquad.screenshot} alt="Away Squad" className="w-full h-32 object-cover rounded-lg" />
+                  <Image
+                    src={awaySquad.screenshot}
+                    alt="Away Squad"
+                    width={400}
+                    height={128}
+                    className="w-full h-32 object-cover rounded-lg"
+                    loading="lazy"
+                  />
                   <div className="flex gap-4 mt-2 text-xs text-gray-400">
                     <span>Formation: {awaySquad.formation}</span>
                     <span>Strength: {awaySquad.teamStrength}</span>
@@ -372,16 +420,19 @@ export default function MatchCenterPage() {
               {showEvidence ? "Hide" : "View"} Match Evidence
             </button>
             {showEvidence && (
-              <img 
+              <Image
                 src={`data:image/png;base64,${match.result.evidenceImage}`}
                 alt="Match Evidence"
+                width={400}
+                height={200}
                 className="rounded-lg max-h-96 mx-auto border border-gray-600"
+                loading="lazy"
               />
             )}
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Only if user is part of match and season is LIVE */}
         {match.status === "SCHEDULED" && session && (
           <div className="text-center">
             <Link

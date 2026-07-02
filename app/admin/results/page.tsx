@@ -1,49 +1,124 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { CheckCircle, XCircle, Clock, Eye, Trophy, Users, Calendar, Image as ImageIcon, ChevronRight, Filter } from "lucide-react"
-import toast from "react-hot-toast"
+import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Eye,
+  Trophy,
+  Users,
+  Calendar,
+  Image as ImageIcon,
+  Search,
+  Filter,
+  Sparkles,
+  ShieldCheck,
+  AlertTriangle,
+  Flame,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import Image from "next/image";
 
 interface PendingResult {
-  id: string
-  homeScore: number
-  awayScore: number
-  evidenceImage: string
-  submittedBy: string
-  approved: boolean
-  source: string
-  createdAt: string
+  id: string;
+  homeScore: number;
+  awayScore: number;
+  evidenceImage: string;
+  submittedBy: string;
+  approved: boolean;
+  source: string;
+  createdAt: string;
   fixture: {
-    id: string
-    homePlayer: { name: string; email: string; profile: { username: string; profilePicture: string } }
-    awayPlayer: { name: string; email: string; profile: { username: string; profilePicture: string } }
-    scheduledDate: string
-  } | null
+    id: string;
+    homePlayer: {
+      name: string;
+      email: string;
+      profile: { username: string; profilePicture: string };
+    };
+    awayPlayer: {
+      name: string;
+      email: string;
+      profile: { username: string; profilePicture: string };
+    };
+    scheduledDate: string;
+  } | null;
   tournamentMatch: {
-    homePlayer: { name: string; profile: { username: string } }
-    awayPlayer: { name: string; profile: { username: string } }
-    tournament: { name: string }
-  } | null
-  user: { name: string; email: string; profile: { username: string } }
+    homePlayer: { name: string; profile: { username: string } };
+    awayPlayer: { name: string; profile: { username: string } };
+    tournament: { name: string };
+  } | null;
+  user: { name: string; email: string; profile: { username: string } };
+}
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: "easeOut" },
+  },
+};
+
+function DecorBackground() {
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-orange-600/20 blur-[120px]" />
+      <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-red-600/15 blur-[120px]" />
+      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+    </div>
+  );
+}
+
+function playerName(player?: { name: string; profile?: { username: string } } | null) {
+  return player?.profile?.username || player?.name || "Player";
+}
+
+function isToday(date: string) {
+  const input = new Date(date);
+  const now = new Date();
+  return (
+    input.getFullYear() === now.getFullYear() &&
+    input.getMonth() === now.getMonth() &&
+    input.getDate() === now.getDate()
+  );
 }
 
 export default function AdminResultsPage() {
-  const { data: session } = useSession()
-  const [results, setResults] = useState<PendingResult[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending")
+  const { data: session } = useSession();
+  const [results, setResults] = useState<PendingResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    fetchResults()
-  }, [])
+    fetchResults();
+  }, []);
 
   async function fetchResults() {
-    const res = await fetch("/api/admin/results")
-    const data = await res.json()
-    setResults(Array.isArray(data) ? data : [])
-    setLoading(false)
+    const res = await fetch("/api/admin/results");
+    const data = await res.json();
+    setResults(Array.isArray(data) ? data : []);
+    setLoading(false);
   }
 
   async function approveResult(resultId: string) {
@@ -51,19 +126,19 @@ export default function AdminResultsPage() {
       const res = await fetch("/api/admin/results/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId })
-      })
-      
-      const data = await res.json()
-      
+        body: JSON.stringify({ resultId }),
+      });
+
+      const data = await res.json();
+
       if (res.ok) {
-        toast.success("Result approved!")
-        fetchResults()
+        toast.success("Result approved!");
+        fetchResults();
       } else {
-        toast.error(data.error || "Failed to approve")
+        toast.error(data.error || "Failed to approve");
       }
     } catch (err) {
-      toast.error("Network error. Please try again.")
+      toast.error("Network error. Please try again.");
     }
   }
 
@@ -72,296 +147,409 @@ export default function AdminResultsPage() {
       const res = await fetch("/api/admin/results/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId })
-      })
-      
+        body: JSON.stringify({ resultId }),
+      });
+
       if (res.ok) {
-        toast.success("Result rejected")
-        fetchResults()
+        toast.success("Result rejected");
+        fetchResults();
       } else {
-        toast.error("Failed to reject")
+        toast.error("Failed to reject");
       }
     }
   }
 
-  const pendingResults = results.filter(r => !r.approved)
-  const approvedResults = results.filter(r => r.approved)
-  
-  const displayResults = filter === "all" ? results : filter === "pending" ? pendingResults : approvedResults
+  const pendingResults = results.filter((r) => !r.approved);
+  const approvedResults = results.filter((r) => r.approved);
+  const todayResults = results.filter((r) => isToday(r.createdAt));
+
+  const displayResults = useMemo(() => {
+    const byStatus =
+      filter === "all" ? results : filter === "pending" ? pendingResults : approvedResults;
+
+    if (!searchTerm.trim()) return byStatus;
+
+    const query = searchTerm.toLowerCase();
+    return byStatus.filter((result) => {
+      const homeName = result.fixture
+        ? playerName(result.fixture.homePlayer)
+        : playerName(result.tournamentMatch?.homePlayer);
+      const awayName = result.fixture
+        ? playerName(result.fixture.awayPlayer)
+        : playerName(result.tournamentMatch?.awayPlayer);
+      const submitter = result.user?.profile?.username || result.user?.name || result.user?.email || "";
+      const tournament = result.tournamentMatch?.tournament?.name || "";
+      return [homeName, awayName, submitter, tournament, result.source]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [approvedResults, filter, pendingResults, results, searchTerm]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-12 h-12 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-400">Loading results...</p>
+      <>
+        <DecorBackground />
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-orange-500 border-t-transparent" />
+            <p className="text-gray-400">Loading results...</p>
+          </div>
         </div>
-      </div>
-    )
+      </>
+    );
   }
 
+  const statCards = [
+    {
+      label: "Pending",
+      value: pendingResults.length,
+      hint: "Awaiting approval",
+      icon: Clock,
+      accent: "text-yellow-400",
+      ring: "border-yellow-500/20",
+      glow: "from-yellow-500/20",
+    },
+    {
+      label: "Approved",
+      value: approvedResults.length,
+      hint: "Approved results",
+      icon: CheckCircle,
+      accent: "text-green-400",
+      ring: "border-green-500/20",
+      glow: "from-green-500/20",
+    },
+    {
+      label: "Today",
+      value: todayResults.length,
+      hint: "Submitted today",
+      icon: Flame,
+      accent: "text-orange-400",
+      ring: "border-orange-500/20",
+      glow: "from-orange-500/20",
+    },
+    {
+      label: "Total",
+      value: results.length,
+      hint: "Total submissions",
+      icon: Trophy,
+      accent: "text-indigo-400",
+      ring: "border-indigo-500/20",
+      glow: "from-indigo-500/20",
+    },
+  ];
+
+  const filterButtons = [
+    { value: "pending" as const, label: "Pending", icon: Clock, count: pendingResults.length, active: "bg-yellow-500/20 text-yellow-300" },
+    { value: "approved" as const, label: "Approved", icon: CheckCircle, count: approvedResults.length, active: "bg-green-500/20 text-green-300" },
+    { value: "all" as const, label: "All", icon: Filter, count: results.length, active: "bg-indigo-500/20 text-indigo-300" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Result Approvals</h1>
-          <p className="text-gray-400 mt-1">Review and manage match results</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-gray-800/50 rounded-xl p-1 border border-gray-700">
-            <button
-              onClick={() => setFilter("pending")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                filter === "pending" 
-                  ? "bg-yellow-500/20 text-yellow-400" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Clock size={14} />
-              Pending ({pendingResults.length})
-            </button>
-            <button
-              onClick={() => setFilter("approved")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                filter === "approved" 
-                  ? "bg-green-500/20 text-green-400" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <CheckCircle size={14} />
-              Approved ({approvedResults.length})
-            </button>
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                filter === "all" 
-                  ? "bg-indigo-500/20 text-indigo-400" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              All ({results.length})
-            </button>
+    <>
+      <DecorBackground />
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-5 sm:space-y-6"
+      >
+        {/* Header */}
+        <motion.div
+          variants={itemVariants}
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-orange-600/20 via-red-600/20 to-purple-600/20 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+        >
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-orange-500/20 blur-3xl" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/30 sm:h-12 sm:w-12">
+                <ShieldCheck className="h-5 w-5 text-white sm:h-6 sm:w-6" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                  📋 Result Management
+                </h1>
+                <p className="mt-0.5 text-xs text-gray-300 sm:text-sm">
+                  Review and manage match result submissions
+                  {session?.user?.name ? ` as ${session.user.name}` : ""}
+                </p>
+              </div>
+            </div>
+            <span className="flex w-fit items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 px-3 py-1.5 text-xs font-semibold text-yellow-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              {pendingResults.length} pending
+            </span>
           </div>
-        </div>
-      </div>
+        </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-yellow-500/10 to-transparent rounded-xl p-4 border border-yellow-500/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-500/20 rounded-lg">
-              <Clock className="h-5 w-5 text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{pendingResults.length}</p>
-              <p className="text-xs text-gray-400">Pending Approval</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-green-500/10 to-transparent rounded-xl p-4 border border-green-500/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-500/20 rounded-lg">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{approvedResults.length}</p>
-              <p className="text-xs text-gray-400">Approved Results</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-indigo-500/10 to-transparent rounded-xl p-4 border border-indigo-500/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/20 rounded-lg">
-              <Trophy className="h-5 w-5 text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{results.length}</p>
-              <p className="text-xs text-gray-400">Total Submissions</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        {/* Stats */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {statCards.map((stat) => (
+            <motion.div
+              key={stat.label}
+              variants={itemVariants}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className={`group relative min-h-[44px] overflow-hidden rounded-2xl border bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-orange-500/40 ${stat.ring}`}
+            >
+              <div
+                className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity group-hover:opacity-70`}
+              />
+              <div className="relative flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
+                </div>
+                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
+                  <stat.icon className="h-5 w-5" />
+                </span>
+              </div>
+              <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
+            </motion.div>
+          ))}
+        </motion.div>
 
-      {displayResults.length === 0 ? (
-        <div className="text-center py-12 bg-gray-800/50 rounded-xl border border-gray-700">
-          <CheckCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Results Found</h3>
-          <p className="text-gray-400">
-            {filter === "pending" ? "No pending results waiting for approval." : "No approved results yet."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {displayResults.map((result) => {
-            const isPending = !result.approved
-            
-            // ✅ Tournament result
-            if (!result.fixture && result.tournamentMatch) {
-              const homeName = result.tournamentMatch.homePlayer?.profile?.username || 
-                               result.tournamentMatch.homePlayer?.name || 
-                               "Home Player"
-              const awayName = result.tournamentMatch.awayPlayer?.profile?.username || 
-                               result.tournamentMatch.awayPlayer?.name || 
-                               "Away Player"
-              
+        {/* Filter Bar */}
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search player, submitter, tournament, or source..."
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-white placeholder-gray-500 transition-colors focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-gray-900/40 p-1 lg:flex">
+              {filterButtons.map((button) => {
+                const Icon = button.icon;
+                const isActive = filter === button.value;
+                return (
+                  <button
+                    key={button.value}
+                    onClick={() => setFilter(button.value)}
+                    className={`flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all sm:px-4 sm:text-sm ${
+                      isActive ? button.active : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <Icon size={14} />
+                    <span className="hidden sm:inline">{button.label}</span>
+                    <span>({button.count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+
+        {displayResults.length === 0 ? (
+          <motion.div
+            variants={itemVariants}
+            className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center shadow-2xl backdrop-blur-xl"
+          >
+            <CheckCircle className="mx-auto mb-4 h-16 w-16 text-gray-600" />
+            <h3 className="mb-2 text-xl font-semibold text-white">No Results Found</h3>
+            <p className="px-4 text-gray-400">
+              {searchTerm
+                ? "No results match your search."
+                : filter === "pending"
+                ? "No pending results waiting for approval."
+                : filter === "approved"
+                ? "No approved results yet."
+                : "No result submissions yet."}
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div variants={containerVariants} className="space-y-4">
+            {displayResults.map((result) => {
+              const isPending = !result.approved;
+              const isTournament = !result.fixture && result.tournamentMatch;
+              const homeName = result.fixture
+                ? playerName(result.fixture.homePlayer)
+                : playerName(result.tournamentMatch?.homePlayer);
+              const awayName = result.fixture
+                ? playerName(result.fixture.awayPlayer)
+                : playerName(result.tournamentMatch?.awayPlayer);
+              const submittedBy = result.user?.profile?.username || result.user?.name || result.user?.email || "Unknown";
+              const matchDate = result.fixture?.scheduledDate || result.createdAt;
+
               return (
-                <div key={result.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">🏆 Tournament</span>
-                      <span className="text-xs bg-gray-600/20 text-gray-400 px-2 py-0.5 rounded-full">{result.tournamentMatch.tournament?.name || "Match"}</span>
-                      {isPending ? (
-                        <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">Pending</span>
-                      ) : (
-                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Approved</span>
+                <motion.div
+                  key={result.id}
+                  variants={itemVariants}
+                  whileHover={{ y: -3 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                  className={`group overflow-hidden rounded-2xl border bg-gray-800/40 shadow-xl backdrop-blur-xl transition-colors ${
+                    isPending
+                      ? "border-yellow-500/20 hover:border-yellow-500/50"
+                      : "border-green-500/15 hover:border-green-500/40"
+                  }`}
+                >
+                  <div
+                    className={`h-1 ${
+                      isPending
+                        ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                        : "bg-gradient-to-r from-green-500 to-emerald-500"
+                    }`}
+                  />
+
+                  <div className="p-4 sm:p-5">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                          isTournament
+                            ? "border-purple-400/20 bg-purple-500/15 text-purple-300"
+                            : "border-blue-400/20 bg-blue-500/15 text-blue-300"
+                        }`}
+                      >
+                        <Trophy size={12} />
+                        {isTournament ? "Tournament" : "League"}
+                      </span>
+                      {isTournament && (
+                        <span className="rounded-full border border-white/10 bg-gray-900/40 px-2.5 py-1 text-xs text-gray-400">
+                          {result.tournamentMatch?.tournament?.name || "Match"}
+                        </span>
                       )}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                          isPending
+                            ? "border-yellow-400/20 bg-yellow-500/15 text-yellow-300"
+                            : "border-green-400/20 bg-green-500/15 text-green-300"
+                        }`}
+                      >
+                        {isPending ? <Clock size={12} /> : <CheckCircle size={12} />}
+                        {isPending ? "Pending" : "Approved"}
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-white font-semibold">{homeName}</span>
-                        <span className="text-xl font-bold text-white">{result.homeScore} - {result.awayScore}</span>
-                        <span className="text-white font-semibold">{awayName}</span>
+
+                    {/* Match display */}
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex min-w-0 flex-1 flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+                        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-gray-900/40 p-3">
+                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 font-bold text-white">
+                            {homeName.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="truncate font-semibold text-white">{homeName}</span>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-gray-950/50 px-5 py-3 shadow-inner">
+                          <span className="text-2xl font-black text-white sm:text-3xl">{result.homeScore}</span>
+                          <span className="text-gray-500">-</span>
+                          <span className="text-2xl font-black text-white sm:text-3xl">{result.awayScore}</span>
+                        </div>
+
+                        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-gray-900/40 p-3 sm:justify-end">
+                          <span className="truncate font-semibold text-white">{awayName}</span>
+                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 font-bold text-white">
+                            {awayName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-400 md:grid-cols-3">
+                      <div className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-900/30 px-3 py-2">
+                        <Calendar size={14} className="flex-shrink-0 text-orange-300" />
+                        <span className="truncate">{new Date(matchDate).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-900/30 px-3 py-2">
+                        <Users size={14} className="flex-shrink-0 text-blue-300" />
+                        <span className="truncate">Submitted by: {submittedBy}</span>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2 rounded-xl bg-gray-900/30 px-3 py-2">
+                        <Clock size={14} className="flex-shrink-0 text-gray-400" />
+                        <span className="truncate">{new Date(result.createdAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Evidence + actions */}
+                    <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        {result.evidenceImage ? (
+                          <button
+                            onClick={() => setSelectedImage(result.evidenceImage)}
+                            className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/10 px-4 text-sm font-medium text-indigo-300 transition-colors hover:bg-indigo-500/20"
+                          >
+                            <ImageIcon size={16} />
+                            View Evidence
+                            <Eye size={14} />
+                          </button>
+                        ) : (
+                          <span className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-gray-900/40 px-4 text-sm text-gray-500">
+                            <AlertTriangle size={16} />
+                            No evidence attached
+                          </span>
+                        )}
+                      </div>
+
                       {isPending && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
                           <button
                             onClick={() => approveResult(result.id)}
-                            className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700"
+                            className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 text-sm font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:from-green-700 hover:to-emerald-700"
                           >
-                            Approve
+                            <CheckCircle size={16} />
+                            Approve Result
                           </button>
                           <button
                             onClick={() => rejectResult(result.id)}
-                            className="bg-red-600/20 text-red-400 px-3 py-1 rounded-lg text-sm hover:bg-red-600/30"
+                            className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-600/15 px-4 text-sm font-semibold text-red-300 transition-all hover:bg-red-600/25"
                           >
+                            <XCircle size={16} />
                             Reject
                           </button>
                         </div>
                       )}
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Submitted: {new Date(result.createdAt).toLocaleString()}
-                    </div>
                   </div>
-                </div>
-              )
-            }
-            
-            // ✅ League result
-            if (result.fixture) {
-              const homeName = result.fixture.homePlayer?.profile?.username || 
-                               result.fixture.homePlayer?.name || 
-                               "Home Player"
-              const awayName = result.fixture.awayPlayer?.profile?.username || 
-                               result.fixture.awayPlayer?.name || 
-                               "Away Player"
-              
-              return (
-                <div key={result.id} className={`bg-gray-800 rounded-xl border overflow-hidden transition-all ${
-                  isPending ? "border-yellow-500/30 hover:border-yellow-500/50" : "border-gray-700 hover:border-gray-600"
-                }`}>
-                  <div className={`h-1 ${isPending ? "bg-gradient-to-r from-yellow-500 to-orange-500" : "bg-gradient-to-r from-green-500 to-emerald-500"}`} />
-                  
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">⚽ League</span>
-                      {isPending ? (
-                        <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">Pending</span>
-                      ) : (
-                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Approved</span>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                            {homeName.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="text-white font-semibold">{homeName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl font-bold text-white">{result.homeScore}</span>
-                          <span className="text-gray-500">-</span>
-                          <span className="text-xl font-bold text-white">{result.awayScore}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-semibold">{awayName}</span>
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
-                            {awayName.charAt(0).toUpperCase()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Calendar size={14} />
-                        <span>{new Date(result.fixture.scheduledDate).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Users size={14} />
-                        <span>Submitted by: {result.user.profile?.username || result.user.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Clock size={14} />
-                        <span>Submitted: {new Date(result.createdAt).toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {result.evidenceImage && (
-                      <div className="mb-4">
-                        <button
-                          onClick={() => setSelectedImage(result.evidenceImage)}
-                          className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors"
-                        >
-                          <ImageIcon size={16} />
-                          <span className="text-sm">View Evidence Screenshot</span>
-                          <Eye size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {isPending && (
-                      <div className="flex gap-3 pt-2 border-t border-gray-700">
-                        <button
-                          onClick={() => approveResult(result.id)}
-                          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-all"
-                        >
-                          <CheckCircle size={16} />
-                          Approve Result
-                        </button>
-                        <button
-                          onClick={() => rejectResult(result.id)}
-                          className="flex items-center gap-2 bg-red-600/20 text-red-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600/30 transition-all border border-red-500/30"
-                        >
-                          <XCircle size={16} />
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            }
-            
-            return null
-          })}
-        </div>
-      )}
-
-      {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setSelectedImage(null)}>
-          <div className="relative max-w-4xl max-h-[90vh] p-4">
-            <button
+        <AnimatePresence>
+          {selectedImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-4"
               onClick={() => setSelectedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-all"
             >
-              <XCircle size={24} />
-            </button>
-            <img src={`data:image/png;base64,${selectedImage}`} alt="Evidence" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
-          </div>
-        </div>
-      )}
-    </div>
-  )
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 18 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="relative max-h-[92vh] w-full max-w-5xl rounded-2xl border border-white/10 bg-gray-900/80 p-3 shadow-2xl backdrop-blur-xl sm:p-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute -top-12 right-0 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-white transition-all hover:bg-white/10 hover:text-gray-300 sm:-top-14"
+                  aria-label="Close evidence preview"
+                >
+                  <XCircle size={24} />
+                </button>
+                <Image
+                  src={`data:image/png;base64,${selectedImage}`}
+                  alt="Evidence"
+                  width={1000}
+                  height={750}
+                  className="max-h-[85vh] w-full rounded-xl object-contain"
+                  loading="lazy"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </>
+  );
 }

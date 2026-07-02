@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Trophy, Star, Crown, Medal, Calendar, User, Shield, Award, Sparkles, Filter } from "lucide-react"
-
+import Image from "next/image"
 interface HallEntry {
   id: string
   category: string
@@ -172,10 +172,13 @@ export default function HallOfFamePage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       {profilePic ? (
-                        <img 
-                          src={profilePic} 
-                          alt={playerName} 
-                          className="h-14 w-14 rounded-full object-cover border-2 border-white/20 group-hover:border-yellow-500/50 transition-all"
+                        <Image
+                          src={profilePic || "/default-avatar.png"}
+                          alt={playerName}
+                          width={96}
+                          height={96}
+                          className="w-24 h-24 rounded-full object-cover"
+                          loading="lazy"
                         />
                       ) : (
                         <div className="h-14 w-14 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-white/20 group-hover:border-yellow-500/50 transition-all">

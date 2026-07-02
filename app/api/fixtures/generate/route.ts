@@ -34,15 +34,45 @@ export async function POST(request: Request) {
       }, { status: 403 })
     }
 
-    const entries = await prisma.leagueEntry.findMany({
+    // ✅ Get league settings for this season
+    const leagueSettings = await prisma.leagueSettings.findUnique({
       where: { seasonId },
-      select: { playerId: true }
     })
 
-    const players = entries.map(e => e.playerId)
+    // ✅ Get players based on payment setting
+    let players: string[] = []
+    let playerSource = ""
+
+    if (leagueSettings?.paymentRequired) {
+      // ✅ Only include paid players
+      const paidEntries = await prisma.playerSeasonEntry.findMany({
+        where: {
+          seasonId,
+          hasPaid: true,
+        },
+        select: { userId: true },
+      })
+      players = paidEntries.map(e => e.userId)
+      playerSource = "paid"
+    } else {
+      // ✅ Include all players in the season
+      const allEntries = await prisma.leagueEntry.findMany({
+        where: { seasonId },
+        select: { playerId: true },
+      })
+      players = allEntries.map(e => e.playerId)
+      playerSource = "all"
+    }
     
     if (players.length < 2) {
-      return NextResponse.json({ error: "Need at least 2 players" }, { status: 400 })
+      const message = leagueSettings?.paymentRequired 
+        ? `Need at least 2 PAID players to generate fixtures. Currently: ${players.length} paid players. 
+           ${players.length === 0 ? 'No players have paid yet. Wait for players to pay or turn off payment requirement in League Settings.' : ''}`
+        : `Need at least 2 players in the season to generate fixtures. Currently: ${players.length} players.`
+      
+      return NextResponse.json({ 
+        error: message 
+      }, { status: 400 })
     }
 
     // Delete existing fixtures
@@ -64,7 +94,6 @@ export async function POST(request: Request) {
     // Generate fixtures
     const fixtures = []
     const today = new Date()
-    const oneWeekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
     
     for (let i = 0; i < players.length; i++) {
       for (let j = i + 1; j < players.length; j++) {
@@ -87,7 +116,7 @@ export async function POST(request: Request) {
       data: fixtures 
     })
 
-    // ✅ Send email notifications to all players
+    // ✅ Send email notifications to players
     const createdFixtures = await prisma.fixture.findMany({
       where: { seasonId },
       include: {
@@ -150,18 +179,27 @@ export async function POST(request: Request) {
       console.log(`📧 Sent ${emailPromises.length} fixture notification emails`)
     }
 
+    // ✅ Generate calendar events for players who want sync
+    await generateCalendarEvents(createdFixtures)
+
     return NextResponse.json({ 
       success: true, 
       count: created.count,
+      playersUsed: players.length,
+      playerSource: playerSource,
       emailsSent: emailPromises.length,
-      playersNotified: notifiedPlayers.size
+      playersNotified: notifiedPlayers.size,
+      message: leagueSettings?.paymentRequired 
+        ? `Generated ${created.count} fixtures for ${players.length} paid players`
+        : `Generated ${created.count} fixtures for ${players.length} players (free league)`
     })
   } catch (error) {
     console.error("Error generating fixtures:", error)
     return NextResponse.json({ error: "Failed to generate fixtures" }, { status: 500 })
   }
 }
-// ✅ After generating fixtures, check if users want calendar sync
+
+// ✅ Generate calendar events for users who opted in
 async function generateCalendarEvents(fixtures: any[]) {
   for (const fixture of fixtures) {
     // Check if home player wants calendar sync
@@ -193,6 +231,7 @@ async function generateCalendarEvents(fixtures: any[]) {
   }
 }
 
+// ✅ Generate ICS calendar file
 async function generateICSFile(fixture: any) {
   // Get player names
   const homePlayer = await prisma.user.findUnique({
@@ -222,13 +261,5 @@ URL:${process.env.NEXTAUTH_URL}/dashboard/fixtures
 END:VEVENT
 END:VCALENDAR`
 
-  // Save ICS file or send as attachment
-  // For now, we'll just log it
   console.log(`📅 Calendar event generated for match ${fixture.id}`)
-  
-  // Option: Store ICS content in database for download
-  // await prisma.fixture.update({
-  //   where: { id: fixture.id },
-  //   data: { calendarEvent: icsContent }
-  // })
 }

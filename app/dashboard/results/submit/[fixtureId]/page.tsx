@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { ArrowLeft, Camera, AlertCircle, CheckCircle, XCircle, Shield, Clock } from "lucide-react"
 import Link from "next/link"
 import toast from "react-hot-toast"
-
+import Image from "next/image"
 interface Fixture {
   id: string
   homePlayer: { 
@@ -318,11 +318,14 @@ export default function SubmitResultPage() {
             <div className="flex-1 text-right">
               <div className="flex justify-end mb-2">
                 {fixture.homePlayer?.profile?.profilePicture ? (
-                  <img 
-                    src={fixture.homePlayer.profile.profilePicture} 
-                    alt={homeName}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500"
-                  />
+                 <Image
+  src={fixture.homePlayer.profile.profilePicture || "/default-avatar.png"}
+  alt={homeName}
+  width={64}
+  height={64}
+  className="h-16 w-16 rounded-full object-cover"
+  loading="lazy"
+/>
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
                     {homeName.charAt(0).toUpperCase()}
@@ -342,10 +345,13 @@ export default function SubmitResultPage() {
             <div className="flex-1 text-left">
               <div className="flex justify-start mb-2">
                 {fixture.awayPlayer?.profile?.profilePicture ? (
-                  <img 
-                    src={fixture.awayPlayer.profile.profilePicture} 
+                  <Image
+                    src={fixture.awayPlayer.profile.profilePicture || "/default-avatar.png"}
                     alt={awayName}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-purple-500"
+                    width={64}
+                    height={64}
+                    className="h-16 w-16 rounded-full object-cover border-2 border-purple-500"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold">
@@ -416,8 +422,14 @@ export default function SubmitResultPage() {
               <label htmlFor="evidence-upload" className="cursor-pointer">
                 {preview ? (
                   <div className="relative">
-                    <img src={preview} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
-                    <button
+<Image
+  src={preview}
+  alt="Preview"
+  width={400}
+  height={200}
+  className="max-h-48 mx-auto rounded-lg"
+  loading="lazy"
+/>                    <button
                       type="button"
                       onClick={() => {
                         setEvidence(null)

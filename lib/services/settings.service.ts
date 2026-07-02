@@ -54,6 +54,8 @@ export async function setSetting(userId: string | null, category: string, key: s
     }
     if (userId) {
       where.userId = userId
+    } else {
+      where.userId = null
     }
     
     const existing = await prisma.setting.findFirst({
@@ -73,12 +75,33 @@ export async function setSetting(userId: string | null, category: string, key: s
         key,
         value: JSON.stringify(value)
       }
-      if (userId) {
+      // ✅ Allow null userId (system settings)
+      if (userId !== undefined) {
         data.userId = userId
       }
-      return await prisma.setting.create({
-        data
-      })
+      
+      try {
+        return await prisma.setting.create({ data })
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          const existing = await prisma.setting.findFirst({
+            where: {
+              userId: userId || null,
+              category,
+              key
+            }
+          })
+          if (existing) {
+            return await prisma.setting.update({
+              where: { id: existing.id },
+              data: {
+                value: JSON.stringify(value)
+              }
+            })
+          }
+        }
+        throw error
+      }
     }
   } catch (error) {
     console.error("Error setting setting:", error)

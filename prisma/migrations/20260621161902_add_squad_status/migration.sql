@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "Squad" ADD COLUMN     "status" TEXT NOT NULL DEFAULT 'APPROVED';

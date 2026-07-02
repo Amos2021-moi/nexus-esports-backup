@@ -1,53 +1,83 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Users, Trophy, Calendar, CheckCircle, TrendingUp, Award, Eye, Activity, Zap } from "lucide-react"
-import Link from "next/link"
-import { Skeleton, SkeletonStats } from "@/components/ui/Skeleton"
+import { useSystemStatus } from "@/lib/hooks/useSystemStatus";
+import { useEffect, useState } from "react";
+import {
+  Users,
+  Trophy,
+  Calendar,
+  Award,
+  Eye,
+  Server,
+  HardDrive,
+  Users as UsersIcon,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Gauge,
+  Activity,
+  Zap,
+  Clock,
+  AlertTriangle,
+  ShieldOff,
+  Moon,
+  Percent,
+  Timer,
+  Newspaper,
+  Database,
+  Settings as SettingsIcon,
+  ArrowUpRight,
+  TrendingUp,
+} from "lucide-react";
+import Link from "next/link";
+import { Skeleton, SkeletonStats } from "@/components/ui/Skeleton";
 
 interface Stats {
-  totalPlayers: number
-  activeSeasons: number
-  totalFixtures: number
-  completedResults: number
-  pendingResults: number
-  totalAwards: number
+  totalPlayers: number;
+  activeSeasons: number;
+  totalFixtures: number;
+  completedResults: number;
+  pendingResults: number;
+  totalAwards: number;
 }
 
 interface ActivityItem {
-  id: string
-  action: string
-  description: string
-  user: string
-  time: string
-  type: string
-  icon: string
+  id: string;
+  action: string;
+  description: string;
+  user: string;
+  time: string;
+  type: string;
+  icon: string;
 }
 
 interface HealthIndicators {
-  pendingResults: number
-  unscheduledFixtures: number
-  missingSquadUploads: number
-  inactivePlayers: number
-  totalPlayers: number
-  completionRate: number
-  avgApprovalTime: number
-  seasonName: string
-  totalFixtures: number
-  completedFixtures: number
+  pendingResults: number;
+  unscheduledFixtures: number;
+  missingSquadUploads: number;
+  inactivePlayers: number;
+  totalPlayers: number;
+  completionRate: number;
+  avgApprovalTime: number;
+  seasonName: string;
+  totalFixtures: number;
+  completedFixtures: number;
 }
 
 export default function AdminOverview() {
+  const { status: systemStatus, loading: statusLoading, refetch: refetchStatus } = useSystemStatus();
+
   const [stats, setStats] = useState<Stats>({
     totalPlayers: 0,
     activeSeasons: 0,
     totalFixtures: 0,
     completedResults: 0,
     pendingResults: 0,
-    totalAwards: 0
-  })
-  const [loading, setLoading] = useState(true)
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+    totalAwards: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [health, setHealth] = useState<HealthIndicators>({
     pendingResults: 0,
     unscheduledFixtures: 0,
@@ -58,231 +88,454 @@ export default function AdminOverview() {
     avgApprovalTime: 0,
     seasonName: "No Active Season",
     totalFixtures: 0,
-    completedFixtures: 0
-  })
+    completedFixtures: 0,
+  });
 
   useEffect(() => {
-    fetchStats()
-    fetchRecentActivity()
-    fetchHealthIndicators()
-  }, [])
+    fetchStats();
+    fetchRecentActivity();
+    fetchHealthIndicators();
+  }, []);
 
   async function fetchStats() {
-    const res = await fetch("/api/admin/stats")
-    const data = await res.json()
-    setStats(data)
+    const res = await fetch("/api/admin/stats");
+    const data = await res.json();
+    setStats(data);
   }
 
   async function fetchRecentActivity() {
-    const res = await fetch("/api/admin/recent-activity")
-    const data = await res.json()
-    setRecentActivity(data)
+    const res = await fetch("/api/admin/recent-activity");
+    const data = await res.json();
+    setRecentActivity(data);
   }
 
   async function fetchHealthIndicators() {
-    const res = await fetch("/api/admin/health")
-    const data = await res.json()
-    setHealth(data)
-    setLoading(false)
+    const res = await fetch("/api/admin/health");
+    const data = await res.json();
+    setHealth(data);
+    setLoading(false);
   }
 
   const statCards = [
-    { name: "Total Players", value: stats.totalPlayers, icon: Users, color: "from-blue-500 to-cyan-500", change: "+12%", href: "/admin/players" },
-    { name: "Active Seasons", value: stats.activeSeasons, icon: Trophy, color: "from-yellow-500 to-orange-500", change: "+2", href: "/admin/seasons" },
-    { name: "Total Fixtures", value: stats.totalFixtures, icon: Calendar, color: "from-green-500 to-emerald-500", change: "+24", href: "/admin/league" },
-    { name: "Completed", value: stats.completedResults, icon: CheckCircle, color: "from-purple-500 to-pink-500", change: "+8", href: "/admin/results" },
-    { name: "Pending", value: stats.pendingResults, icon: Eye, color: "from-orange-500 to-red-500", change: "+3", href: "/admin/results" },
-    { name: "Awards", value: stats.totalAwards, icon: Award, color: "from-indigo-500 to-purple-500", change: "+4", href: "/admin/awards" },
-  ]
+    { name: "Total Players", value: stats.totalPlayers, icon: Users, color: "from-blue-500 to-cyan-500", href: "/admin/players" },
+    { name: "Active Seasons", value: stats.activeSeasons, icon: Trophy, color: "from-yellow-500 to-orange-500", href: "/admin/seasons" },
+    { name: "Total Fixtures", value: stats.totalFixtures, icon: Calendar, color: "from-green-500 to-emerald-500", href: "/admin/league" },
+    { name: "Completed", value: stats.completedResults, icon: CheckCircle, color: "from-purple-500 to-pink-500", href: "/admin/results" },
+    { name: "Pending", value: stats.pendingResults, icon: Eye, color: "from-orange-500 to-red-500", href: "/admin/results" },
+    { name: "Awards", value: stats.totalAwards, icon: Award, color: "from-indigo-500 to-purple-500", href: "/admin/awards" },
+  ];
+
+  const healthCards = [
+    { value: health.pendingResults, label: "Pending Results", icon: Clock, color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20" },
+    { value: health.unscheduledFixtures, label: "Unscheduled", icon: Calendar, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+    { value: health.missingSquadUploads, label: "Missing Squads", icon: ShieldOff, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+    { value: health.inactivePlayers, label: "Inactive", icon: Moon, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+    { value: `${health.completionRate}%`, label: "Completion", icon: Percent, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+    { value: `${health.avgApprovalTime}h`, label: "Avg Approval", icon: Timer, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+  ];
+
+  const quickActions = [
+    { href: "/admin/seasons", label: "New Season", icon: Trophy, color: "from-indigo-500 to-purple-600" },
+    { href: "/admin/league", label: "Fixtures", icon: Calendar, color: "from-emerald-500 to-teal-600" },
+    { href: "/admin/results", label: "Approve", icon: CheckCircle, color: "from-yellow-500 to-amber-600" },
+    { href: "/admin/awards", label: "Awards", icon: Award, color: "from-pink-500 to-rose-600" },
+    { href: "/admin/players", label: "Players", icon: Users, color: "from-blue-500 to-cyan-600" },
+    { href: "/admin/news", label: "News", icon: Newspaper, color: "from-rose-500 to-red-600" },
+    { href: "/admin/settings/league", label: "Settings", icon: SettingsIcon, color: "from-slate-500 to-gray-600" },
+    { href: "/admin/analytics", label: "Analytics", icon: Activity, color: "from-cyan-500 to-teal-600" },
+  ];
+
+  /* ------------------------------ Decorative bg ----------------------------- */
+  const DecorBackground = () => (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl" />
+      <div className="absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl" />
+      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl" />
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+    </div>
+  );
 
   if (loading) {
-  return (
-    <div className="space-y-6">
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 backdrop-blur-sm p-6 border border-white/10">
-        <Skeleton variant="text" className="w-64 h-8" />
-        <Skeleton variant="text" className="w-48 h-4 mt-1" />
-      </div>
-      <SkeletonStats />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-          <Skeleton variant="text" className="w-32 h-6 mb-4" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} variant="card" className="h-20" />
-            ))}
+    return (
+      <>
+        <DecorBackground />
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 p-6 backdrop-blur-sm">
+            <Skeleton variant="text" className="h-8 w-64" />
+            <Skeleton variant="text" className="mt-1 h-4 w-48" />
           </div>
-        </div>
-        <div className="bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-          <Skeleton variant="text" className="w-32 h-6 mb-4" />
-          <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <Skeleton variant="text" className="w-20 h-4" />
-                <Skeleton variant="text" className="w-16 h-4" />
+          <SkeletonStats />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="rounded-xl border border-gray-700 bg-gray-800/30 p-5 lg:col-span-2">
+              <Skeleton variant="text" className="mb-4 h-6 w-32" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} variant="card" className="h-20" />
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-  return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 backdrop-blur-sm p-6 border border-white/10">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Good morning, Admin! 👋</h1>
-            <p className="text-gray-400 mt-1">Here's what's happening in Nexus Esports League.</p>
-          </div>
-          <div className="flex gap-2">
-            <Zap className="h-5 w-5 text-yellow-500" />
-            <span className="text-xs text-gray-400">Live Updates</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {statCards.map((stat) => (
-          <Link key={stat.name} href={stat.href} className="block group">
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-indigo-500/50 transition-all duration-200 group-hover:scale-105">
-              <div className="flex items-center justify-between mb-3">
-                <div className={`bg-gradient-to-r ${stat.color} p-2 rounded-lg`}>
-                  <stat.icon className="h-4 w-4 text-white" />
-                </div>
-                <span className="text-xs text-green-400">{stat.change}</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{stat.value}</p>
-              <p className="text-xs text-gray-400 mt-1">{stat.name}</p>
             </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Health Indicators */}
-      <div className="bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Activity className="h-5 w-5 text-green-400" />
-          League Health
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-yellow-500/20">
-            <p className="text-2xl font-bold text-yellow-400">{health.pendingResults}</p>
-            <p className="text-xs text-gray-400">Pending Results</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-blue-500/20">
-            <p className="text-2xl font-bold text-blue-400">{health.unscheduledFixtures}</p>
-            <p className="text-xs text-gray-400">Unscheduled</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-orange-500/20">
-            <p className="text-2xl font-bold text-orange-400">{health.missingSquadUploads}</p>
-            <p className="text-xs text-gray-400">Missing Squads</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-red-500/20">
-            <p className="text-2xl font-bold text-red-400">{health.inactivePlayers}</p>
-            <p className="text-xs text-gray-400">Inactive Players</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-green-500/20">
-            <p className="text-2xl font-bold text-green-400">{health.completionRate}%</p>
-            <p className="text-xs text-gray-400">Completion Rate</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-purple-500/20">
-            <p className="text-2xl font-bold text-purple-400">{health.avgApprovalTime}h</p>
-            <p className="text-xs text-gray-400">Avg Approval</p>
+            <div className="rounded-xl border border-gray-700 bg-gray-800/30 p-5">
+              <Skeleton variant="text" className="mb-4 h-6 w-32" />
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <Skeleton variant="text" className="h-4 w-20" />
+                    <Skeleton variant="text" className="h-4 w-16" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-3 text-center text-xs text-gray-500">
-          Season: {health.seasonName} • {health.completedFixtures}/{health.totalFixtures} matches completed
-        </div>
-      </div>
+      </>
+    );
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="lg:col-span-2 bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-indigo-400" />
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link href="/admin/seasons" className="text-center p-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 transition-all">
-              <Trophy className="h-5 w-5 text-white mx-auto mb-1" />
-              <span className="text-xs text-white">New Season</span>
-            </Link>
-            <Link href="/admin/league" className="text-center p-3 rounded-xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transition-all">
-              <Calendar className="h-5 w-5 text-white mx-auto mb-1" />
-              <span className="text-xs text-white">Gen Fixtures</span>
-            </Link>
-            <Link href="/admin/results" className="text-center p-3 rounded-xl bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 transition-all">
-              <CheckCircle className="h-5 w-5 text-white mx-auto mb-1" />
-              <span className="text-xs text-white">Approve</span>
-            </Link>
-            <Link href="/admin/awards" className="text-center p-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all">
-              <Award className="h-5 w-5 text-white mx-auto mb-1" />
-              <span className="text-xs text-white">New Award</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* System Status */}
-        <div className="bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-green-400" />
-            System Status
-          </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Database</span>
-              <span className="text-sm text-green-400 flex items-center gap-1">
-                <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-                Connected
+  return (
+    <>
+      <DecorBackground />
+      <div className="space-y-6">
+        {/* Welcome Section */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 p-6 shadow-2xl backdrop-blur-xl">
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
+          <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-500/10 blur-3xl" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
+                <Zap className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
+                  Admin Dashboard
+                  <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-medium text-indigo-300">
+                    v2.0
+                  </span>
+                </h1>
+                <p className="text-sm text-gray-400">
+                  Welcome back! Here's your platform overview.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-full border border-green-400/20 bg-green-500/10 px-3 py-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                </span>
+                <span className="text-xs font-medium text-green-400">Live</span>
+              </div>
+              <span className="text-xs text-gray-500">
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">API Status</span>
-              <span className="text-sm text-green-400">Operational</span>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+          {statCards.map((stat) => (
+            <Link key={stat.name} href={stat.href} className="group block">
+              <div className="relative min-h-[44px] overflow-hidden rounded-xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-white/20">
+                <div
+                  className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-r ${stat.color} opacity-20 blur-2xl transition-opacity group-hover:opacity-40`}
+                />
+                <div className="relative">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className={`rounded-lg bg-gradient-to-r ${stat.color} p-2 shadow-lg`}>
+                      <stat.icon className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-400">
+                      <TrendingUp className="h-3 w-3" />
+                      +12%
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{stat.value}</p>
+                  <p className="mt-0.5 text-xs text-gray-400">{stat.name}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* League Health */}
+        <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-green-500/10 p-2">
+                <Activity className="h-5 w-5 text-green-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-white">League Health</h2>
+              <span className="rounded-full bg-gray-700/30 px-2.5 py-0.5 text-[10px] text-gray-400">
+                {health.completedFixtures}/{health.totalFixtures}
+              </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Last Backup</span>
-              <span className="text-sm text-gray-400">Today, 02:00 AM</span>
+            <span className="text-xs text-gray-500">
+              Season: {health.seasonName}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            {healthCards.map((card) => (
+              <div
+                key={card.label}
+                className={`rounded-xl border p-3 text-center ${card.border} ${card.bg}`}
+              >
+                <card.icon className={`mx-auto mb-1.5 h-5 w-5 ${card.color}`} />
+                <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                <p className="text-xs text-gray-400">{card.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Grid: Quick Actions + System Status + Recent Activity */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {/* Quick Actions - 5 columns */}
+          <div className="xl:col-span-5">
+            <div className="h-full rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+              <div className="mb-5 flex items-center gap-2">
+                <div className="rounded-lg bg-yellow-500/10 p-2">
+                  <Zap className="h-5 w-5 text-yellow-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">Quick Actions</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className={`group relative overflow-hidden rounded-xl bg-gradient-to-r ${action.color} p-4 text-center shadow-lg transition-colors hover:shadow-xl`}
+                  >
+                    <div className="absolute inset-0 bg-white/0 transition-colors group-hover:bg-white/10" />
+                    <div className="relative">
+                      <action.icon className="mx-auto mb-1.5 h-5 w-5 text-white/90" />
+                      <span className="text-xs font-medium text-white/90">
+                        {action.label}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Uptime</span>
-              <span className="text-sm text-gray-400">99.9%</span>
+          </div>
+
+          {/* System Status - 4 columns */}
+          <div className="xl:col-span-4">
+            <div className="h-full rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-indigo-500/10 p-2">
+                    <Server className="h-5 w-5 text-indigo-400" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-white">System Status</h2>
+                </div>
+                <button
+                  onClick={refetchStatus}
+                  disabled={statusLoading}
+                  className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg bg-gray-700/50 text-gray-400 transition-colors hover:bg-gray-600/50 hover:text-white disabled:opacity-50"
+                  title="Refresh"
+                >
+                  <RefreshCw size={14} className={statusLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+
+              {statusLoading ? (
+                <div className="space-y-3">
+                  <div className="h-10 w-full animate-pulse rounded-lg bg-gray-700/50" />
+                  <div className="grid grid-cols-2 gap-3">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-700/50" />
+                    ))}
+                  </div>
+                </div>
+              ) : systemStatus ? (
+                <div className="space-y-4">
+                  {/* Health Status */}
+                  <div className={`flex items-center justify-between rounded-lg p-3 ${
+                    systemStatus.health.status === "healthy" ? "bg-green-500/10 border border-green-500/20" :
+                    systemStatus.health.status === "warning" ? "bg-yellow-500/10 border border-yellow-500/20" :
+                    "bg-red-500/10 border border-red-500/20"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {systemStatus.health.status === "healthy" ? (
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                      ) : systemStatus.health.status === "warning" ? (
+                        <AlertCircle className="h-5 w-5 text-yellow-400" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      )}
+                      <span className={`text-sm font-medium ${
+                        systemStatus.health.status === "healthy" ? "text-green-400" :
+                        systemStatus.health.status === "warning" ? "text-yellow-400" :
+                        "text-red-400"
+                      }`}>
+                        {systemStatus.health.status === "healthy" ? "Healthy" :
+                         systemStatus.health.status === "warning" ? "Warning" :
+                         "Critical"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {systemStatus.health.issues.length === 0 ? (
+                        <span className="text-green-400">All systems go</span>
+                      ) : (
+                        <span className="text-yellow-400">{systemStatus.health.issues.length} issue(s)</span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Status Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-gray-900/40 p-3">
+                      <div className="flex items-center gap-2">
+                        <Database className="h-4 w-4 text-blue-400" />
+                        <span className="text-xs text-gray-400">Database</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        {systemStatus.database.status === "connected" ? (
+                          <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                        )}
+                        <span className={`text-sm font-semibold ${
+                          systemStatus.database.status === "connected" ? "text-green-400" : "text-red-400"
+                        }`}>
+                          {systemStatus.database.status}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <Gauge className="h-3 w-3" />
+                        <span>{systemStatus.database.latency}ms</span>
+                        <span className="text-gray-600">•</span>
+                        <span>{systemStatus.database.size}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-900/40 p-3">
+                      <div className="flex items-center gap-2">
+                        <Server className="h-4 w-4 text-purple-400" />
+                        <span className="text-xs text-gray-400">API</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                        <span className="text-sm font-semibold text-green-400">
+                          {systemStatus.api.status}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">All endpoints operational</div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-900/40 p-3">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-orange-400" />
+                        <span className="text-xs text-gray-400">Server</span>
+                      </div>
+                      <div className="mt-1 space-y-0.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">CPU</span>
+                          <span className="font-medium text-white">{systemStatus.server.cpu}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Memory</span>
+                          <span className="font-medium text-white">{systemStatus.server.memory}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-900/40 p-3">
+                      <div className="flex items-center gap-2">
+                        <UsersIcon className="h-4 w-4 text-cyan-400" />
+                        <span className="text-xs text-gray-400">Users</span>
+                      </div>
+                      <div className="mt-1 space-y-0.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Total</span>
+                          <span className="font-medium text-white">{systemStatus.users.total}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">New (24h)</span>
+                          <span className="font-medium text-emerald-400">+{systemStatus.users.new24h}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center">
+                  <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
+                  <p className="mt-2 text-sm text-gray-400">Failed to load status</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Activity - 3 columns */}
+          <div className="xl:col-span-3">
+            <div className="h-full rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="rounded-lg bg-purple-500/10 p-2">
+                  <Activity className="h-5 w-5 text-purple-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
+              </div>
+              <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-track-gray-800/50 scrollbar-thumb-gray-600/50">
+                {recentActivity.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500">
+                    <AlertTriangle className="mx-auto h-8 w-8 text-gray-600" />
+                    <p className="mt-2 text-sm">No recent activity</p>
+                  </div>
+                ) : (
+                  recentActivity.slice(0, 6).map((activity: ActivityItem) => (
+                    <div
+                      key={activity.id}
+                      className="group flex items-start gap-3 rounded-xl border border-white/5 bg-gray-900/30 p-3 transition-colors hover:border-indigo-500/20 hover:bg-gray-900/60"
+                    >
+                      <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">
+                          {activity.action}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-gray-400">
+                          {activity.description}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          by {activity.user}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 text-[10px] text-gray-500">
+                        {new Date(activity.time).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              {recentActivity.length > 6 && (
+                <div className="mt-3 text-center">
+                  <Link
+                    href="/admin/audit"
+                    className="text-xs text-indigo-400 transition-colors hover:text-indigo-300"
+                  >
+                    View all activity →
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Recent Activity */}
-      <div className="bg-gray-800/30 rounded-xl border border-gray-700 p-5">
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Activity className="h-5 w-5 text-indigo-400" />
-          Recent Activity
-        </h2>
-        <div className="space-y-3">
-          {recentActivity.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No recent activity
-            </div>
-          ) : (
-            recentActivity.map((activity: ActivityItem) => (
-              <div key={activity.id} className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0">
-                <div>
-                  <p className="text-sm text-white">{activity.action}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{activity.description}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">by {activity.user}</p>
-                </div>
-                <span className="text-xs text-gray-500">
-                  {new Date(activity.time).toLocaleString()}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  )
+    </>
+  );
 }

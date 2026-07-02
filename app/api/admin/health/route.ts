@@ -2,18 +2,23 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logger, logApiError } from "@/lib/logger"
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
     if (!session) {
+      logger.warn("Health check attempted without authentication")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     
     if (session.user.role !== "ADMIN") {
+      logger.warn(`Health check attempted by non-admin: ${session.user.email}`)
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+
+    logger.info("Health check started by admin")
 
     // Get current season
     const currentSeason = await prisma.season.findFirst({
@@ -117,19 +122,27 @@ export async function GET() {
     let avgApprovalTime = 0
     if (approvedResults.length > 0) {
       let totalTime = 0
+      let count = 0
       for (const result of approvedResults) {
-  // ✅ Skip tournament results (no fixtureId)
-  if (!result.fixtureId) continue
-  
-  const fixture = await prisma.fixture.findUnique({
-    where: { id: result.fixtureId as string }
-  })
-  if (fixture?.approvedAt && result.createdAt) {
-    totalTime += fixture.approvedAt.getTime() - result.createdAt.getTime()
-  }
-}
-      avgApprovalTime = Math.round(totalTime / approvedResults.length / (1000 * 60 * 60))
+        if (!result.fixtureId) continue
+        
+        const fixture = await prisma.fixture.findUnique({
+          where: { id: result.fixtureId as string }
+        })
+        if (fixture?.approvedAt && result.createdAt) {
+          totalTime += fixture.approvedAt.getTime() - result.createdAt.getTime()
+          count++
+        }
+      }
+      avgApprovalTime = count > 0 ? Math.round(totalTime / count / (1000 * 60 * 60)) : 0
     }
+
+    logger.info("Health check completed successfully", {
+      pendingResults,
+      totalFixtures,
+      completionRate,
+      seasonName: currentSeason?.name || "No Active Season"
+    })
 
     return NextResponse.json({
       pendingResults,
@@ -144,7 +157,7 @@ export async function GET() {
       completedFixtures
     })
   } catch (error) {
-    console.error("Error fetching health indicators:", error)
+    logApiError("/api/admin/health", error)
     return NextResponse.json({
       pendingResults: 0,
       unscheduledFixtures: 0,

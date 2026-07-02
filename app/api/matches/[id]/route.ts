@@ -37,7 +37,11 @@ export async function GET(
             }
           }
         },
-        season: true,
+        season: {
+          include: {
+            leagueSettings: true,
+          },
+        },
         result: {
           include: {
             user: {
@@ -50,6 +54,72 @@ export async function GET(
 
     if (!match) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
+    }
+
+    // ✅ Check if match is locked or completed
+    if (match.status === "COMPLETED" || match.status === "PENDING") {
+      // Allow viewing completed/pending matches without payment check
+      // Continue to return data
+    } else {
+      // ✅ For scheduled/locked matches, check payment
+      const leagueSettings = match.season?.leagueSettings
+
+      if (leagueSettings?.paymentRequired) {
+        // ✅ Check if current user has paid
+        const playerEntry = await prisma.playerSeasonEntry.findUnique({
+          where: {
+            userId_seasonId: {
+              userId: session.user.id,
+              seasonId: match.seasonId,
+            },
+          },
+        })
+
+        const seasonEntry = await prisma.seasonEntry.findUnique({
+          where: {
+            userId_seasonId: {
+              userId: session.user.id,
+              seasonId: match.seasonId,
+            },
+          },
+        })
+
+        const hasPaid = playerEntry?.hasPaid || seasonEntry?.status === "ACTIVE"
+
+        // ✅ If not paid, return limited data with payment info
+        if (!hasPaid) {
+          return NextResponse.json({
+            match: {
+              id: match.id,
+              status: match.status,
+              scheduledDate: match.scheduledDate,
+              homePlayer: {
+                name: match.homePlayer?.name || "Home Player",
+                profile: {
+                  username: match.homePlayer?.profile?.username || "Home",
+                  profilePicture: match.homePlayer?.profile?.profilePicture || null,
+                }
+              },
+              awayPlayer: {
+                name: match.awayPlayer?.name || "Away Player",
+                profile: {
+                  username: match.awayPlayer?.profile?.username || "Away",
+                  profilePicture: match.awayPlayer?.profile?.profilePicture || null,
+                }
+              },
+              season: {
+                name: match.season?.name || "Season",
+              },
+            },
+            paymentRequired: true,
+            hasPaid: false,
+            message: "Payment required to view full match details. Please pay on your dashboard.",
+            headToHead: { homeWins: 0, awayWins: 0, draws: 0, total: 0 },
+            homeForm: [],
+            awayForm: [],
+          })
+        }
+      }
     }
 
     // Get head-to-head history
@@ -122,14 +192,13 @@ export async function GET(
     const homeFormResults = homeForm.map(f => formatResult(f, match.homePlayerId))
     const awayFormResults = awayForm.map(f => formatResult(f, match.awayPlayerId))
 
-    // Get comments (if we have a match discussion feature)
-    // For now, we'll use the post/comment system
-
     return NextResponse.json({
       match,
       headToHead: { homeWins, awayWins, draws, total: headToHead.length },
       homeForm: homeFormResults,
       awayForm: awayFormResults,
+      paymentRequired: false,
+      hasPaid: true,
     })
   } catch (error) {
     console.error("Error fetching match:", error)

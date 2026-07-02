@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Trophy, Users, Calendar, Award, Medal, ChevronDown, LogIn } from "lucide-react"
 import { useSession } from "next-auth/react"
-
+import Image from "next/image"
 interface StandingsEntry {
   id: string
   playerId: string
@@ -209,11 +209,14 @@ export default function StandingsPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {entry.profilePicture ? (
-                              <img 
-                                src={entry.profilePicture} 
-                                alt={entry.playerName}
-                                className="h-8 w-8 rounded-full object-cover border border-gray-600"
-                              />
+                              <Image
+  src={entry.profilePicture || "/default-avatar.png"}
+  alt={entry.playerName}
+  width={32}
+  height={32}
+  className="h-8 w-8 rounded-full object-cover border border-gray-600"
+  loading="lazy"
+/>
                             ) : (
                               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
                                 {entry.playerName.charAt(0).toUpperCase()}

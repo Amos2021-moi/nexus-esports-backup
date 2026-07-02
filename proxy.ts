@@ -1,93 +1,49 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const path = request.nextUrl.pathname
 
-  // ✅ Skip ALL API routes
-  if (pathname.startsWith("/api")) {
-    return NextResponse.next()
+  // ✅ Get the session token
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
+
+  // ✅ Redirect admin to admin dashboard if they try to go to player dashboard
+  if (path === "/dashboard" && token?.role === "ADMIN") {
+    return NextResponse.redirect(new URL("/admin", request.url))
   }
 
-  // ✅ Skip static assets
-  if (pathname.startsWith("/_next") ||
-      pathname.startsWith("/favicon.ico") ||
-      pathname.startsWith("/maintenance")) {
-    return NextResponse.next()
+  // ✅ Redirect player to player dashboard if they try to go to admin
+  if (path === "/admin" && token?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  // ✅ Check maintenance mode
-  try {
-    const maintenanceRes = await fetch(`${request.nextUrl.origin}/api/settings?category=system&key=maintenanceMode`, {
-      headers: { 'Cache-Control': 'no-cache' }
-    })
-
-    let maintenanceMode = false
-    if (maintenanceRes.ok) {
-      const data = await maintenanceRes.json()
-      maintenanceMode = data.maintenanceMode || false
-    }
-
-    // ✅ If maintenance mode is enabled
-    if (maintenanceMode) {
-      const token = await getToken({ 
-        req: request,
-        secret: process.env.NEXTAUTH_SECRET 
-      })
-
-      // ✅ ALLOW admins to access everything
-      if (token?.role === "ADMIN") {
-        return NextResponse.next()
-      }
-
-      // ✅ Allow access to signin page (so users can log in)
-      if (pathname === "/auth/signin" || pathname === "/auth/signup") {
-        return NextResponse.next()
-      }
-
-      // ✅ All other users see maintenance page
-      const maintenanceUrl = new URL("/maintenance", request.url)
-      return NextResponse.rewrite(maintenanceUrl)
-    }
-  } catch (error) {
-    console.error("Error checking maintenance mode:", error)
-    // If we can't check, allow access
-    return NextResponse.next()
-  }
-
-  // ✅ Check if user is authenticated for protected routes
-  const protectedPaths = ["/dashboard", "/admin", "/tournaments", "/players", "/standings", "/matches"]
-  const isProtected = protectedPaths.some(path => pathname.startsWith(path))
-
-  if (isProtected) {
-    const token = await getToken({ 
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET 
-    })
-
+  // ✅ Admin routes protection - only ADMIN role can access
+  if (path.startsWith("/admin")) {
     if (!token) {
-      const signInUrl = new URL("/auth/signin", request.url)
-      signInUrl.searchParams.set("callbackUrl", pathname)
-      return NextResponse.redirect(signInUrl)
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
     }
-  }
-
-  // ✅ Check admin routes
-  if (pathname.startsWith("/admin")) {
-    const token = await getToken({ 
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET 
-    })
-
-    if (!token) {
-      const signInUrl = new URL("/auth/signin", request.url)
-      signInUrl.searchParams.set("callbackUrl", pathname)
-      return NextResponse.redirect(signInUrl)
-    }
-
     if (token.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  }
+
+  // ✅ Dashboard routes - allow both admin and player
+  if (path.startsWith("/dashboard")) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url))
+    }
+  }
+
+  // ✅ API admin routes protection
+  if (path.startsWith("/api/admin")) {
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (token.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
   }
 
@@ -96,6 +52,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api).*)",
+    "/",
+    "/dashboard",
+    "/admin",
+    "/admin/:path*",
+    "/dashboard/:path*",
+    "/api/admin/:path*",
+    "/api/competition/:path*",
   ],
 }

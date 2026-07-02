@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
 
-export async function GET() {
-  try {
-    // ✅ REMOVED: Authentication check - now public
-    // Now anyone can see these stats
-
+// ✅ Cache stats for 30 seconds
+const getCachedStats = unstable_cache(
+  async () => {
     const [
       totalPlayers,
       totalFixtures,
@@ -32,7 +31,7 @@ export async function GET() {
 
     const pendingResults = await prisma.result.count({ where: { approved: false } })
 
-    return NextResponse.json({
+    return {
       totalPlayers,
       totalFixtures,
       completedResults,
@@ -44,7 +43,16 @@ export async function GET() {
       totalPosts,
       totalComments,
       totalLikes
-    })
+    }
+  },
+  ['admin-stats'],
+  { revalidate: 30 } // ✅ Refresh every 30 seconds
+)
+
+export async function GET() {
+  try {
+    const data = await getCachedStats()
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching stats:", error)
     return NextResponse.json({

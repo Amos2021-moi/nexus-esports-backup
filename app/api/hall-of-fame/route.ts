@@ -1,61 +1,37 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+
+// ✅ Add revalidation for Hall of Fame
+export const revalidate = 3600 // Revalidate every hour
 
 export async function GET() {
   try {
     const entries = await prisma.hallOfFame.findMany({
       include: {
         player: {
-          include: { profile: true }
+          include: {
+            profile: true
+          }
         },
         season: true
       },
       orderBy: { inductedAt: 'desc' }
     })
-    return NextResponse.json(entries)
+
+    const formattedEntries = entries.map(entry => ({
+      id: entry.id,
+      playerName: entry.player.name || "Unknown",
+      username: entry.player.profile?.username || "Unknown",
+      category: entry.category,
+      reason: entry.reason,
+      imageUrl: entry.imageUrl || entry.player.profile?.profilePicture || null,
+      seasonName: entry.season.name,
+      inductedAt: entry.inductedAt
+    }))
+
+    return NextResponse.json(formattedEntries)
   } catch (error) {
-    console.error("Error fetching hall of fame:", error)
-    return NextResponse.json([])
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized: Please login" }, { status: 401 })
-    }
-    
-    if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
-    }
-
-    const { playerId, seasonId, category, reason, imageUrl } = await request.json()
-
-    if (!playerId || !seasonId || !category || !reason) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    const entry = await prisma.hallOfFame.create({
-      data: {
-        playerId,
-        seasonId,
-        category,
-        reason,
-        imageUrl: imageUrl || null
-      },
-      include: {
-        player: { include: { profile: true } },
-        season: true
-      }
-    })
-
-    return NextResponse.json(entry, { status: 201 })
-  } catch (error) {
-    console.error("Error creating hall of fame entry:", error)
-    return NextResponse.json({ error: "Failed to create entry" }, { status: 500 })
+    console.error("Error fetching Hall of Fame:", error)
+    return NextResponse.json({ error: "Failed to fetch Hall of Fame" }, { status: 500 })
   }
 }
