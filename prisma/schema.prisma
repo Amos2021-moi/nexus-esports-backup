@@ -57,7 +57,7 @@ model User {
   paymentAudits             PaymentAudit[]
   playerSeasonEntries       PlayerSeasonEntry[]
   playerStat                PlayerStat?             // ✅ Keep this
-
+pushSubscriptions    PushSubscription[]   // ✅ ADD THIS
   @@index([email])
   @@index([role])
   @@index([createdAt])
