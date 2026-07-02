@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { updateTrustScore } from "@/lib/services/trust.service"
+import { notificationWithEmailService } from "@/lib/services/notificationWithEmail.service"
 
 export async function POST(request: Request) {
   try {
@@ -80,7 +81,6 @@ export async function POST(request: Request) {
 
         if (nextMatch) {
           // Determine if this winner goes to home or away
-          // Odd match numbers go to home, even to away
           const isHomeSlot = match.matchNumber % 2 === 1
           
           if (isHomeSlot && !nextMatch.homePlayerId) {
@@ -127,6 +127,33 @@ export async function POST(request: Request) {
         where: { id: resultId },
         data: { approved: true }
       })
+
+      // ✅ SEND EMAIL NOTIFICATIONS FOR TOURNAMENT
+      const homeName = match.homePlayer?.profile?.username || match.homePlayer?.name || "Home Player"
+      const awayName = match.awayPlayer?.profile?.username || match.awayPlayer?.name || "Away Player"
+      const winnerName = winnerId === match.homePlayerId ? homeName : awayName
+
+      // Send to home player
+      if (match.homePlayerId) {
+        await notificationWithEmailService.sendResultNotification(match.homePlayerId, {
+          homePlayer: homeName,
+          awayPlayer: awayName,
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          status: "approved"
+        })
+      }
+
+      // Send to away player
+      if (match.awayPlayerId) {
+        await notificationWithEmailService.sendResultNotification(match.awayPlayerId, {
+          homePlayer: homeName,
+          awayPlayer: awayName,
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          status: "approved"
+        })
+      }
 
       return NextResponse.json({ 
         success: true, 
@@ -243,11 +270,11 @@ export async function POST(request: Request) {
       }
     })
 
-    // 6. Send notifications
+    // 6. Send notifications (In-App)
     const winner = result.homeScore > result.awayScore ? fixture.homePlayer : result.awayScore > result.homeScore ? fixture.awayPlayer : null
     const winnerName = winner?.profile?.username || winner?.name || "No one (Draw)"
-    const homePlayerName = fixture.homePlayer.profile?.username || fixture.homePlayer.name
-    const awayPlayerName = fixture.awayPlayer.profile?.username || fixture.awayPlayer.name
+    const homePlayerName = fixture.homePlayer.profile?.username ?? fixture.homePlayer.name ?? "Home Player"
+    const awayPlayerName = fixture.awayPlayer.profile?.username ?? fixture.awayPlayer.name ?? "Away Player"
 
     await prisma.notification.createMany({
       data: [
@@ -266,6 +293,23 @@ export async function POST(request: Request) {
           link: `/matches/${result.fixtureId}`
         }
       ]
+    })
+
+    // ✅ SEND EMAIL NOTIFICATIONS FOR LEAGUE
+    await notificationWithEmailService.sendResultNotification(fixture.homePlayerId, {
+      homePlayer: homePlayerName,
+      awayPlayer: awayPlayerName,
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+      status: "approved"
+    })
+
+    await notificationWithEmailService.sendResultNotification(fixture.awayPlayerId, {
+      homePlayer: homePlayerName,
+      awayPlayer: awayPlayerName,
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+      status: "approved"
     })
 
     // 7. Update trust scores

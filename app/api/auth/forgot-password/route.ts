@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       }
     })
 
+    // ✅ Send password reset email
     await emailService.sendPasswordResetEmail(
       user.email,
       user.name || "Player",

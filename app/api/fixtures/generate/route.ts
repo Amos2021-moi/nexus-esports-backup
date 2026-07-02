@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { emailService } from "@/lib/services/email.service"
+import { notificationWithEmailService } from "@/lib/services/notificationWithEmail.service"
 
 export async function POST(request: Request) {
   try {
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       data: fixtures 
     })
 
-    // ✅ Send email notifications to players
+    // ✅ Get created fixtures with player details
     const createdFixtures = await prisma.fixture.findMany({
       where: { seasonId },
       include: {
@@ -129,45 +129,43 @@ export async function POST(request: Request) {
       }
     })
 
-    // Send email to each player for each fixture
+    // ✅ SEND EMAIL NOTIFICATIONS using notificationWithEmailService
     const emailPromises = []
     const notifiedPlayers = new Set()
 
     for (const fixture of createdFixtures) {
-      // Email to home player
+      const homeName = fixture.homePlayer?.name || "Home Player"
+      const awayName = fixture.awayPlayer?.name || "Away Player"
+      const seasonName = season.name || "Current Season"
+
+      // Send to home player
       if (fixture.homePlayer && fixture.homePlayer.email && 
           fixture.homePlayer.emailVerified && fixture.homePlayer.emailNotificationsEnabled &&
           !notifiedPlayers.has(fixture.homePlayer.id)) {
         
         emailPromises.push(
-          emailService.sendMatchReminder(
-            fixture.homePlayer.email,
-            fixture.homePlayer.name || "Player",
-            {
-              ...fixture,
-              userId: fixture.homePlayer.id,
-              awayPlayer: fixture.awayPlayer
-            }
-          )
+          notificationWithEmailService.sendFixtureNotification(fixture.homePlayer.id, {
+            homePlayer: homeName,
+            awayPlayer: awayName,
+            date: fixture.scheduledDate.toISOString(),
+            seasonName: seasonName
+          })
         )
         notifiedPlayers.add(fixture.homePlayer.id)
       }
 
-      // Email to away player
+      // Send to away player
       if (fixture.awayPlayer && fixture.awayPlayer.email && 
           fixture.awayPlayer.emailVerified && fixture.awayPlayer.emailNotificationsEnabled &&
           !notifiedPlayers.has(fixture.awayPlayer.id)) {
         
         emailPromises.push(
-          emailService.sendMatchReminder(
-            fixture.awayPlayer.email,
-            fixture.awayPlayer.name || "Player",
-            {
-              ...fixture,
-              userId: fixture.awayPlayer.id,
-              homePlayer: fixture.homePlayer
-            }
-          )
+          notificationWithEmailService.sendFixtureNotification(fixture.awayPlayer.id, {
+            homePlayer: homeName,
+            awayPlayer: awayName,
+            date: fixture.scheduledDate.toISOString(),
+            seasonName: seasonName
+          })
         )
         notifiedPlayers.add(fixture.awayPlayer.id)
       }

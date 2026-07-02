@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { notificationWithEmailService } from "@/lib/services/notificationWithEmail.service"
 
 export async function GET() {
   try {
@@ -56,6 +57,22 @@ export async function POST(request: Request) {
         awardedAt: new Date()
       }
     })
+
+    // ✅ Send email notification to award winner
+    if (winnerId) {
+      const winner = await prisma.user.findUnique({
+        where: { id: winnerId },
+        include: { profile: true }
+      })
+
+      if (winner) {
+        await notificationWithEmailService.sendAwardNotification(winnerId, {
+          name: name,
+          reason: description || `You've been awarded the ${name} award!`,
+          link: `/dashboard/awards`
+        })
+      }
+    }
 
     return NextResponse.json(award, { status: 201 })
   } catch (error) {

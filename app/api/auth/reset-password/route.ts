@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { notificationWithEmailService } from "@/lib/services/notificationWithEmail.service"
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +48,21 @@ export async function POST(request: Request) {
         resetPasswordSentAt: null,
         resetPasswordExpiresAt: null
       }
+    })
+
+    // ✅ Send notification that password was successfully reset
+    await notificationWithEmailService.sendNotificationWithEmail({
+      userId: user.id,
+      type: "SYSTEM_ALERT",
+      title: "🔐 Password Reset Successful",
+      message: "Your password has been successfully reset. If you didn't do this, please contact support immediately.",
+      priority: "HIGH",
+      data: {
+        link: process.env.NEXTAUTH_URL + "/auth/signin",
+        customMessage: "Your password was changed successfully. You can now sign in with your new password."
+      },
+      emailTemplate: "notification",
+      emailSubject: "🔐 Password Reset Successful - Nexus Esports"
     })
 
     return NextResponse.json({

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { safaricomService } from "@/lib/services/safaricom.service"
+import { notificationWithEmailService } from "@/lib/services/notificationWithEmail.service"
 
 export async function GET(request: Request) {
   try {
@@ -150,6 +151,22 @@ export async function GET(request: Request) {
             })
           })
 
+          // ✅ SEND EMAIL NOTIFICATION FOR PAYMENT SUCCESS
+          await notificationWithEmailService.sendNotificationWithEmail({
+            userId: session.user.id,
+            type: "PAYMENT_CONFIRMED",
+            title: "✅ Payment Confirmed!",
+            message: `Your payment of KES ${seasonEntry.entryFee || 0} has been confirmed. Receipt: ${mpesaReceipt}`,
+            priority: "HIGH",
+            data: {
+              amount: seasonEntry.entryFee || 0,
+              receipt: mpesaReceipt,
+              link: "/dashboard"
+            },
+            emailTemplate: "notification",
+            emailSubject: "✅ Payment Confirmed - Nexus Esports"
+          })
+
           return NextResponse.json({
             status: "success",
             message: "Payment confirmed",
@@ -158,7 +175,7 @@ export async function GET(request: Request) {
           })
         }
 
-        // ✅ USER CANCELLED - 1037, 1032, 2001
+        // ✅ USER CANCELLED - 1037, 1032
         if (resultCode === 1037 || resultCode === 1032) {
           await prisma.seasonEntry.update({
             where: { id: seasonEntry.id },
@@ -167,6 +184,21 @@ export async function GET(request: Request) {
               resultCode: resultCode,
               resultDesc: "User cancelled the transaction on their phone",
             },
+          })
+
+          // ✅ SEND NOTIFICATION FOR PAYMENT CANCELLED
+          await notificationWithEmailService.sendNotificationWithEmail({
+            userId: session.user.id,
+            type: "PAYMENT_FAILED",
+            title: "❌ Payment Cancelled",
+            message: `You cancelled the payment of KES ${seasonEntry.entryFee || 0}. You can try again anytime.`,
+            priority: "HIGH",
+            data: {
+              amount: seasonEntry.entryFee || 0,
+              link: "/dashboard"
+            },
+            emailTemplate: "notification",
+            emailSubject: "❌ Payment Cancelled - Nexus Esports"
           })
 
           return NextResponse.json({
@@ -201,6 +233,21 @@ export async function GET(request: Request) {
             resultCode: resultCode,
             resultDesc: resultDesc || "Payment failed",
           },
+        })
+
+        // ✅ SEND NOTIFICATION FOR PAYMENT FAILED
+        await notificationWithEmailService.sendNotificationWithEmail({
+          userId: session.user.id,
+          type: "PAYMENT_FAILED",
+          title: "❌ Payment Failed",
+          message: `Your payment of KES ${seasonEntry.entryFee || 0} failed. Please try again.`,
+          priority: "CRITICAL",
+          data: {
+            amount: seasonEntry.entryFee || 0,
+            link: "/dashboard"
+          },
+          emailTemplate: "notification",
+          emailSubject: "❌ Payment Failed - Nexus Esports"
         })
 
         return NextResponse.json({

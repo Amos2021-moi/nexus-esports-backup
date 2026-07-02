@@ -8,13 +8,15 @@ export class PredictionService {
   
   // ✅ Get player's ELO
   async getPlayerELO(userId: string): Promise<number> {
-    const rating = await prisma.eLO.findUnique({ where: { userId } });
-    return rating?.elo || DEFAULT_ELO;
+    const stats = await prisma.playerStat.findUnique({
+      where: { userId }
+    });
+    return stats?.elo || DEFAULT_ELO;
   }
 
-  // ✅ Update player ELO in database
+  // ✅ Update player ELO
   async updatePlayerELO(userId: string, newELO: number): Promise<void> {
-    await prisma.eLORating.upsert({
+    await prisma.playerStat.upsert({
       where: { userId },
       update: { elo: newELO },
       create: { userId, elo: newELO }
