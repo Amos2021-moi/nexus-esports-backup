@@ -7,28 +7,17 @@ import bcrypt from "bcryptjs"
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // ✅ Google Provider
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       httpOptions: {
         timeout: 10000,
       },
-      // ✅ FIX: Add authorization params to prevent state cookie errors
-      authorization: {
-        params: {
-          prompt: "select_account",
-        },
-      },
     }),
-
-    // ✅ Facebook Provider
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID || "",
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || "",
     }),
-    
-    // ✅ Credentials Provider
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -65,7 +54,6 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account }) {
-      // ✅ Handle Google Sign-In
       if (account?.provider === "google") {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! }
@@ -104,7 +92,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // ✅ Handle Facebook Sign-In
       if (account?.provider === "facebook") {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! }
@@ -165,48 +152,13 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
-    error: "/auth/error", // ✅ Add error page
+    error: "/auth/error",
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
-  // ✅ Add cookies configuration for production
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === "production" 
-        ? `__Secure-next-auth.session-token` 
-        : `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    callbackUrl: {
-      name: process.env.NODE_ENV === "production"
-        ? `__Secure-next-auth.callback-url`
-        : `next-auth.callback-url`,
-      options: {
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    csrfToken: {
-      name: process.env.NODE_ENV === "production"
-        ? `__Host-next-auth.csrf-token`
-        : `next-auth.csrf-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
 }
 
 declare module "next-auth" {
