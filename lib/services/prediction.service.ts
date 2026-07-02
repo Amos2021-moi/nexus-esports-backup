@@ -8,9 +8,7 @@ export class PredictionService {
   
   // ✅ Get player's ELO
   async getPlayerELO(userId: string): Promise<number> {
-    const rating = await prisma.eLORating.findUnique({
-      where: { userId }
-    });
+    const rating = await prisma.eLO.findUnique({ where: { userId } });
     return rating?.elo || DEFAULT_ELO;
   }
 
