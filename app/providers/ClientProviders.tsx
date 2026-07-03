@@ -23,7 +23,6 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
       {children}
       <Toaster position="top-right" />
       <InstallPrompt />
-      <PushNotificationPrompt />
     </>
   );
 }
