@@ -61,6 +61,7 @@ const adminMenu = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard, color: "text-indigo-400", bg: "bg-indigo-500/10" },
   { name: "Competition", href: "/admin/competition", icon: Trophy, color: "text-yellow-400", bg: "bg-yellow-500/10" },
   { name: "Payment Analytics", href: "/admin/payments", icon: BarChart3, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  { name: "Players", href: "/players", icon: Users, color: "text-green-400", bg: "bg-green-500/10" },
   { name: "Seasons", href: "/admin/seasons", icon: Calendar, color: "text-yellow-400", bg: "bg-yellow-500/10" },
   { name: "League", href: "/admin/league", icon: Trophy, color: "text-green-400", bg: "bg-green-500/10" },
   { name: "Results", href: "/admin/results", icon: CheckCircle, color: "text-purple-400", bg: "bg-purple-500/10" },
