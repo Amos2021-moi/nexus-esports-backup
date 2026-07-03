@@ -82,16 +82,16 @@ export default function InstallPrompt() {
                   className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
                 >
                   {loading ? (
-                    <>
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Installing...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-3.5 w-3.5" />
-                      Install App
-                    </>
-                  )}
+  <div className="flex items-center gap-2">
+    <div className="h-3.5 w-3.5 animate-spin-custom rounded-full border-2 border-white border-t-transparent" />
+    <span>Installing...</span>
+  </div>
+) : (
+  <>
+    <Download className="h-3.5 w-3.5" />
+    Install App
+  </>
+)}
                 </button>
                 <button
                   onClick={handleDismiss}
