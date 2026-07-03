@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { sendPushToUser } from "@/lib/push/send";
+import { sendPushToUser, isPushAvailable } from "@/lib/push/send";
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +9,15 @@ export async function POST(request: Request) {
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // ✅ Check if push is available
+    if (!isPushAvailable()) {
+      return NextResponse.json({
+        success: false,
+        error: "VAPID keys not configured. Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to environment variables.",
+        status: "VAPID_MISSING"
+      }, { status: 500 });
     }
 
     const body = await request.json();
@@ -26,13 +35,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Sent to ${result.sent} devices, ${result.failed} failed`,
-      result,
+      message: result.message,
+      sent: result.sent,
+      failed: result.failed,
     });
   } catch (error) {
     console.error("Error sending test push:", error);
     return NextResponse.json(
-      { error: "Failed to send test push" },
+      { error: "Failed to send test push", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

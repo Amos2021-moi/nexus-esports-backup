@@ -1,12 +1,30 @@
 import webpush from "web-push";
 import { PushSubscription, getAllSubscriptions, getUserSubscriptions, removeSubscription } from "./subscription";
 
-// Configure web-push
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:nexusesportshub@gmail.com",
-  process.env.VAPID_PUBLIC_KEY || "",
-  process.env.VAPID_PRIVATE_KEY || ""
-);
+// ✅ Get VAPID keys from environment
+const publicKey = process.env.VAPID_PUBLIC_KEY || "";
+const privateKey = process.env.VAPID_PRIVATE_KEY || "";
+const subject = process.env.VAPID_SUBJECT || "mailto:nexusesportshub@gmail.com";
+
+// ✅ Log key status (helps with debugging)
+console.log("🔑 VAPID Public Key exists:", !!publicKey);
+console.log("🔑 VAPID Private Key exists:", !!privateKey);
+console.log("🔑 VAPID Subject:", subject);
+
+// ✅ Only configure if keys exist
+const isVapidConfigured = !!(publicKey && privateKey);
+
+if (isVapidConfigured) {
+  try {
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    console.log("✅ VAPID configured for push notifications");
+  } catch (error) {
+    console.error("❌ Failed to configure VAPID:", error);
+  }
+} else {
+  console.warn("⚠️ VAPID keys not configured. Push notifications will not work.");
+  console.warn("   Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to environment variables.");
+}
 
 interface PushPayload {
   title: string;
@@ -21,30 +39,77 @@ interface PushPayload {
   }>;
 }
 
+// ✅ Check if push is available
+export function isPushAvailable(): boolean {
+  return isVapidConfigured;
+}
+
 // ✅ Send to a single user
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload
-): Promise<{ sent: number; failed: number }> {
-  const subscriptions = await getUserSubscriptions(userId);
-  return sendPushToSubscriptions(subscriptions, payload);
+): Promise<{ sent: number; failed: number; message: string }> {
+  if (!isPushAvailable()) {
+    return {
+      sent: 0,
+      failed: 0,
+      message: "Push notifications not configured. Add VAPID keys to enable."
+    };
+  }
+
+  try {
+    const subscriptions = await getUserSubscriptions(userId);
+    return sendPushToSubscriptions(subscriptions, payload);
+  } catch (error: any) {
+    console.error("Error getting subscriptions:", error);
+    return {
+      sent: 0,
+      failed: 0,
+      message: error.message || "Failed to get subscriptions"
+    };
+  }
 }
 
 // ✅ Send to all users
 export async function sendPushToAll(
   payload: PushPayload
-): Promise<{ sent: number; failed: number }> {
-  const subscriptions = await getAllSubscriptions();
-  return sendPushToSubscriptions(subscriptions, payload);
+): Promise<{ sent: number; failed: number; message: string }> {
+  if (!isPushAvailable()) {
+    return {
+      sent: 0,
+      failed: 0,
+      message: "Push notifications not configured. Add VAPID keys to enable."
+    };
+  }
+
+  try {
+    const subscriptions = await getAllSubscriptions();
+    return sendPushToSubscriptions(subscriptions, payload);
+  } catch (error: any) {
+    console.error("Error getting subscriptions:", error);
+    return {
+      sent: 0,
+      failed: 0,
+      message: error.message || "Failed to get subscriptions"
+    };
+  }
 }
 
 // ✅ Send to specific subscriptions
 async function sendPushToSubscriptions(
   subscriptions: PushSubscription[],
   payload: PushPayload
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; message: string }> {
   let sent = 0;
   let failed = 0;
+
+  if (subscriptions.length === 0) {
+    return {
+      sent: 0,
+      failed: 0,
+      message: "No push subscriptions found."
+    };
+  }
 
   const pushPayload = JSON.stringify({
     title: payload.title,
@@ -64,6 +129,8 @@ async function sendPushToSubscriptions(
     ],
   });
 
+  console.log(`📤 Sending push to ${subscriptions.length} subscribers...`);
+
   for (const subscription of subscriptions) {
     try {
       await webpush.sendNotification(
@@ -77,19 +144,24 @@ async function sendPushToSubscriptions(
         pushPayload
       );
       sent++;
+      console.log(`✅ Push sent to ${subscription.endpoint.substring(0, 30)}...`);
     } catch (error: any) {
       // If subscription expired, remove it
       if (error.statusCode === 410 || error.statusCode === 404) {
         await removeSubscription(subscription.endpoint);
         console.log(`🗑️ Removed expired subscription: ${subscription.endpoint}`);
       } else {
-        console.error(`❌ Failed to send push:`, error);
+        console.error(`❌ Failed to send push:`, error.message);
       }
       failed++;
     }
   }
 
-  return { sent, failed };
+  return {
+    sent,
+    failed,
+    message: `Sent to ${sent} devices, ${failed} failed`
+  };
 }
 
 // ✅ Send a specific notification type
@@ -100,7 +172,7 @@ export async function sendMatchReminderPush(
     awayPlayer: string;
     scheduledDate: string;
   }
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; message: string }> {
   return sendPushToUser(userId, {
     title: "⚽ Match Reminder",
     body: `You have a match tomorrow: ${match.homePlayer} vs ${match.awayPlayer}`,
@@ -127,7 +199,7 @@ export async function sendResultPush(
     awayScore: number;
     status: "approved" | "rejected";
   }
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; message: string }> {
   const isApproved = result.status === "approved";
   const emoji = isApproved ? "✅" : "❌";
 
