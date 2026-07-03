@@ -27,7 +27,7 @@ interface AppearanceSettings {
 }
 
 const defaultSettings: AppearanceSettings = {
-  theme: "dark",
+  theme: "light",
   compactMode: false,
   reduceMotion: false,
   sidebarStyle: "default",

@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ✅ Default theme is light */
 :root {
   --primary-color: #4f46e5;
   --secondary-color: #8b5cf6;
@@ -11,7 +12,7 @@
   --border-color: #e5e7eb;
 }
 
-/* Dark mode variables */
+/* ✅ Dark mode is applied when .dark class is present */
 .dark {
   --primary-color: #818cf8;
   --secondary-color: #a78bfa;
@@ -21,7 +22,6 @@
   --border-color: #374151;
 }
 
-/* Apply theme colors */
 body {
   background-color: var(--bg-color);
   color: var(--text-color);

@@ -78,7 +78,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [appearanceSettings, setAppearanceSettings] = useState({
     sidebarStyle: "default" as "default" | "compact" | "icon",
@@ -86,19 +86,21 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   });
 
   useEffect(() => {
-    setIsClient(true);
+  setIsClient(true);
 
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "light") {
-      setIsDarkMode(false);
-      document.documentElement.classList.remove("dark");
-    } else {
-      setIsDarkMode(true);
-      document.documentElement.classList.add("dark");
-    }
+  // ✅ Load saved theme
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme === "dark") {
+    setIsDarkMode(true);
+    document.documentElement.classList.add("dark");
+  } else {
+    // ✅ Default to light
+    setIsDarkMode(false);
+    document.documentElement.classList.remove("dark");
+  }
 
-    loadAppearanceSettings();
-  }, []);
+  loadAppearanceSettings();
+}, []);
 
   const loadAppearanceSettings = () => {
     const savedAppearance = localStorage.getItem("appearance");
@@ -411,17 +413,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </div>
 
               <button
-                onClick={toggleTheme}
-                aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
-                title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              >
-                {isDarkMode ? (
-                  <Sun size={18} className="text-yellow-400" />
-                ) : (
-                  <Moon size={18} className="text-gray-400" />
-                )}
-              </button>
+  onClick={toggleTheme}
+  aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+>
+  {isDarkMode ? (
+    <Sun size={18} className="text-yellow-400" />
+  ) : (
+    <Moon size={18} className="text-gray-600" />
+  )}
+</button>
 
               {/* ✅ Smart Notification Bell */}
               <SmartNotificationBell />
