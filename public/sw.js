@@ -2,24 +2,29 @@
 const CACHE_NAME = "nexus-esports-v1";
 const OFFLINE_URL = "/offline";
 
+// ✅ Add icons back to cache
 const ASSETS_TO_CACHE = [
   "/",
   "/offline",
+  "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
-  "/manifest.json",
 ];
 
+// Install event - cache assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log("📦 Caching assets...");
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(ASSETS_TO_CACHE).catch((error) => {
+        console.warn("⚠️ Some assets failed to cache:", error);
+      });
     })
   );
   self.skipWaiting();
 });
 
+// Activate event - clean old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -33,6 +38,7 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Fetch event - serve from cache if offline
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     event.respondWith(fetch(event.request));
@@ -79,8 +85,14 @@ self.addEventListener("push", (event) => {
     badge: data.badge || "/icons/icon-192.png",
     data: data.data || {},
     actions: data.actions || [
-      { action: "view", title: "View" },
-      { action: "dismiss", title: "Dismiss" },
+      {
+        action: "view",
+        title: "View",
+      },
+      {
+        action: "dismiss",
+        title: "Dismiss",
+      },
     ],
     vibrate: [200, 100, 200],
     requireInteraction: true,
@@ -95,6 +107,7 @@ self.addEventListener("push", (event) => {
 // Notification click event
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
   const url = event.notification.data?.url || "/dashboard";
 
   event.waitUntil(
