@@ -2,7 +2,7 @@
 const CACHE_NAME = "nexus-esports-v1";
 const OFFLINE_URL = "/offline";
 
-// ✅ Add icons back to cache
+// ✅ Add manifest.json to cache
 const ASSETS_TO_CACHE = [
   "/",
   "/offline",
@@ -16,9 +16,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log("📦 Caching assets...");
-      return cache.addAll(ASSETS_TO_CACHE).catch((error) => {
-        console.warn("⚠️ Some assets failed to cache:", error);
-      });
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
   self.skipWaiting();
@@ -38,7 +36,7 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache if offline
+// Fetch event
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     event.respondWith(fetch(event.request));
