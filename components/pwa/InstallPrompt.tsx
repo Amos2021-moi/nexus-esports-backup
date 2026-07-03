@@ -2,28 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X, Smartphone, Sparkles } from "lucide-react";
+import { Download, X, Smartphone, Loader2 } from "lucide-react";
 
 export default function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
       setIsInstalled(true);
       return;
     }
 
-    // Listen for beforeinstallprompt event
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
     });
 
-    // Listen for app installed event
     window.addEventListener("appinstalled", () => {
       setShowPrompt(false);
       setIsInstalled(true);
@@ -31,7 +29,10 @@ export default function InstallPrompt() {
   }, []);
 
   const handleInstall = async () => {
-    if (deferredPrompt) {
+    if (!deferredPrompt) return;
+
+    setLoading(true);
+    try {
       deferredPrompt.prompt();
       const result = await deferredPrompt.userChoice;
       if (result.outcome === "accepted") {
@@ -39,6 +40,10 @@ export default function InstallPrompt() {
         setIsInstalled(true);
       }
       setDeferredPrompt(null);
+    } catch (error) {
+      console.error("Install error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,10 +78,20 @@ export default function InstallPrompt() {
               <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={handleInstall}
-                  className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-indigo-700 hover:to-purple-700"
+                  disabled={loading}
+                  className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  Install App
+                  {loading ? (
+                    <>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Installing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3.5 w-3.5" />
+                      Install App
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={handleDismiss}
