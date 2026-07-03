@@ -9,6 +9,14 @@ import { registerServiceWorker } from "@/lib/service-worker/register";
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerServiceWorker();
+    
+    // ✅ Log VAPID key status
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (publicKey) {
+      console.log("✅ VAPID Public Key exists:", publicKey.substring(0, 20) + "...");
+    } else {
+      console.warn("⚠️ NEXT_PUBLIC_VAPID_PUBLIC_KEY not set");
+    }
   }, []);
 
   return (

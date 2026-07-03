@@ -9,15 +9,32 @@ export default function PushNotificationPrompt() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(true);
+  const [isSupported, setIsSupported] = useState(true);
 
   useEffect(() => {
-    if (!("Notification" in window)) return;
+    // ✅ Check if notifications are supported
+    if (!("Notification" in window)) {
+      setIsSupported(false);
+      return;
+    }
+
+    // ✅ Check if service worker is supported
+    if (!("serviceWorker" in navigator)) {
+      setIsSupported(false);
+      return;
+    }
 
     setPermission(Notification.permission);
 
+    // ✅ If permission is granted, check subscription
     if (Notification.permission === "granted") {
       checkSubscription();
+    }
+
+    // ✅ If permission is denied, hide prompt
+    if (Notification.permission === "denied") {
+      setShowPrompt(false);
     }
   }, []);
 
@@ -25,8 +42,12 @@ export default function PushNotificationPrompt() {
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-
       setSubscribed(!!subscription);
+
+      // If already subscribed, hide prompt
+      if (subscription) {
+        setShowPrompt(false);
+      }
     } catch (error) {
       console.error("Error checking subscription:", error);
     }
@@ -41,29 +62,38 @@ export default function PushNotificationPrompt() {
     setLoading(true);
 
     try {
-      // Request permission
+      // ✅ Request permission
       const result = await Notification.requestPermission();
 
       if (result !== "granted") {
         setPermission("denied");
         toast.error("Notifications permission denied");
+        setShowPrompt(false);
         setLoading(false);
         return;
       }
 
       setPermission("granted");
 
-      // Subscribe to push
+      // ✅ Wait for service worker
       const registration = await navigator.serviceWorker.ready;
 
+      // ✅ Get VAPID public key from environment
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+      
+      if (!publicKey) {
+        toast.error("VAPID public key not configured");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Subscribe to push
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
-        ) as BufferSource,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
-      // Save subscription to server
+      // ✅ Save subscription to server
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,10 +102,11 @@ export default function PushNotificationPrompt() {
 
       if (res.ok) {
         setSubscribed(true);
-        toast.success("🔔 Push notifications enabled!");
         setShowPrompt(false);
+        toast.success("🔔 Push notifications enabled!");
       } else {
-        toast.error("Failed to save subscription");
+        const data = await res.json();
+        toast.error(data.error || "Failed to save subscription");
       }
     } catch (error) {
       console.error("Error subscribing:", error);
@@ -85,35 +116,7 @@ export default function PushNotificationPrompt() {
     }
   }
 
-  async function handleUnsubscribe() {
-    setLoading(true);
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-
-      if (subscription) {
-        await subscription.unsubscribe();
-
-        // Remove from server
-        await fetch("/api/push/unsubscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        });
-
-        setSubscribed(false);
-        toast.success("Push notifications disabled");
-      }
-    } catch (error) {
-      console.error("Error unsubscribing:", error);
-      toast.error("Failed to disable push notifications");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding)
       .replace(/-/g, "+")
@@ -125,65 +128,63 @@ export default function PushNotificationPrompt() {
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }
-    return outputArray;
+    return outputArray.buffer;
   }
 
-  // Don't show if already subscribed or permission denied
-  if (permission === "denied" || subscribed) return null;
+  // ✅ Don't show if not supported, permission denied, or already subscribed
+  if (!isSupported || permission === "denied" || subscribed || !showPrompt) {
+    return null;
+  }
 
-  // If permission not granted, show prompt
-  if (permission !== "granted") {
-    return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          className="fixed bottom-20 left-0 right-0 z-50 px-4"
-        >
-          <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-gray-900/95 p-4 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
-                <Bell className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-white">Enable Notifications</h4>
-                <p className="mt-0.5 text-xs text-gray-400">
-                  Get match reminders, result updates, and important alerts.
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={loading}
-                    className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Enabling...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3.5 w-3.5" />
-                        Enable
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowPrompt(false)}
-                    className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gray-700/50 px-4 py-1.5 text-xs text-gray-400 transition hover:bg-gray-600/50 hover:text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Dismiss
-                  </button>
-                </div>
+  // ✅ If permission is default (not asked yet), show prompt
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="fixed bottom-20 left-0 right-0 z-50 px-4"
+      >
+        <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-gray-900/95 p-4 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
+              <Bell className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-white">Enable Notifications</h4>
+              <p className="mt-0.5 text-xs text-gray-400">
+                Get match reminders, result updates, and important alerts.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleSubscribe}
+                  disabled={loading}
+                  className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Enabling...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Enable
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowPrompt(false)}
+                  className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-gray-700/50 px-4 py-1.5 text-xs text-gray-400 transition hover:bg-gray-600/50 hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Dismiss
+                </button>
               </div>
             </div>
           </div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  }
-
-  return null;
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
 }
