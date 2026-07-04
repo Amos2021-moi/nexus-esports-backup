@@ -56,6 +56,8 @@ model User {
   seasonEntries             SeasonEntry[]
   paymentAudits             PaymentAudit[]
   playerSeasonEntries       PlayerSeasonEntry[]
+    communicationLogs   CommunicationLog[]        // ADD THIS
+  communicationReceipts CommunicationReceipt[]  // ADD THIS
   playerStat                PlayerStat?             // ✅ Keep this
 pushSubscriptions    PushSubscription[]   // ✅ ADD THIS
   @@index([email])
@@ -641,6 +643,47 @@ model NotificationPreference {
   updatedAt         DateTime @updatedAt
   
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CommunicationLog {
+  id             String   @id @default(cuid())
+  adminId        String   // Who sent it
+  subject        String   // Email subject or notification title
+  message        String   @db.Text
+  channel        String   // EMAIL | IN_APP | BOTH
+  recipientType  String   // ALL | SPECIFIC
+  recipientIds   String[] // Array of user IDs
+  recipientCount Int      // Number of recipients
+  status         String   @default("PENDING") // PENDING | SENT | PARTIAL | FAILED
+  sentAt         DateTime @default(now())
+  deliveredAt    DateTime?
+  metadata       Json?    // Additional data (send stats, errors, etc.)
+
+  admin          User     @relation(fields: [adminId], references: [id])
+  receipts CommunicationReceipt[]  // ADD THIS
+  @@index([adminId])
+  @@index([sentAt])
+  @@index([status])
+}
+
+model CommunicationReceipt {
+  id        String   @id @default(cuid())
+  logId     String
+  userId    String
+  channel   String   // EMAIL | IN_APP
+  status    String   // SENT | DELIVERED | READ | FAILED
+  sentAt    DateTime @default(now())
+  readAt    DateTime?
+  error     String?  // If failed, store error message
+
+  log       CommunicationLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([logId, userId, channel])
+  @@index([logId])
+  @@index([userId])
+  @@index([status])
+  @@index([readAt])
 }
 
 model PushSubscription {

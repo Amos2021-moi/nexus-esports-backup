@@ -71,6 +71,7 @@ const adminMenu = [
   { name: "Analytics", href: "/admin/analytics", icon: Activity, color: "text-cyan-400", bg: "bg-cyan-500/10" },
   { name: "Audit Logs", href: "/admin/audit", icon: FileText, color: "text-red-400", bg: "bg-red-500/10" },
   { name: "Admin Management", href: "/admin/admins", icon: Shield, color: "text-slate-400", bg: "bg-slate-500/10" },
+  { name: "Communication", href: "/admin/communication", icon: MessageCircle, color: "text-indigo-400", bg: "bg-indigo-500/10" }, // ADD THIS
   { name: "Settings", href: "/admin/settings/league", icon: Settings, color: "text-gray-400", bg: "bg-gray-500/10" },
 ];
 
