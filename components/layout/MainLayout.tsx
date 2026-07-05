@@ -1,5 +1,6 @@
 "use client";
 
+import VersionBadge from "@/components/ui/VersionBadge";
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -34,6 +35,7 @@ import {
   Search,
   CreditCard,
   Gift,
+  GitBranch,
   Brain,
   Star,
   Flame,
@@ -82,6 +84,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [version, setVersion] = useState<{
+    version?: string;
+    build?: string;
+    hash?: string;
+    environment?: string;
+    date?: string;
+  } | null>(null);
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{ latest?: string } | null>(null);
   const [appearanceSettings, setAppearanceSettings] = useState({
     sidebarStyle: "default" as "default" | "compact" | "icon",
     compactMode: false,
@@ -363,23 +374,133 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <div className="h-8" />
         </div>
 
-        {/* Logout */}
-        <div className="flex-shrink-0 border-t border-white/10 bg-gray-900/95">
-          <div className={`p-4 ${isIconOnly ? "flex justify-center" : ""}`}>
-            <button
-              onClick={() => router.push("/api/auth/signout")}
-              title={isIconOnly ? "Logout" : undefined}
-              className={`flex w-full items-center justify-center space-x-2 rounded-xl border border-red-500/20 bg-gradient-to-r from-red-500/10 to-pink-500/10 px-3 py-2.5 text-gray-400 transition-all duration-200 hover:from-red-500/20 hover:to-pink-500/20 hover:text-red-400 ${
-                isIconOnly ? "px-2" : ""
-              }`}
-            >
-              <LogOut size={16} />
-              {!isIconOnly && (
-                <span className="text-sm font-medium">Logout</span>
-              )}
-            </button>
-          </div>
+        {/* Logout & Version */}
+<div className="flex-shrink-0 border-t border-white/10 bg-gray-900/95">
+  {/* Logout Button */}
+  <div className={`p-4 ${isIconOnly ? "flex justify-center" : ""}`}>
+    <button
+      onClick={() => router.push("/api/auth/signout")}
+      title={isIconOnly ? "Logout" : undefined}
+      className={`group relative w-full overflow-hidden rounded-xl border border-red-500/20 bg-gradient-to-r from-red-500/10 to-pink-500/10 px-3 py-2.5 text-gray-400 transition-all duration-300 hover:from-red-500/20 hover:to-pink-500/20 hover:text-red-400 hover:shadow-lg hover:shadow-red-500/10 ${
+        isIconOnly ? "px-2" : ""
+      }`}
+    >
+      {/* Glow effect on hover */}
+      <span className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/5 to-pink-500/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      
+      <span className="relative flex items-center justify-center gap-2">
+        <LogOut size={16} className="transition-transform duration-300 group-hover:scale-110" />
+        {!isIconOnly && (
+          <span className="text-sm font-medium">Logout</span>
+        )}
+      </span>
+    </button>
+  </div>
+
+  {/* Version Badge - Premium Styling */}
+  <div className="border-t border-white/5 px-4 py-3">
+    <div className="flex items-center justify-center gap-2">
+      {/* Version Divider */}
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/5" />
+      
+      {/* Version Badge - Clickable */}
+      <div
+        onClick={() => {
+          if (window.location.pathname.includes('/admin')) {
+            window.location.href = '/admin/system/version';
+          }
+        }}
+        className="group relative cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1.5 transition-all duration-300 hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:shadow-lg hover:shadow-indigo-500/5"
+      >
+        {/* Premium shimmer effect */}
+        <span className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500/0 via-indigo-500/5 to-purple-500/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        
+        <div className="relative flex items-center gap-2 text-[11px] font-medium text-gray-400 transition-colors duration-300 group-hover:text-gray-300">
+          <GitBranch size={11} className="text-indigo-400/60 transition-colors duration-300 group-hover:text-indigo-400" />
+          <span className="font-mono">
+            v{version?.version || "1.0.0"}
+          </span>
+          <span className="h-1 w-1 rounded-full bg-gray-600" />
+          <span className="text-[10px] text-gray-500">
+            {version?.hash || "dev"}
+          </span>
+          {version?.environment && (
+            <>
+              <span className="h-1 w-1 rounded-full bg-gray-600" />
+              <span className="text-[10px] text-indigo-400/70">
+                {version.environment === 'production' ? '🚀' : version.environment === 'staging' ? '🧪' : '🔧'}
+              </span>
+            </>
+          )}
+          <Sparkles size={10} className="text-yellow-400/40 transition-opacity duration-300 group-hover:text-yellow-400/70" />
+          
+          {/* Update indicator */}
+          {hasUpdate && (
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yellow-400" />
+            </span>
+          )}
         </div>
+
+        {/* Tooltip on hover */}
+        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 scale-95 rounded-xl border border-white/10 bg-gray-900/95 px-4 py-3 shadow-2xl backdrop-blur-xl opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
+          <div className="space-y-1.5 text-xs whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-white">Version</span>
+              <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-indigo-300">
+                v{version?.version || "1.0.0"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <span>Build:</span>
+              <span className="font-mono text-white">#{version?.build || "0"}</span>
+            </div>
+            {version?.hash && (
+              <div className="flex items-center gap-2 text-gray-400">
+                <span>Commit:</span>
+                <span className="font-mono text-white">{version.hash}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-gray-400">
+              <span>Env:</span>
+              <span className={`font-medium ${
+                version?.environment === 'production' ? 'text-emerald-400' :
+                version?.environment === 'staging' ? 'text-yellow-400' :
+                version?.environment === 'preview' ? 'text-purple-400' :
+                'text-blue-400'
+              }`}>
+                {version?.environment || 'development'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <span>Deployed:</span>
+              <span className="text-white">
+                {version?.date ? new Date(version.date).toLocaleDateString() : 'N/A'}
+              </span>
+            </div>
+            {hasUpdate && (
+              <div className="mt-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-2 text-yellow-400">
+                <span className="text-xs font-medium">🔄 Update Available!</span>
+                <span className="ml-1 text-[10px] opacity-70">{updateStatus?.latest}</span>
+              </div>
+            )}
+          </div>
+          {/* Tooltip arrow */}
+          <div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white/10 bg-gray-900/95" />
+        </div>
+      </div>
+
+      {/* Right Divider */}
+      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/5" />
+    </div>
+
+    {/* Click hint */}
+    <p className="mt-1.5 text-center text-[9px] text-gray-600">
+      Click version to manage • Auto-updates enabled
+    </p>
+  </div>
+</div>
       </aside>
 
       {/* Main */}

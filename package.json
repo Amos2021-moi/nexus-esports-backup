@@ -1,14 +1,21 @@
 {
   "name": "nexus-esports-league",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0 --turbo",
-    "build": "next build",
+    "build": "npm run version:auto && next build",
+    "build:patch": "VERSION_TYPE=patch npm run build",
+    "build:minor": "VERSION_TYPE=minor npm run build",
+    "build:major": "VERSION_TYPE=major npm run build",
+    "version:auto": "node scripts/update-version.js",
+    "version:patch": "VERSION_TYPE=patch node scripts/update-version.js",
+    "version:minor": "VERSION_TYPE=minor node scripts/update-version.js",
+    "version:major": "VERSION_TYPE=major node scripts/update-version.js",
     "start": "next start",
     "lint": "next eslint",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && npx prisma migrate deploy && next build"
+    "vercel-build": "npm run version:auto && prisma generate && npx prisma migrate deploy && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

@@ -197,85 +197,112 @@ export class EmailService {
 
   // ✅ Send notification
   async sendNotification(
-    to: string | string[],
-    title: string,
-    message: string,
-    priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" = "MEDIUM",
-    data: EmailTemplateData = {}
-  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const priorityEmoji = {
-      CRITICAL: "🚨",
-      HIGH: "⚡",
-      MEDIUM: "📬",
-      LOW: "📧",
-    };
+  to: string | string[],
+  title: string,
+  message: string,
+  priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" = "MEDIUM",
+  data: EmailTemplateData = {}
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const priorityEmoji = {
+    CRITICAL: "🚨",
+    HIGH: "⚡",
+    MEDIUM: "📬",
+    LOW: "📧",
+  };
 
-    const priorityColors = {
-      CRITICAL: "#ef4444",
-      HIGH: "#f97316",
-      MEDIUM: "#eab308",
-      LOW: "#6b7280",
-    };
+  const priorityColors = {
+    CRITICAL: "#ef4444",
+    HIGH: "#f97316",
+    MEDIUM: "#eab308",
+    LOW: "#6b7280",
+  };
 
-    const html = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #0f0f1a; border-radius: 16px; color: #fff;">
-        <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #1e293b;">
-          <div style="display: inline-block; padding: 12px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 16px;">
-            <span style="font-size: 28px;">🏆</span>
+  // Format the message with proper line breaks and HTML
+  const formattedMessage = message
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => `<p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 8px 0;">${line}</p>`)
+    .join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f0f1a; color: #fff; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #1a1a2e; border-radius: 16px; overflow: hidden; border: 1px solid #2d2d4a; }
+        .header { padding: 30px 30px 20px; text-align: center; border-bottom: 1px solid #2d2d4a; background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1)); }
+        .logo { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; }
+        .subtitle { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+        .content { padding: 30px; }
+        .footer { padding: 20px 30px; text-align: center; border-top: 1px solid #2d2d4a; color: #64748b; font-size: 12px; }
+        .footer a { color: #818cf8; text-decoration: none; }
+        .badge { display: inline-block; padding: 4px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; background: ${priorityColors[priority]}20; color: ${priorityColors[priority]}; border: 1px solid ${priorityColors[priority]}40; margin-bottom: 12px; }
+        .divider { border: none; height: 1px; background: linear-gradient(to right, transparent, #2d2d4a, transparent); margin: 20px 0; }
+        .highlight { color: #818cf8; font-weight: 600; }
+        .text-muted { color: #94a3b8; }
+        .btn { display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; border-radius: 12px; text-decoration: none; font-weight: 600; margin: 16px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">🏆 Nexus Esports</div>
+          <div class="subtitle">Premier eFootball League</div>
+        </div>
+        <div class="content">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <span class="badge">${priorityEmoji[priority]} ${priority} Priority</span>
           </div>
-          <h1 style="color: #fff; font-size: 24px; margin: 12px 0 0;">Nexus Esports</h1>
-          <p style="color: #94a3b8; font-size: 14px;">Premier eFootball League</p>
+          <h2 style="color: #fff; font-size: 20px; margin-bottom: 16px;">${title}</h2>
+          ${formattedMessage}
+          ${data.link ? `
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${data.link}" class="btn">View Details →</a>
+            </div>
+          ` : ''}
+          <hr class="divider">
+          <div style="text-align: center; color: #94a3b8; font-size: 13px;">
+            <p>Nexus Esports League • School eFootball Platform</p>
+            <p style="margin-top: 8px; font-size: 12px; color: #64748b;">
+              <a href="${process.env.NEXTAUTH_URL}/dashboard/settings/notifications" style="color: #818cf8; text-decoration: none;">Manage preferences</a>
+              •
+              <a href="${process.env.NEXTAUTH_URL}/privacy" style="color: #818cf8; text-decoration: none;">Privacy Policy</a>
+            </p>
+          </div>
         </div>
-
-        <div style="text-align: center; margin: 20px 0;">
-          <span style="display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; background: ${priorityColors[priority]}20; color: ${priorityColors[priority]}; border: 1px solid ${priorityColors[priority]}40;">
-            ${priorityEmoji[priority]} ${priority} Priority
-          </span>
-        </div>
-
-        <div style="padding: 20px 0;">
-          <h2 style="color: #fff; font-size: 20px; margin-bottom: 12px;">${title}</h2>
-          <p style="color: #cbd5e1; font-size: 16px; line-height: 1.6;">${message}</p>
-        </div>
-
-        ${data.link ? `
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="${data.link}" style="display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; border-radius: 12px; text-decoration: none; font-weight: 600;">
-            View Details →
-          </a>
-        </div>
-        ` : ''}
-
-        <div style="border-top: 1px solid #1e293b; padding-top: 20px; margin-top: 20px; text-align: center;">
-          <p style="color: #64748b; font-size: 12px;">
-            You're receiving this because you're a member of Nexus Esports.
-            <br>
-            <a href="${process.env.NEXTAUTH_URL}/dashboard/settings/notifications" style="color: #818cf8; text-decoration: none;">Manage preferences</a>
-          </p>
-          <p style="color: #475569; font-size: 12px;">
-            © ${new Date().getFullYear()} Nexus Esports League
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Nexus Esports League</p>
+          <p style="margin-top: 4px; font-size: 11px; color: #475569;">
+            This message was sent to you as a registered member of Nexus Esports League.
           </p>
         </div>
       </div>
-    `;
+    </body>
+    </html>
+  `;
 
-    const text = `
+  const text = `
 ${priorityEmoji[priority]} ${priority} Priority
 ${title}
-${message}
+${message.replace(/\n/g, '\n')}
 ${data.link ? `View Details: ${data.link}` : ''}
 ---
 Nexus Esports League
 Manage preferences: ${process.env.NEXTAUTH_URL}/dashboard/settings/notifications
 `;
 
-    return this.sendEmail({
-      to,
-      subject: `${priorityEmoji[priority]} ${title}`,
-      html,
-      text,
-    });
-  }
+  return this.sendEmail({
+    to,
+    subject: `${priorityEmoji[priority]} ${title}`,
+    html,
+    text,
+  });
+}
 
   // ✅ Send password reset email
   async sendPasswordResetEmail(

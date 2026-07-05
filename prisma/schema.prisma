@@ -58,6 +58,7 @@ model User {
   playerSeasonEntries       PlayerSeasonEntry[]
     communicationLogs   CommunicationLog[]        // ADD THIS
   communicationReceipts CommunicationReceipt[]  // ADD THIS
+  versions Version[]  // 👈 ADD THIS LINE
   playerStat                PlayerStat?             // ✅ Keep this
 pushSubscriptions    PushSubscription[]   // ✅ ADD THIS
   @@index([email])
@@ -658,12 +659,26 @@ model CommunicationLog {
   sentAt         DateTime @default(now())
   deliveredAt    DateTime?
   metadata       Json?    // Additional data (send stats, errors, etc.)
-
+attachments CommunicationAttachment[]
   admin          User     @relation(fields: [adminId], references: [id])
   receipts CommunicationReceipt[]  // ADD THIS
   @@index([adminId])
   @@index([sentAt])
   @@index([status])
+}
+model CommunicationAttachment {
+  id        String   @id @default(cuid())
+  logId     String
+  fileName  String
+  fileSize  Int
+  fileType  String
+  fileUrl   String
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  log       CommunicationLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@index([logId])
 }
 
 model CommunicationReceipt {
@@ -684,6 +699,23 @@ model CommunicationReceipt {
   @@index([userId])
   @@index([status])
   @@index([readAt])
+}
+
+model Version {
+  id          String   @id @default(cuid())
+  version     String   // e.g., "1.0.1"
+  build       Int      // Auto-incrementing build number
+  hash        String?  // Git commit hash (first 7 chars)
+  changelog   String?  @db.Text // What changed
+  deployedBy  String   // Admin who deployed
+  environment String   @default("development") // dev | staging | production
+  deployedAt  DateTime @default(now())
+
+  admin       User     @relation(fields: [deployedBy], references: [id])
+
+  @@index([deployedAt])
+  @@index([version])
+  @@index([environment])
 }
 
 model PushSubscription {

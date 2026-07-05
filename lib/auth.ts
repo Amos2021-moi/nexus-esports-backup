@@ -8,12 +8,12 @@ import bcrypt from "bcryptjs"
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      httpOptions: {
-        timeout: 10000,
-      },
-    }),
+  clientId: process.env.GOOGLE_CLIENT_ID || "",
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  httpOptions: {
+    timeout: 15000, // Increase from 10000 to 15000 (15 seconds)
+  },
+}),
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID || "",
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || "",
