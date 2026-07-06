@@ -146,7 +146,7 @@ async function connectToWhatsApp() {
     version: [3, 0, 0],
     auth: state,
     printQRInTerminal: false,
-    logger: require("pino")({ level: "silent" }),
+    //logger: require("pino")({ level: "silent" }),
     browser: ["Nexus Esports Bot", "Chrome", "120.0.0.0"],
   });
 

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "WhatsApp Bot for Nexus Esports",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
