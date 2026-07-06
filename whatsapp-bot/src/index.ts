@@ -20,7 +20,7 @@ import { Boom } from "@hapi/boom";
 import * as QRCode from "qrcode-terminal";
 import * as fs from "fs";
 import express, { Request, Response } from "express";
-import { handleWebhook } from "./webhook";
+import { handleWebhook } from "./webhook.js";
 
 const SESSION_DIR = path.join(__dirname, "../sessions");
 const GROUP_JID = process.env.WHATSAPP_GROUP_JID || "";

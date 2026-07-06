@@ -8,7 +8,7 @@ console.log(`📁 webhook loading .env from: ${envPath}`);
 dotenv.config({ path: envPath });
 
 import { Request, Response } from "express";
-import { sendToGroup } from "./index";
+import { sendToGroup } from "./index.js";
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 console.log(`🔑 WEBHOOK_SECRET loaded in webhook: "${WEBHOOK_SECRET}"`);
