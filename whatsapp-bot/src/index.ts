@@ -1,16 +1,5 @@
 import dotenv from "dotenv";
-import path from "path";
-
-// ✅ Force load .env from the root directory
-const envPath = path.resolve(__dirname, "../.env");
-console.log(`📁 Loading .env from: ${envPath}`);
-const result = dotenv.config({ path: envPath });
-
-if (result.error) {
-  console.error("❌ Failed to load .env:", result.error);
-} else {
-  console.log("✅ .env loaded successfully");
-}
+dotenv.config();
 
 import makeWASocket, {
   DisconnectReason,
@@ -19,10 +8,11 @@ import makeWASocket, {
 import { Boom } from "@hapi/boom";
 import * as QRCode from "qrcode-terminal";
 import * as fs from "fs";
+import * as path from "path";
 import express, { Request, Response } from "express";
 import { handleWebhook } from "./webhook.js";
 
-const SESSION_DIR = path.join(__dirname, "../sessions");
+const SESSION_DIR = path.join(process.cwd(), "sessions");
 const GROUP_JID = process.env.WHATSAPP_GROUP_JID || "";
 const PORT = parseInt(process.env.PORT || "3001");
 
@@ -38,7 +28,6 @@ if (!fs.existsSync(SESSION_DIR)) {
 let isReady = false;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
-let reconnectTimeout: NodeJS.Timeout | null = null;
 
 // ✅ Export sendToGroup for webhook
 export async function sendToGroup(sock: any, message: string, retries: number = 5) {
@@ -146,7 +135,7 @@ async function connectToWhatsApp() {
     version: [3, 0, 0],
     auth: state,
     printQRInTerminal: false,
-    //logger: require("pino")({ level: "silent" }),
+    logger: undefined, // Remove pino
     browser: ["Nexus Esports Bot", "Chrome", "120.0.0.0"],
   });
 
@@ -199,7 +188,7 @@ async function connectToWhatsApp() {
         let found = false;
         for (const [jid, group] of Object.entries(groups)) {
           if (jid === GROUP_JID) {
-            console.log(`✅ Target group FOUND: ${group.subject}`);
+            console.log(`✅ Target group FOUND: ${(group as any).subject}`);
             found = true;
           }
         }

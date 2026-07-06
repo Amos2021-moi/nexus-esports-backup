@@ -1,11 +1,5 @@
-// src/webhook.ts
 import dotenv from "dotenv";
-import path from "path";
-
-// ✅ Force load .env from the root directory using absolute path
-const envPath = path.resolve(__dirname, "../.env");
-console.log(`📁 webhook loading .env from: ${envPath}`);
-dotenv.config({ path: envPath });
+dotenv.config();
 
 import { Request, Response } from "express";
 import { sendToGroup } from "./index.js";
@@ -69,7 +63,6 @@ export async function handleWebhook(req: Request, res: Response, sock: any) {
         break;
 
       case "standings.updated":
-        // ✅ Use the pre-formatted message from Nexus
         message = data.message || "📊 *Standings Updated*";
         break;
 
