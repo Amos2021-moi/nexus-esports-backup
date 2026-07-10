@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback,memo } from "react";
 import { useSession } from "next-auth/react";
 import {
   Trophy,
@@ -23,6 +23,10 @@ import {
   LineChart as LineChartIcon,
   PieChart as PieChartIcon,
   Minus,
+  Zap,
+  Flame,
+  Medal,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -160,23 +164,37 @@ interface H2HStats {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            Animation variants                              */
+/*                            Animation Variants                              */
 /* -------------------------------------------------------------------------- */
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.07, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
+  },
+};
+
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
   },
 };
 
@@ -211,7 +229,6 @@ function AnimatedCounter({
       controls.stop();
       unsub();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return (
@@ -260,6 +277,137 @@ function TrendBadge({ winRate }: { winRate: number }) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const HeroStat = memo(({ stat }: { stat: any }) => {
+  const Icon = stat.icon;
+  return (
+    <motion.div
+      variants={statCardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      className="will-change-transform"
+    >
+      <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
+        <div
+          className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${stat.gradient} opacity-20 blur-2xl transition-opacity duration-500 group-hover:opacity-40`}
+        />
+        <div className="relative flex items-start justify-between">
+          <span
+            className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg ${stat.glow}`}
+          >
+            <Icon className="h-5 w-5 text-white" />
+          </span>
+          <Sparkles className="h-4 w-4 text-white/20" />
+        </div>
+        <p className="relative mt-4 text-3xl font-extrabold text-white">
+          <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+        </p>
+        <p className="relative mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+          {stat.name}
+        </p>
+      </div>
+    </motion.div>
+  );
+});
+
+HeroStat.displayName = "HeroStat";
+
+const PerfCard = memo(({
+  icon: Icon,
+  label,
+  value,
+  suffix = "",
+  accent,
+  ring,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  suffix?: string;
+  accent: string;
+  ring: string;
+}) => (
+  <motion.div
+    variants={statCardVariants}
+    initial="hidden"
+    animate="visible"
+    whileHover="hover"
+    className="will-change-transform"
+  >
+    <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 text-center shadow-xl backdrop-blur-xl ring-1 ${ring}`}>
+      <span className={`mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${accent}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <p className="text-xl font-bold text-white">
+        <AnimatedCounter value={value} suffix={suffix} />
+      </p>
+      <p className="text-xs text-gray-400">{label}</p>
+    </div>
+  </motion.div>
+));
+
+PerfCard.displayName = "PerfCard";
+
+const AwardChip = memo(({ award, index }: { award: any; index: number }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ delay: 0.05 * index, type: "spring", stiffness: 300 }}
+    whileHover={{ y: -2 }}
+    className="flex items-center gap-2 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 shadow-md shadow-yellow-500/10"
+  >
+    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-500">
+      <Star className="h-3.5 w-3.5 text-white" />
+    </span>
+    <span className="text-sm font-medium text-white">{award.name}</span>
+    <span className="text-xs text-gray-400">• {award.season.name}</span>
+  </motion.div>
+));
+
+AwardChip.displayName = "AwardChip";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function StatisticsPage() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
@@ -269,36 +417,27 @@ export default function StatisticsPage() {
   const [h2hStats, setH2hStats] = useState<H2HStats[]>([]);
   const [seasons, setSeasons] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    fetchAllData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeason]);
-
-  async function fetchAllData() {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const seasonParam =
-        selectedSeason !== "all" ? `?seasonId=${selectedSeason}` : "";
+      const seasonParam = selectedSeason !== "all" ? `?seasonId=${selectedSeason}` : "";
 
-      // Fetch player stats
-      const statsRes = await fetch(`/api/statistics/player${seasonParam}`);
+      const [statsRes, matchesRes, h2hRes] = await Promise.all([
+        fetch(`/api/statistics/player${seasonParam}`),
+        fetch(`/api/statistics/matches${seasonParam}`),
+        fetch(`/api/statistics/h2h${seasonParam}`),
+      ]);
+
       const statsData = await statsRes.json();
       setStats(statsData);
 
-      // Extract seasons from stats
       if (statsData.seasons) {
-        setSeasons(
-          statsData.seasons.map((s: any) => ({ id: s.id, name: s.name }))
-        );
+        setSeasons(statsData.seasons.map((s: any) => ({ id: s.id, name: s.name })));
       }
 
-      // Fetch match history
-      const matchesRes = await fetch(`/api/statistics/matches${seasonParam}`);
       const matchesData = await matchesRes.json();
       setMatchHistory(matchesData);
 
-      // Fetch head-to-head stats
-      const h2hRes = await fetch(`/api/statistics/h2h${seasonParam}`);
       const h2hData = await h2hRes.json();
       setH2hStats(h2hData);
     } catch (error) {
@@ -307,45 +446,31 @@ export default function StatisticsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedSeason]);
 
-  // Get current season stats
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
   const currentSeasonStats = stats?.seasonStats;
 
-  // Derived "active" stat source (season when available, else career) — read-only helpers
-  const played =
-    currentSeasonStats?.played ?? stats?.careerStats.matches ?? 0;
+  const played = currentSeasonStats?.played ?? stats?.careerStats.matches ?? 0;
   const wins = currentSeasonStats?.wins ?? stats?.careerStats.wins ?? 0;
   const draws = currentSeasonStats?.draws ?? stats?.careerStats.draws ?? 0;
   const losses = currentSeasonStats?.losses ?? stats?.careerStats.losses ?? 0;
   const points = currentSeasonStats?.points ?? stats?.careerStats.points ?? 0;
-  const winRate =
-    currentSeasonStats?.winRate ?? stats?.careerStats.winRate ?? 0;
-  const goalsFor =
-    currentSeasonStats?.goalsFor ?? stats?.careerStats.goalsFor ?? 0;
-  const goalsAgainst =
-    currentSeasonStats?.goalsAgainst ?? stats?.careerStats.goalsAgainst ?? 0;
-  const goalDifference =
-    currentSeasonStats?.goalDifference ??
-    stats?.careerStats.goalDifference ??
-    0;
+  const winRate = currentSeasonStats?.winRate ?? stats?.careerStats.winRate ?? 0;
+  const goalsFor = currentSeasonStats?.goalsFor ?? stats?.careerStats.goalsFor ?? 0;
+  const goalsAgainst = currentSeasonStats?.goalsAgainst ?? stats?.careerStats.goalsAgainst ?? 0;
+  const goalDifference = currentSeasonStats?.goalDifference ?? stats?.careerStats.goalDifference ?? 0;
   const goalsPerMatch = played > 0 ? goalsFor / played : 0;
 
-  // Chart data for performance over time
   const performanceData = {
-    labels:
-      matchHistory?.matches
-        .slice(0, 10)
-        .map((m) => new Date(m.scheduledDate).toLocaleDateString())
-        .reverse() || [],
+    labels: matchHistory?.matches.slice(0, 10).map((m) => new Date(m.scheduledDate).toLocaleDateString()).reverse() || [],
     datasets: [
       {
         label: "Goals Scored",
-        data:
-          matchHistory?.matches
-            .slice(0, 10)
-            .map((m) => m.myScore || 0)
-            .reverse() || [],
+        data: matchHistory?.matches.slice(0, 10).map((m) => m.myScore || 0).reverse() || [],
         borderColor: "#4F46E5",
         backgroundColor: "rgba(79, 70, 229, 0.15)",
         fill: true,
@@ -356,11 +481,7 @@ export default function StatisticsPage() {
       },
       {
         label: "Goals Conceded",
-        data:
-          matchHistory?.matches
-            .slice(0, 10)
-            .map((m) => m.opponentScore || 0)
-            .reverse() || [],
+        data: matchHistory?.matches.slice(0, 10).map((m) => m.opponentScore || 0).reverse() || [],
         borderColor: "#EF4444",
         backgroundColor: "rgba(239, 68, 68, 0.12)",
         fill: true,
@@ -372,16 +493,11 @@ export default function StatisticsPage() {
     ],
   };
 
-  // Chart data for win/loss/draw distribution
   const resultData = {
     labels: ["Wins", "Draws", "Losses"],
     datasets: [
       {
-        data: [
-          matchHistory?.summary.wins || 0,
-          matchHistory?.summary.draws || 0,
-          matchHistory?.summary.losses || 0,
-        ],
+        data: [matchHistory?.summary.wins || 0, matchHistory?.summary.draws || 0, matchHistory?.summary.losses || 0],
         backgroundColor: ["#22C55E", "#EAB308", "#EF4444"],
         borderColor: ["#16a34a", "#ca8a04", "#dc2626"],
         borderWidth: 2,
@@ -390,12 +506,10 @@ export default function StatisticsPage() {
     ],
   };
 
-  // Goal split percentages for the GF vs GA visual bar
   const totalGoals = goalsFor + goalsAgainst;
   const gfPercent = totalGoals > 0 ? (goalsFor / totalGoals) * 100 : 50;
   const gaPercent = totalGoals > 0 ? (goalsAgainst / totalGoals) * 100 : 50;
 
-  // Hero stat config
   const heroStats = useMemo(
     () => [
       {
@@ -435,33 +549,45 @@ export default function StatisticsPage() {
     [played, wins, goalsFor, winRate]
   );
 
+  const perfStats = useMemo(() => [
+    { label: "Matches", value: played, icon: Activity, accent: "text-blue-400", ring: "ring-blue-500/20" },
+    { label: "Wins", value: wins, icon: CheckCircle, accent: "text-emerald-400", ring: "ring-emerald-500/20" },
+    { label: "Draws", value: draws, icon: MinusCircle, accent: "text-yellow-400", ring: "ring-yellow-500/20" },
+    { label: "Losses", value: losses, icon: XCircle, accent: "text-red-400", ring: "ring-red-500/20" },
+    { label: "Points", value: points, icon: Trophy, accent: "text-amber-400", ring: "ring-amber-500/20" },
+    { label: "Win Rate", value: winRate, suffix: "%", icon: TrendingUp, accent: "text-green-400", ring: "ring-green-500/20" },
+  ], [played, wins, draws, losses, points, winRate]);
+
   if (loading) {
     return (
-      <div className="relative min-h-[60vh]">
+      <>
         <DecorBackground />
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="relative mx-auto mb-4 h-14 w-14">
-              <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20" />
-              <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
-              <BarChart3 className="absolute inset-0 m-auto h-5 w-5 text-indigo-400" />
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <BarChart3 className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
             </div>
-            <p className="text-gray-400">Loading statistics...</p>
+            <p className="mt-2 font-medium text-gray-400">Loading statistics...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Crunching your numbers</span>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
     <div className="relative">
       <DecorBackground />
-
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -473,17 +599,13 @@ export default function StatisticsPage() {
               <BarChart3 className="h-6 w-6 text-white" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                Player Statistics
-              </h1>
-              <p className="mt-1 text-gray-400">
-                Track your performance and progress
-              </p>
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">📊 Player Statistics</h1>
+              <p className="mt-1 text-gray-400">Track your performance and progress</p>
             </div>
           </div>
 
           {/* Season Selector */}
-          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-gray-800/40 p-2 backdrop-blur-xl">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2 backdrop-blur-xl">
             <Calendar className="ml-1 h-4 w-4 text-gray-400" />
             <div className="relative">
               <select
@@ -493,9 +615,7 @@ export default function StatisticsPage() {
               >
                 <option value="all">All Seasons</option>
                 {seasons.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -503,94 +623,23 @@ export default function StatisticsPage() {
           </div>
         </motion.div>
 
-        {/* Hero Stats Bar */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-2 gap-4 lg:grid-cols-4"
-        >
+        {/* Hero Stats */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {heroStats.map((stat) => (
-            <motion.div
-              key={stat.name}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl"
-            >
-              {/* gradient glow accent */}
-              <div
-                className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${stat.gradient} opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-40`}
-              />
-              <div className="relative flex items-start justify-between">
-                <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg ${stat.glow}`}
-                >
-                  <stat.icon className="h-5 w-5 text-white" />
-                </span>
-                <Sparkles className="h-4 w-4 text-white/20" />
-              </div>
-              <p className="relative mt-4 text-3xl font-extrabold text-white">
-                <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-              </p>
-              <p className="relative mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">
-                {stat.name}
-              </p>
-            </motion.div>
+            <HeroStat key={stat.name} stat={stat} />
           ))}
         </motion.div>
 
-        {/* Performance Grid (6 cards) */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6"
-        >
-          <PerfCard
-            icon={Activity}
-            label="Matches"
-            value={played}
-            accent="text-blue-400"
-            ring="ring-blue-500/20"
-          />
-          <PerfCard
-            icon={CheckCircle}
-            label="Wins"
-            value={wins}
-            accent="text-emerald-400"
-            ring="ring-emerald-500/20"
-          />
-          <PerfCard
-            icon={MinusCircle}
-            label="Draws"
-            value={draws}
-            accent="text-yellow-400"
-            ring="ring-yellow-500/20"
-          />
-          <PerfCard
-            icon={XCircle}
-            label="Losses"
-            value={losses}
-            accent="text-red-400"
-            ring="ring-red-500/20"
-          />
-          <PerfCard
-            icon={Trophy}
-            label="Points"
-            value={points}
-            accent="text-amber-400"
-            ring="ring-amber-500/20"
-          />
-          <PerfCard
-            icon={TrendingUp}
-            label="Win Rate"
-            value={winRate}
-            suffix="%"
-            accent="text-green-400"
-            ring="ring-green-500/20"
-          />
+        {/* Performance Grid */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          {perfStats.map((stat) => (
+            <PerfCard key={stat.label} {...stat} />
+          ))}
         </motion.div>
 
-        {/* Goals stats + Goal Difference visual */}
-        <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
-          {/* Goals For */}
-          <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gray-800/40 p-5 backdrop-blur-xl">
+        {/* Goals Stats */}
+        <motion.div variants={containerVariants} className="grid gap-3 lg:grid-cols-3">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
             <div className="flex items-center justify-between">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 ring-1 ring-blue-500/30">
                 <Target className="h-5 w-5 text-blue-400" />
@@ -600,13 +649,10 @@ export default function StatisticsPage() {
               </p>
             </div>
             <p className="mt-3 text-sm text-gray-400">Goals For</p>
-            <p className="text-xs text-gray-500">
-              {goalsPerMatch.toFixed(2)} per match
-            </p>
-          </div>
+            <p className="text-xs text-gray-500">{goalsPerMatch.toFixed(2)} per match</p>
+          </motion.div>
 
-          {/* Goals Against */}
-          <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-gray-800/40 p-5 backdrop-blur-xl">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
             <div className="flex items-center justify-between">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 ring-1 ring-red-500/30">
                 <Shield className="h-5 w-5 text-red-400" />
@@ -616,63 +662,34 @@ export default function StatisticsPage() {
               </p>
             </div>
             <p className="mt-3 text-sm text-gray-400">Goals Against</p>
-            <p className="text-xs text-gray-500">
-              {played > 0 ? (goalsAgainst / played).toFixed(2) : "0.00"} per
-              match
-            </p>
-          </div>
+            <p className="text-xs text-gray-500">{played > 0 ? (goalsAgainst / played).toFixed(2) : "0.00"} per match</p>
+          </motion.div>
 
-          {/* Goal Difference */}
-          <div
-            className={`relative overflow-hidden rounded-2xl border bg-gray-800/40 p-5 backdrop-blur-xl ${
-              goalDifference >= 0
-                ? "border-emerald-500/20"
-                : "border-red-500/20"
-            }`}
+          <motion.div
+            variants={itemVariants}
+            className={`rounded-2xl border bg-white/5 p-5 backdrop-blur-xl ${goalDifference >= 0 ? "border-emerald-500/20" : "border-red-500/20"}`}
           >
             <div className="flex items-center justify-between">
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${
-                  goalDifference >= 0
-                    ? "bg-emerald-500/15 ring-emerald-500/30"
-                    : "bg-red-500/15 ring-red-500/30"
-                }`}
-              >
-                {goalDifference >= 0 ? (
-                  <TrendingUp className="h-5 w-5 text-emerald-400" />
-                ) : (
-                  <TrendingDown className="h-5 w-5 text-red-400" />
-                )}
+              <span className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${goalDifference >= 0 ? "bg-emerald-500/15 ring-emerald-500/30" : "bg-red-500/15 ring-red-500/30"}`}>
+                {goalDifference >= 0 ? <TrendingUp className="h-5 w-5 text-emerald-400" /> : <TrendingDown className="h-5 w-5 text-red-400" />}
               </span>
-              <p
-                className={`text-3xl font-extrabold ${
-                  goalDifference >= 0 ? "text-emerald-400" : "text-red-400"
-                }`}
-              >
-                {goalDifference >= 0 ? "+" : ""}
-                <AnimatedCounter value={Math.abs(goalDifference)} />
+              <p className={`text-3xl font-extrabold ${goalDifference >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {goalDifference >= 0 ? "+" : ""}<AnimatedCounter value={Math.abs(goalDifference)} />
               </p>
             </div>
             <p className="mt-3 text-sm text-gray-400">Goal Difference</p>
-            <p className="text-xs text-gray-500">
-              {goalsPerMatch.toFixed(2)} goals/match
-            </p>
-          </div>
+            <p className="text-xs text-gray-500">{goalsPerMatch.toFixed(2)} goals/match</p>
+          </motion.div>
         </motion.div>
 
-        {/* Goal Difference animated GF vs GA bar */}
-        <motion.div
-          variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl"
-        >
+        {/* Attack vs Defense Bar */}
+        <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
               <BarChart3 className="h-4 w-4 text-indigo-400" />
               Attack vs Defense
             </h3>
-            <span className="text-xs text-gray-500">
-              {goalsFor} GF · {goalsAgainst} GA
-            </span>
+            <span className="text-xs text-gray-500">{goalsFor} GF · {goalsAgainst} GA</span>
           </div>
           <div className="flex h-6 w-full overflow-hidden rounded-full bg-gray-900/60 ring-1 ring-white/10">
             <motion.div
@@ -703,10 +720,7 @@ export default function StatisticsPage() {
         </motion.div>
 
         {/* Form Guide */}
-        <motion.div
-          variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl"
-        >
+        <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -714,56 +728,35 @@ export default function StatisticsPage() {
                 Recent Form
               </h3>
               <div className="flex gap-1.5">
-                {(matchHistory?.form || "")
-                  .split("")
-                  .map((letter, i) => (
-                    <motion.span
-                      key={i}
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{
-                        delay: 0.1 + i * 0.06,
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 18,
-                      }}
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ring-1 ${
-                        letter === "W"
-                          ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30 shadow-md shadow-emerald-500/20"
-                          : letter === "D"
-                          ? "bg-yellow-500/20 text-yellow-400 ring-yellow-500/30"
-                          : letter === "L"
-                          ? "bg-red-500/20 text-red-400 ring-red-500/30"
-                          : "bg-gray-600/20 text-gray-400 ring-gray-500/30"
-                      }`}
-                    >
-                      {letter}
-                    </motion.span>
-                  ))}
-                {!matchHistory?.form && (
-                  <span className="text-xs text-gray-500">No recent matches</span>
-                )}
+                {(matchHistory?.form || "").split("").map((letter, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1 + i * 0.06, type: "spring", stiffness: 400, damping: 18 }}
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ring-1 ${
+                      letter === "W" ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30 shadow-md shadow-emerald-500/20" :
+                      letter === "D" ? "bg-yellow-500/20 text-yellow-400 ring-yellow-500/30" :
+                      letter === "L" ? "bg-red-500/20 text-red-400 ring-red-500/30" :
+                      "bg-gray-600/20 text-gray-400 ring-gray-500/30"
+                    }`}
+                  >
+                    {letter}
+                  </motion.span>
+                ))}
+                {!matchHistory?.form && <span className="text-xs text-gray-500">No recent matches</span>}
               </div>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-400">
-                <span className="text-emerald-400">
-                  {matchHistory?.summary.wins || 0}W
-                </span>{" "}
-                -{" "}
-                <span className="text-yellow-400">
-                  {matchHistory?.summary.draws || 0}D
-                </span>{" "}
-                -{" "}
-                <span className="text-red-400">
-                  {matchHistory?.summary.losses || 0}L
-                </span>
+                <span className="text-emerald-400">{matchHistory?.summary.wins || 0}W</span> -
+                <span className="text-yellow-400">{matchHistory?.summary.draws || 0}D</span> -
+                <span className="text-red-400">{matchHistory?.summary.losses || 0}L</span>
               </span>
               <TrendBadge winRate={winRate} />
             </div>
           </div>
 
-          {/* Win rate progress bar */}
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between text-xs text-gray-400">
               <span>Win Rate</span>
@@ -780,115 +773,62 @@ export default function StatisticsPage() {
           </div>
         </motion.div>
 
-        {/* Charts Row */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-1 gap-6 lg:grid-cols-2"
-        >
-          {/* Performance Chart */}
-          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+        {/* Charts */}
+        <motion.div variants={containerVariants} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <LineChartIcon className="h-4 w-4 text-indigo-400" />
               Performance Trend
             </h3>
             <div className="h-[220px]">
-              <Line
-                data={performanceData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      labels: { color: "#9CA3AF", font: { size: 11 } },
-                    },
-                  },
-                  scales: {
-                    x: {
-                      grid: { color: "rgba(55,65,81,0.4)" },
-                      ticks: { color: "#9CA3AF", font: { size: 9 } },
-                    },
-                    y: {
-                      grid: { color: "rgba(55,65,81,0.4)" },
-                      ticks: { color: "#9CA3AF", font: { size: 10 } },
-                    },
-                  },
-                }}
-              />
+              <Line data={performanceData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: "#9CA3AF", font: { size: 11 } } } },
+                scales: {
+                  x: { grid: { color: "rgba(55,65,81,0.4)" }, ticks: { color: "#9CA3AF", font: { size: 9 } } },
+                  y: { grid: { color: "rgba(55,65,81,0.4)" }, ticks: { color: "#9CA3AF", font: { size: 10 } } },
+                },
+              }} />
             </div>
-          </div>
+          </motion.div>
 
-          {/* Result Distribution */}
-          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <PieChartIcon className="h-4 w-4 text-indigo-400" />
               Result Distribution
             </h3>
             <div className="flex h-[220px] items-center justify-center">
               <div className="h-[200px] w-[200px]">
-                <Doughnut
-                  data={resultData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: "bottom",
-                        labels: {
-                          color: "#9CA3AF",
-                          font: { size: 11 },
-                          padding: 12,
-                        },
-                      },
-                    },
-                    cutout: "62%",
-                  }}
-                />
+                <Doughnut data={resultData} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: "bottom", labels: { color: "#9CA3AF", font: { size: 11 }, padding: 12 } } },
+                  cutout: "62%",
+                }} />
               </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
 
-        {/* Awards Section */}
+        {/* Awards */}
         {stats?.awards && stats.awards.length > 0 && (
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/[0.07] to-amber-500/[0.04] p-6 shadow-2xl backdrop-blur-xl"
-          >
+          <motion.div variants={itemVariants} className="rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/[0.07] to-amber-500/[0.04] p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Crown className="h-4 w-4 text-yellow-400" />
-              Awards &amp; Achievements
+              Awards & Achievements
             </h3>
             <div className="flex flex-wrap gap-3">
               {stats.awards.map((award, i) => (
-                <motion.div
-                  key={award.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.05 * i, type: "spring", stiffness: 300 }}
-                  whileHover={{ y: -2 }}
-                  className="flex items-center gap-2 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 shadow-md shadow-yellow-500/10"
-                >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-500">
-                    <Star className="h-3.5 w-3.5 text-white" />
-                  </span>
-                  <span className="text-sm font-medium text-white">
-                    {award.name}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    • {award.season.name}
-                  </span>
-                </motion.div>
+                <AwardChip key={award.id} award={award} index={i} />
               ))}
             </div>
           </motion.div>
         )}
 
-        {/* Head-to-Head Section */}
+        {/* Head-to-Head */}
         {h2hStats.length > 0 && (
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl"
-          >
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Users className="h-4 w-4 text-indigo-400" />
               Head-to-Head Records
@@ -910,38 +850,18 @@ export default function StatisticsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {h2hStats.slice(0, 10).map((stat) => (
-                    <tr
-                      key={stat.opponentId}
-                      className="text-gray-300 transition-colors hover:bg-white/[0.03]"
-                    >
-                      <td className="py-3 font-medium text-white">
-                        {stat.opponentName}
-                      </td>
+                    <tr key={stat.opponentId} className="text-gray-300 transition-colors hover:bg-white/5">
+                      <td className="py-3 font-medium text-white">{stat.opponentName}</td>
                       <td className="py-3 text-center">{stat.played}</td>
-                      <td className="py-3 text-center text-emerald-400">
-                        {stat.wins}
-                      </td>
-                      <td className="py-3 text-center text-yellow-400">
-                        {stat.draws}
-                      </td>
-                      <td className="py-3 text-center text-red-400">
-                        {stat.losses}
-                      </td>
+                      <td className="py-3 text-center text-emerald-400">{stat.wins}</td>
+                      <td className="py-3 text-center text-yellow-400">{stat.draws}</td>
+                      <td className="py-3 text-center text-red-400">{stat.losses}</td>
                       <td className="py-3 text-center">{stat.goalsFor}</td>
                       <td className="py-3 text-center">{stat.goalsAgainst}</td>
-                      <td
-                        className={`py-3 text-center font-medium ${
-                          stat.goalDifference >= 0
-                            ? "text-emerald-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {stat.goalDifference >= 0 ? "+" : ""}
-                        {stat.goalDifference}
+                      <td className={`py-3 text-center font-medium ${stat.goalDifference >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {stat.goalDifference >= 0 ? "+" : ""}{stat.goalDifference}
                       </td>
-                      <td className="py-3 text-center text-blue-400">
-                        {stat.winRate}%
-                      </td>
+                      <td className="py-3 text-center text-blue-400">{stat.winRate}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -950,12 +870,9 @@ export default function StatisticsPage() {
           </motion.div>
         )}
 
-        {/* Season Stats Table */}
+        {/* Season History */}
         {stats?.seasons && stats.seasons.length > 0 && (
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl"
-          >
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Calendar className="h-4 w-4 text-indigo-400" />
               Season History
@@ -974,46 +891,21 @@ export default function StatisticsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {stats.seasons.map((s) => {
-                    const isCurrent =
-                      currentSeasonStats?.season?.id === s.id ||
-                      selectedSeason === s.id;
+                    const isCurrent = currentSeasonStats?.season?.id === s.id || selectedSeason === s.id;
                     return (
-                      <tr
-                        key={s.id}
-                        className={`transition-colors hover:bg-white/[0.03] ${
-                          isCurrent ? "bg-indigo-500/[0.07]" : ""
-                        }`}
-                      >
+                      <tr key={s.id} className={`transition-colors hover:bg-white/5 ${isCurrent ? "bg-indigo-500/[0.07]" : ""}`}>
                         <td className="py-3">
                           <div className="flex items-center gap-2">
-                            {isCurrent && (
-                              <span className="h-2 w-2 rounded-full bg-indigo-400 shadow shadow-indigo-400/50" />
-                            )}
-                            <span className="font-medium text-white">
-                              {s.name}
-                            </span>
-                            {s.status && (
-                              <span className="rounded-full bg-gray-700/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-400 ring-1 ring-white/10">
-                                {s.status}
-                              </span>
-                            )}
+                            {isCurrent && <span className="h-2 w-2 rounded-full bg-indigo-400 shadow shadow-indigo-400/50" />}
+                            <span className="font-medium text-white">{s.name}</span>
+                            {s.status && <span className="rounded-full bg-gray-700/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-400 ring-1 ring-white/10">{s.status}</span>}
                           </div>
                         </td>
-                        <td className="py-3 text-center text-gray-300">
-                          {s.played}
-                        </td>
-                        <td className="py-3 text-center text-emerald-400">
-                          {s.wins}
-                        </td>
-                        <td className="py-3 text-center text-yellow-400">
-                          {s.draws}
-                        </td>
-                        <td className="py-3 text-center text-red-400">
-                          {s.losses}
-                        </td>
-                        <td className="py-3 text-center font-bold text-white">
-                          {s.points}
-                        </td>
+                        <td className="py-3 text-center text-gray-300">{s.played}</td>
+                        <td className="py-3 text-center text-emerald-400">{s.wins}</td>
+                        <td className="py-3 text-center text-yellow-400">{s.draws}</td>
+                        <td className="py-3 text-center text-red-400">{s.losses}</td>
+                        <td className="py-3 text-center font-bold text-white">{s.points}</td>
                       </tr>
                     );
                   })}
@@ -1023,151 +915,71 @@ export default function StatisticsPage() {
           </motion.div>
         )}
 
-        {/* Career Stats Summary */}
-        {stats?.totalSeasons &&
-          stats.totalSeasons > 1 &&
-          selectedSeason === "all" && (
-            <motion.div
-              variants={itemVariants}
-              className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-600/10 to-purple-600/10 p-6 shadow-2xl backdrop-blur-xl"
-            >
-              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
-              <h3 className="relative mb-4 flex items-center gap-2 text-sm font-semibold text-white">
-                <Trophy className="h-4 w-4 text-yellow-400" />
-                Career Summary
-              </h3>
-              <div className="relative grid grid-cols-2 gap-4 text-center md:grid-cols-4">
-                {[
-                  { label: "Total Matches", value: stats.careerStats.matches },
-                  { label: "Total Wins", value: stats.careerStats.wins },
-                  { label: "Total Points", value: stats.careerStats.points },
-                  { label: "Seasons Played", value: stats.totalSeasons },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <p className="text-3xl font-extrabold text-white">
-                      <AnimatedCounter value={item.value} />
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+        {/* Career Summary */}
+        {stats?.totalSeasons && stats.totalSeasons > 1 && selectedSeason === "all" && (
+          <motion.div variants={itemVariants} className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-600/10 to-purple-600/10 p-6 shadow-2xl backdrop-blur-xl">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
+            <h3 className="relative mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+              <Trophy className="h-4 w-4 text-yellow-400" />
+              Career Summary
+            </h3>
+            <div className="relative grid grid-cols-2 gap-4 text-center md:grid-cols-4">
+              {[
+                { label: "Total Matches", value: stats.careerStats.matches },
+                { label: "Total Wins", value: stats.careerStats.wins },
+                { label: "Total Points", value: stats.careerStats.points },
+                { label: "Seasons Played", value: stats.totalSeasons },
+              ].map((item) => (
+                <div key={item.label}>
+                  <p className="text-3xl font-extrabold text-white"><AnimatedCounter value={item.value} /></p>
+                  <p className="mt-1 text-xs text-gray-400">{item.label}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* Recent Matches */}
         {matchHistory?.matches && matchHistory.matches.length > 0 && (
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl"
-          >
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Calendar className="h-4 w-4 text-indigo-400" />
               Recent Matches
             </h3>
             <div className="space-y-2">
-              <AnimatePresence>
-                {matchHistory.matches.slice(0, 10).map((match, i) => (
-                  <motion.div
-                    key={match.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.03 * i }}
-                    whileHover={{ x: 4 }}
-                    className="flex min-h-[44px] items-center justify-between rounded-xl border border-white/5 bg-gray-900/40 p-3 transition-colors hover:bg-gray-900/70"
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span
-                        className={`rounded-lg px-2 py-1 text-xs font-bold ring-1 ${
-                          match.result === "WIN"
-                            ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30"
-                            : match.result === "DRAW"
-                            ? "bg-yellow-500/20 text-yellow-400 ring-yellow-500/30"
-                            : match.result === "LOSS"
-                            ? "bg-red-500/20 text-red-400 ring-red-500/30"
-                            : "bg-gray-500/20 text-gray-400 ring-gray-500/30"
-                        }`}
-                      >
-                        {match.result}
-                      </span>
-                      <span className="text-sm text-white">
-                        vs {match.opponentName}
-                      </span>
-                      {match.score && (
-                        <span className="rounded-md bg-white/5 px-2 py-0.5 text-sm font-bold text-white ring-1 ring-white/10">
-                          {match.score}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-500">
-                        {match.isHome ? "🏠 Home" : "✈️ Away"}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(match.scheduledDate).toLocaleDateString()}
+              {matchHistory.matches.slice(0, 10).map((match, i) => (
+                <motion.div
+                  key={match.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.03 * i }}
+                  whileHover={{ x: 4 }}
+                  className="flex min-h-[44px] items-center justify-between rounded-xl border border-white/5 bg-gray-900/40 p-3 transition-colors hover:bg-gray-900/70"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className={`rounded-lg px-2 py-1 text-xs font-bold ring-1 ${
+                      match.result === "WIN" ? "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" :
+                      match.result === "DRAW" ? "bg-yellow-500/20 text-yellow-400 ring-yellow-500/30" :
+                      match.result === "LOSS" ? "bg-red-500/20 text-red-400 ring-red-500/30" :
+                      "bg-gray-500/20 text-gray-400 ring-gray-500/30"
+                    }`}>
+                      {match.result}
                     </span>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    <span className="text-sm text-white">vs {match.opponentName}</span>
+                    {match.score && (
+                      <span className="rounded-md bg-white/5 px-2 py-0.5 text-sm font-bold text-white ring-1 ring-white/10">
+                        {match.score}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-500">{match.isHome ? "🏠 Home" : "✈️ Away"}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{new Date(match.scheduledDate).toLocaleDateString()}</span>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
       </motion.div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                       Small reusable presentational bits                    */
-/* -------------------------------------------------------------------------- */
-
-function PerfCard({
-  icon: Icon,
-  label,
-  value,
-  suffix = "",
-  accent,
-  ring,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  suffix?: string;
-  accent: string;
-  ring: string;
-}) {
-  return (
-    <motion.div
-      whileHover={{ y: -3, scale: 1.03 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className={`rounded-2xl border border-white/10 bg-gray-800/40 p-4 text-center shadow-xl backdrop-blur-xl ring-1 ${ring}`}
-    >
-      <span
-        className={`mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${accent}`}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="text-xl font-bold text-white">
-        <AnimatedCounter value={value} suffix={suffix} />
-      </p>
-      <p className="text-xs text-gray-400">{label}</p>
-    </motion.div>
-  );
-}
-
-/* Decorative animated gradient background with blur orbs + grid overlay */
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Plus,
   Users,
@@ -21,8 +21,17 @@ import {
   ShieldCheck,
   HelpCircle,
   ListChecks,
+  Loader2,
+  ChevronRight,
+  Star,
+  Zap,
+  Medal,
+  Minus,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface Player {
   id: string;
@@ -51,41 +60,44 @@ interface LeagueEntry {
   points: number;
 }
 
-const containerVariants = {
+/* -------------------------------------------------------------------------- */
+/*                            Animation Variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 18 },
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    // Use numeric bezier for easing; cast to any to satisfy framer-motion's TypeScript types
-    transition: { duration: 0.45, ease: ([0.22, 1, 0.36, 1] as unknown) as any },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-    </div>
-  );
-}
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Helper Functions                                */
+/* -------------------------------------------------------------------------- */
 
 function playerLabel(player: Player) {
   return player.profile?.username || player.name || player.email;
@@ -97,6 +109,132 @@ function rankMedal(index: number) {
   if (index === 2) return "🥉";
   return index + 1;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const StatCard = memo(({ stat }: { stat: any }) => (
+  <motion.div
+    variants={statCardVariants}
+    initial="hidden"
+    animate="visible"
+    whileHover="hover"
+    className="will-change-transform"
+  >
+    <div className={`group relative h-full overflow-hidden rounded-2xl border bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 ${stat.ring}`}>
+      <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity duration-500 group-hover:opacity-70`} />
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
+        </div>
+        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
+          <stat.icon className="h-5 w-5" />
+        </span>
+      </div>
+      <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
+    </div>
+  </motion.div>
+));
+
+StatCard.displayName = "StatCard";
+
+const PlayerCheckbox = memo(({ player, isSelected, onToggle }: {
+  player: Player;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+}) => (
+  <label
+    className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition-all ${
+      isSelected
+        ? "border-indigo-500 bg-indigo-500/20"
+        : "border-white/10 bg-gray-800/50 hover:bg-gray-700/60"
+    }`}
+  >
+    <input
+      type="checkbox"
+      checked={isSelected}
+      onChange={() => onToggle(player.id)}
+      className="h-4 w-4 accent-indigo-500"
+    />
+    <span className="min-w-0 truncate text-sm text-white">
+      {playerLabel(player)}
+    </span>
+  </label>
+));
+
+PlayerCheckbox.displayName = "PlayerCheckbox";
+
+const LeagueTableRow = memo(({ entry, index, onRemove }: { entry: LeagueEntry; index: number; onRemove: (entryId: string) => void }) => (
+  <tr className="transition-colors hover:bg-white/5">
+    <td className="sticky left-0 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
+      {rankMedal(index)}
+    </td>
+    <td className="sticky left-12 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white">
+          {playerLabel(entry.player).charAt(0).toUpperCase()}
+        </span>
+        <span className="max-w-[160px] truncate">{playerLabel(entry.player)}</span>
+      </div>
+    </td>
+    <td className="px-4 py-3 text-center text-gray-300">{entry.played}</td>
+    <td className="px-4 py-3 text-center text-green-400">{entry.wins}</td>
+    <td className="px-4 py-3 text-center text-yellow-400">{entry.draws}</td>
+    <td className="px-4 py-3 text-center text-red-400">{entry.losses}</td>
+    <td className="px-4 py-3 text-center font-bold text-white">{entry.points}</td>
+    <td className="px-4 py-3 text-center">
+      <button
+        onClick={() => onRemove(entry.id)}
+        className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+        title="Remove player from season"
+      >
+        <X size={16} />
+      </button>
+    </td>
+  </tr>
+));
+
+LeagueTableRow.displayName = "LeagueTableRow";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function AdminLeaguePage() {
   const { data: session, status } = useSession();
@@ -116,12 +254,10 @@ export default function AdminLeaguePage() {
   // Role check - redirect if not admin
   useEffect(() => {
     if (status === "loading") return;
-
     if (!session) {
       router.push("/auth/signin");
       return;
     }
-
     if (session.user?.role !== "ADMIN") {
       router.push("/dashboard");
       return;
@@ -166,7 +302,7 @@ export default function AdminLeaguePage() {
     setEntries(Array.isArray(data) ? data : []);
   }
 
-  // ✅ Bulk add selected players
+  // Bulk add selected players
   async function addSelectedPlayers() {
     if (!selectedSeason) {
       toast.error("Select a season first");
@@ -196,7 +332,6 @@ export default function AdminLeaguePage() {
 
         if (response.ok) {
           successCount++;
-          // Create PlayerSeasonEntry for payment tracking
           await fetch("/api/competition/player-entry", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -223,14 +358,13 @@ export default function AdminLeaguePage() {
     );
   }
 
-  // ✅ Add ALL players to season
+  // Add ALL players to season
   async function addAllPlayers() {
     if (!selectedSeason) {
       toast.error("Select a season first");
       return;
     }
 
-    // Get all PLAYER role users not already in season
     const availablePlayers = players.filter(
       (p) => p.role === "PLAYER" && !entries.some((e) => e.playerId === p.id)
     );
@@ -286,7 +420,7 @@ export default function AdminLeaguePage() {
     );
   }
 
-  // ✅ Toggle player selection
+  // Toggle player selection
   function togglePlayer(playerId: string) {
     setSelectedPlayers((prev) =>
       prev.includes(playerId)
@@ -295,7 +429,7 @@ export default function AdminLeaguePage() {
     );
   }
 
-  // ✅ Select/Deselect all players
+  // Select/Deselect all players
   function toggleAllPlayers() {
     const availablePlayers = players.filter(
       (p) => p.role === "PLAYER" && !entries.some((e) => e.playerId === p.id)
@@ -397,7 +531,6 @@ export default function AdminLeaguePage() {
     setGenerating(false);
   }
 
-  // Get available players (not already in season)
   const availablePlayers = players.filter(
     (p) => p.role === "PLAYER" && !entries.some((e) => e.playerId === p.id)
   );
@@ -417,7 +550,7 @@ export default function AdminLeaguePage() {
   const totalPlayed = entries.reduce((sum, entry) => sum + entry.played, 0);
   const totalWins = entries.reduce((sum, entry) => sum + entry.wins, 0);
 
-  const statCards = [
+  const statCards = useMemo(() => [
     {
       label: "Season Players",
       value: entries.length,
@@ -454,7 +587,7 @@ export default function AdminLeaguePage() {
       ring: "border-green-500/20",
       glow: "from-green-500/20",
     },
-  ];
+  ], [entries, totalPlayed, totalWins, leader, availablePlayers]);
 
   // Show loading while checking role
   if (status === "loading" || loading) {
@@ -463,15 +596,22 @@ export default function AdminLeaguePage() {
         <DecorBackground />
         <div className="flex h-64 items-center justify-center">
           <div className="text-center">
-            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
-            <div className="text-gray-400">Loading league data...</div>
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <Trophy className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading league data...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Fetching your data</span>
+            </div>
           </div>
         </div>
       </>
     );
   }
 
-  // If not admin, don't render anything (redirect will happen)
   if (!session || session.user?.role !== "ADMIN") {
     return null;
   }
@@ -483,7 +623,7 @@ export default function AdminLeaguePage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-5 sm:space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -515,7 +655,7 @@ export default function AdminLeaguePage() {
         {/* Season Selection */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <div className="mb-4 flex items-center gap-2">
             <Calendar className="h-5 w-5 text-indigo-400" />
@@ -554,36 +694,16 @@ export default function AdminLeaguePage() {
         </motion.div>
 
         {/* Stats */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {statCards.map((stat) => (
-            <motion.div
-              key={stat.label}
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className={`group relative min-h-[44px] overflow-hidden rounded-2xl border bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 ${stat.ring}`}
-            >
-              <div
-                className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity group-hover:opacity-70`}
-              />
-              <div className="relative flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className={`truncate text-xl font-bold sm:text-2xl ${stat.accent}`}>{stat.value}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
-                </div>
-                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
-                  <stat.icon className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
-            </motion.div>
+            <StatCard key={stat.label} stat={stat} />
           ))}
         </motion.div>
 
         {/* Add Player Section - BULK */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
@@ -596,7 +716,6 @@ export default function AdminLeaguePage() {
           </div>
 
           <div className="space-y-4">
-            {/* Bulk Select */}
             {availablePlayers.length > 0 ? (
               <>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -620,24 +739,12 @@ export default function AdminLeaguePage() {
                 <div className="max-h-64 overflow-y-auto rounded-2xl border border-white/10 bg-gray-900/40 p-2">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredAvailablePlayers.map((player) => (
-                      <label
+                      <PlayerCheckbox
                         key={player.id}
-                        className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border p-3 transition-all ${
-                          selectedPlayers.includes(player.id)
-                            ? "border-indigo-500 bg-indigo-500/20"
-                            : "border-white/10 bg-gray-800/50 hover:bg-gray-700/60"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedPlayers.includes(player.id)}
-                          onChange={() => togglePlayer(player.id)}
-                          className="h-4 w-4 accent-indigo-500"
-                        />
-                        <span className="min-w-0 truncate text-sm text-white">
-                          {playerLabel(player)}
-                        </span>
-                      </label>
+                        player={player}
+                        isSelected={selectedPlayers.includes(player.id)}
+                        onToggle={togglePlayer}
+                      />
                     ))}
                   </div>
                   {filteredAvailablePlayers.length === 0 && (
@@ -653,7 +760,7 @@ export default function AdminLeaguePage() {
                   >
                     {bulkAdding ? (
                       <>
-                        <RefreshCw size={18} className="animate-spin" />
+                        <Loader2 size={18} className="animate-spin" />
                         Adding...
                       </>
                     ) : (
@@ -671,7 +778,7 @@ export default function AdminLeaguePage() {
                   >
                     {addingAll ? (
                       <>
-                        <RefreshCw size={18} className="animate-spin" />
+                        <Loader2 size={18} className="animate-spin" />
                         Adding All...
                       </>
                     ) : (
@@ -692,7 +799,7 @@ export default function AdminLeaguePage() {
             )}
           </div>
 
-          {/* Quick Add - Single Player (backup) */}
+          {/* Quick Add - Single Player */}
           <div className="mt-4 border-t border-white/10 pt-4">
             <p className="mb-2 text-xs text-gray-500">Or add a single player:</p>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -725,7 +832,7 @@ export default function AdminLeaguePage() {
         {/* Current Participants */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
             <Users className="h-5 w-5 text-blue-400" />
@@ -754,33 +861,7 @@ export default function AdminLeaguePage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {sortedEntries.map((entry, index) => (
-                    <tr key={entry.id} className="transition-colors hover:bg-white/[0.03]">
-                      <td className="sticky left-0 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
-                        {rankMedal(index)}
-                      </td>
-                      <td className="sticky left-12 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white">
-                            {playerLabel(entry.player).charAt(0).toUpperCase()}
-                          </span>
-                          <span className="max-w-[160px] truncate">{playerLabel(entry.player)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-300">{entry.played}</td>
-                      <td className="px-4 py-3 text-center text-green-400">{entry.wins}</td>
-                      <td className="px-4 py-3 text-center text-yellow-400">{entry.draws}</td>
-                      <td className="px-4 py-3 text-center text-red-400">{entry.losses}</td>
-                      <td className="px-4 py-3 text-center font-bold text-white">{entry.points}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => removePlayerFromSeason(entry.id)}
-                          className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
-                          title="Remove player from season"
-                        >
-                          <X size={16} />
-                        </button>
-                      </td>
-                    </tr>
+                    <LeagueTableRow key={entry.id} entry={entry} index={index} onRemove={removePlayerFromSeason} />
                   ))}
                 </tbody>
               </table>
@@ -791,7 +872,7 @@ export default function AdminLeaguePage() {
         {/* Generate Fixtures */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
             <ListChecks className="h-5 w-5 text-green-400" />
@@ -808,7 +889,7 @@ export default function AdminLeaguePage() {
           >
             {generating ? (
               <>
-                <RefreshCw size={18} className="animate-spin" />
+                <Loader2 size={18} className="animate-spin" />
                 Generating...
               </>
             ) : (

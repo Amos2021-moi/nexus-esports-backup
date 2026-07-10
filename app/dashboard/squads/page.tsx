@@ -1,7 +1,7 @@
 "use client";
 
 import EmptyState from "@/components/ui/EmptyState";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback,memo } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import {
@@ -17,6 +17,14 @@ import {
   Sparkles,
   Activity,
   Loader2,
+  ChevronRight,
+  Zap,
+  Star,
+  Medal,
+  Crown,
+  Users,
+  Clock,
+  CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import toast from "react-hot-toast";
@@ -40,19 +48,16 @@ const squadTypes = [
   { value: "TOURNAMENT", label: "Tournament Squad", icon: Trophy, color: "bg-purple-500" },
 ];
 
-// Formation options
 const formations = [
   "4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2", "5-4-1",
   "4-1-2-1-2", "4-5-1", "3-6-1", "4-3-2-1", "3-4-1-2", "4-4-1-1",
 ];
 
-// Playstyle options
 const playstyles = [
   "Possession", "Counter Attack", "Long Ball", "Wing Play",
   "Tiki-Taka", "Quick Counter", "Out Wide", "Long Ball Counter", "Control",
 ];
 
-/* Badge styling per squad type (additive — visual only). */
 const typeBadgeClasses: Record<string, string> = {
   MAIN: "bg-yellow-500/15 text-yellow-300 ring-yellow-500/30",
   SEASONAL: "bg-green-500/15 text-green-300 ring-green-500/30",
@@ -62,18 +67,173 @@ const typeBadgeClasses: Record<string, string> = {
 const DESCRIPTION_MAX = 300;
 
 /* -------------------------------------------------------------------------- */
-/*                            Animation variants                              */
+/*                            Animation Variants                              */
 /* -------------------------------------------------------------------------- */
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.03 } },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const SquadCard = memo(({ squad, onDelete, onViewImage }: {
+  squad: Squad;
+  onDelete: (id: string) => void;
+  onViewImage: (image: string) => void;
+}) => {
+  const SquadIcon = squadTypes.find((t) => t.value === squad.type)?.icon || Shield;
+  const iconColor = squadTypes.find((t) => t.value === squad.type)?.color || "bg-gray-500";
+  const badgeClass = typeBadgeClasses[squad.type] || "bg-gray-500/15 text-gray-300 ring-gray-500/30";
+
+  return (
+    <motion.div
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      className="will-change-transform group overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition-colors hover:border-indigo-500/40"
+    >
+      {/* Image Preview */}
+      <div
+        className="relative h-52 cursor-pointer overflow-hidden bg-gray-900"
+        onClick={() => onViewImage(squad.screenshot)}
+      >
+        <Image
+          src={squad.screenshot}
+          alt="Squad"
+          width={400}
+          height={208}
+          className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <Eye className="h-8 w-8 text-white" />
+        </div>
+        <div className="absolute left-3 top-3 flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 backdrop-blur-sm ${badgeClass}`}>
+            <SquadIcon size={12} />
+            {squad.type}
+          </span>
+          {squad.isActive && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30 backdrop-blur-sm">
+              <Sparkles size={12} />
+              Active
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Squad Info */}
+      <div className="p-4">
+        <div className="mb-3 flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`rounded-lg p-1.5 ${iconColor}`}>
+              <SquadIcon size={14} className="text-white" />
+            </div>
+            <span className="text-sm font-medium text-white">
+              {squadTypes.find((t) => t.value === squad.type)?.label}
+            </span>
+          </div>
+          <button
+            onClick={() => onDelete(squad.id)}
+            aria-label="Remove squad"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-red-500/10 hover:text-red-400"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+
+        {/* Metadata chips */}
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+            <Activity size={12} className="text-pink-400" />
+            <span className="text-gray-500">Formation:</span>
+            <span className="font-semibold text-white">{squad.formation || "—"}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+            <Shield size={12} className="text-indigo-400" />
+            <span className="text-gray-500">Strength:</span>
+            <span className="font-semibold text-white">{squad.teamStrength || "—"}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
+            <Trophy size={12} className="text-yellow-400" />
+            <span className="text-gray-500">Playstyle:</span>
+            <span className="font-semibold text-white">{squad.playstyle || "—"}</span>
+          </span>
+        </div>
+
+        {squad.description && (
+          <div className="mt-3">
+            <span className="text-xs text-gray-500">NOTES</span>
+            <p className="mt-1 text-sm text-gray-300">{squad.description}</p>
+          </div>
+        )}
+
+        <div className="mt-3 border-t border-white/10 pt-3 text-xs text-gray-500">
+          Uploaded: {new Date(squad.createdAt).toLocaleDateString()}
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+SquadCard.displayName = "SquadCard";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10">
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/15 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.03]"
+      style={{
+        backgroundImage:
+          "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function SquadsPage() {
   const { data: session } = useSession();
@@ -126,7 +286,7 @@ export default function SquadsPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.screenshot) {
       toast.error("Please upload your squad screenshot");
@@ -165,9 +325,9 @@ export default function SquadsPage() {
       toast.error("Failed to upload squad");
     }
     setSubmitting(false);
-  }
+  }, [formData]);
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm("Are you sure you want to remove this squad?")) {
       try {
         const res = await fetch(`/api/squads?id=${id}`, { method: "DELETE" });
@@ -181,7 +341,7 @@ export default function SquadsPage() {
         toast.error("Failed to remove");
       }
     }
-  }
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -231,36 +391,40 @@ export default function SquadsPage() {
     reader.readAsDataURL(file);
   };
 
-  // ✅ Check if squads should be shown based on privacy
   const canViewSquads = privacySettings.showSquad || isOwnProfile;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-          <div className="text-gray-400">Loading squads...</div>
-        </div>
-      </div>
-    );
-  }
 
   const descLength = formData.description.length;
 
+  if (loading) {
+    return (
+      <>
+        <DecorBackground />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <Shield className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading squads...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Fetching your squads</span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="relative">
-      {/* Decorative gradient background */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
-        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/15 blur-[120px]" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
-      </div>
-
+      <DecorBackground />
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -268,10 +432,8 @@ export default function SquadsPage() {
           className="flex flex-wrap justify-between items-center gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">My Squads</h1>
-            <p className="text-gray-400 mt-1">
-              Upload and showcase your eFootball squads
-            </p>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">🛡️ My Squads</h1>
+            <p className="text-gray-400 mt-1">Upload and showcase your eFootball squads</p>
           </div>
           <button
             onClick={() => setShowForm(true)}
@@ -282,7 +444,7 @@ export default function SquadsPage() {
           </button>
         </motion.div>
 
-        {/* Privacy Warning - ✅ Show if squads are private */}
+        {/* Privacy Warning */}
         {!privacySettings.showSquad && (
           <motion.div
             variants={itemVariants}
@@ -326,19 +488,15 @@ export default function SquadsPage() {
           </div>
         </motion.div>
 
-        {/* Squad Grid - ✅ Show or hide based on privacy */}
+        {/* Squad Grid */}
         {!canViewSquads ? (
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center backdrop-blur-xl"
+            className="rounded-2xl border border-white/10 bg-white/5 py-12 text-center backdrop-blur-xl"
           >
             <EyeOff className="mx-auto mb-4 h-16 w-16 text-gray-600" />
-            <h3 className="mb-2 text-xl font-semibold text-white">
-              Squads are Private
-            </h3>
-            <p className="text-gray-400">
-              This player has chosen to keep their squads private.
-            </p>
+            <h3 className="mb-2 text-xl font-semibold text-white">Squads are Private</h3>
+            <p className="text-gray-400">This player has chosen to keep their squads private.</p>
             <a
               href="/dashboard/settings/privacy"
               className="mt-4 inline-block text-indigo-400 hover:text-indigo-300"
@@ -359,123 +517,16 @@ export default function SquadsPage() {
         ) : (
           <motion.div
             variants={containerVariants}
-            className="grid grid-cols-1 gap-6 md:grid-cols-2"
+            className="grid grid-cols-1 gap-5 md:grid-cols-2"
           >
-            {squads.map((squad) => {
-              const SquadIcon =
-                squadTypes.find((t) => t.value === squad.type)?.icon || Shield;
-              const iconColor =
-                squadTypes.find((t) => t.value === squad.type)?.color ||
-                "bg-gray-500";
-              const badgeClass =
-                typeBadgeClasses[squad.type] ||
-                "bg-gray-500/15 text-gray-300 ring-gray-500/30";
-
-              return (
-                <motion.div
-                  key={squad.id}
-                  variants={itemVariants}
-                  whileHover={{ y: -4 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                  className="group overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 backdrop-blur-xl transition-colors hover:border-indigo-500/40"
-                >
-                  {/* Image Preview */}
-                  <div
-                    className="relative h-52 cursor-pointer overflow-hidden bg-gray-900"
-                    onClick={() => setSelectedImage(squad.screenshot)}
-                  >
-                    <Image
-                      src={squad.screenshot}
-                      alt="Squad"
-                      width={400}
-                      height={208}
-                      className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Eye className="h-8 w-8 text-white" />
-                    </div>
-                    {/* Type + Active badges overlaid */}
-                    <div className="absolute left-3 top-3 flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 backdrop-blur-sm ${badgeClass}`}
-                      >
-                        <SquadIcon size={12} />
-                        {squad.type}
-                      </span>
-                      {squad.isActive && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30 backdrop-blur-sm">
-                          <Sparkles size={12} />
-                          Active
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Squad Info */}
-                  <div className="p-4">
-                    <div className="mb-3 flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`rounded-lg p-1.5 ${iconColor}`}>
-                          <SquadIcon size={14} className="text-white" />
-                        </div>
-                        <span className="text-sm font-medium text-white">
-                          {squadTypes.find((t) => t.value === squad.type)?.label}
-                        </span>
-                      </div>
-                      {/* ✅ Only show delete button for own squads */}
-                      {session?.user?.id === squad.userId && (
-                        <button
-                          onClick={() => handleDelete(squad.id)}
-                          aria-label="Remove squad"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-red-500/10 hover:text-red-400"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Metadata chips */}
-                    <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
-                        <Activity size={12} className="text-pink-400" />
-                        <span className="text-gray-500">Formation:</span>
-                        <span className="font-semibold text-white">
-                          {squad.formation || "—"}
-                        </span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
-                        <Shield size={12} className="text-indigo-400" />
-                        <span className="text-gray-500">Strength:</span>
-                        <span className="font-semibold text-white">
-                          {squad.teamStrength || "—"}
-                        </span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">
-                        <Trophy size={12} className="text-yellow-400" />
-                        <span className="text-gray-500">Playstyle:</span>
-                        <span className="font-semibold text-white">
-                          {squad.playstyle || "—"}
-                        </span>
-                      </span>
-                    </div>
-
-                    {squad.description && (
-                      <div className="mt-3">
-                        <span className="text-xs text-gray-500">NOTES</span>
-                        <p className="mt-1 text-sm text-gray-300">
-                          {squad.description}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-3 border-t border-white/10 pt-3 text-xs text-gray-500">
-                      Uploaded: {new Date(squad.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {squads.map((squad) => (
+              <SquadCard
+                key={squad.id}
+                squad={squad}
+                onDelete={handleDelete}
+                onViewImage={setSelectedImage}
+              />
+            ))}
           </motion.div>
         )}
       </motion.div>
@@ -551,11 +602,9 @@ export default function SquadsPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Squad Type — visual cards */}
+                {/* Squad Type */}
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                    Squad Type
-                  </label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Squad Type</label>
                   <div className="grid grid-cols-3 gap-2">
                     {squadTypes.map((t) => {
                       const TypeIcon = t.icon;
@@ -564,9 +613,7 @@ export default function SquadsPage() {
                         <button
                           key={t.value}
                           type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, type: t.value })
-                          }
+                          onClick={() => setFormData({ ...formData, type: t.value })}
                           className={`flex min-h-[44px] flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium transition ${
                             active
                               ? "border-indigo-500/60 bg-indigo-500/15 text-white"
@@ -589,9 +636,7 @@ export default function SquadsPage() {
                   {!formData.screenshot ? (
                     <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/15 bg-gray-900/40 p-4 text-center transition hover:border-indigo-500/50 hover:bg-gray-900/60">
                       <Upload className="h-6 w-6 text-indigo-400" />
-                      <span className="text-sm text-gray-300">
-                        Click to upload screenshot
-                      </span>
+                      <span className="text-sm text-gray-300">Click to upload screenshot</span>
                       <span className="text-xs text-gray-500">PNG or JPG, max 5MB</span>
                       <input
                         type="file"
@@ -612,9 +657,7 @@ export default function SquadsPage() {
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, screenshot: "" })
-                        }
+                        onClick={() => setFormData({ ...formData, screenshot: "" })}
                         aria-label="Remove image"
                         className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-500 shadow-lg transition hover:bg-red-600"
                       >
@@ -631,16 +674,12 @@ export default function SquadsPage() {
                   </label>
                   <select
                     value={formData.formation}
-                    onChange={(e) =>
-                      setFormData({ ...formData, formation: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, formation: e.target.value })}
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   >
                     <option value="">Select Formation</option>
                     {formations.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
+                      <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                 </div>
@@ -648,8 +687,7 @@ export default function SquadsPage() {
                 {/* Team Strength */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                    Team Strength{" "}
-                    <span className="text-xs text-gray-500">(1000 - 4000)</span>
+                    Team Strength <span className="text-xs text-gray-500">(1000 - 4000)</span>
                   </label>
                   <input
                     type="number"
@@ -667,41 +705,30 @@ export default function SquadsPage() {
                     placeholder="e.g., 2800"
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   />
-                  {/* Range slider mirrors the numeric value (visual aid only) */}
                   <input
                     type="range"
                     min="1000"
                     max="4000"
                     step="10"
                     value={formData.teamStrength || 1000}
-                    onChange={(e) =>
-                      setFormData({ ...formData, teamStrength: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, teamStrength: e.target.value })}
                     className="mt-2 w-full accent-indigo-500"
                     aria-label="Team strength slider"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Team strength rating from 1000 to 4000
-                  </p>
+                  <p className="mt-1 text-xs text-gray-500">Team strength rating from 1000 to 4000</p>
                 </div>
 
                 {/* Playstyle */}
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                    Playstyle
-                  </label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Playstyle</label>
                   <select
                     value={formData.playstyle}
-                    onChange={(e) =>
-                      setFormData({ ...formData, playstyle: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, playstyle: e.target.value })}
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 p-2.5 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   >
                     <option value="">Select Playstyle</option>
                     {playstyles.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
+                      <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
@@ -709,18 +736,12 @@ export default function SquadsPage() {
                 {/* Notes */}
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                      Notes (Optional)
-                    </label>
-                    <span className="text-xs text-gray-500">
-                      {descLength}/{DESCRIPTION_MAX}
-                    </span>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-300">Notes (Optional)</label>
+                    <span className="text-xs text-gray-500">{descLength}/{DESCRIPTION_MAX}</span>
                   </div>
                   <textarea
                     value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={2}
                     maxLength={DESCRIPTION_MAX}
                     placeholder="Any additional info about your squad..."

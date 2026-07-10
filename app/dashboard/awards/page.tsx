@@ -1,7 +1,7 @@
 "use client";
 
 import EmptyState from "@/components/ui/EmptyState";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback,memo } from "react";
 import {
   Trophy,
   Award as AwardIcon,
@@ -15,6 +15,9 @@ import {
   Medal,
   ChevronDown,
   Layers,
+  User,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
@@ -55,65 +58,26 @@ const categoryColors: Record<string, string> = {
   CHAMPION: "from-yellow-500/20 to-amber-500/20 border-yellow-500/30",
   GOLDEN_BOOT: "from-orange-500/20 to-red-500/20 border-orange-500/30",
   GOLDEN_GLOVE: "from-blue-500/20 to-cyan-500/20 border-blue-500/30",
-  PLAYER_OF_THE_SEASON:
-    "from-purple-500/20 to-pink-500/20 border-purple-500/30",
+  PLAYER_OF_THE_SEASON: "from-purple-500/20 to-pink-500/20 border-purple-500/30",
   MOST_IMPROVED: "from-green-500/20 to-emerald-500/20 border-green-500/30",
   BEST_NEWCOMER: "from-pink-500/20 to-rose-500/20 border-pink-500/30",
   TOP_PLAYMAKER: "from-red-500/20 to-orange-500/20 border-red-500/30",
   MOST_CONSISTENT: "from-indigo-500/20 to-violet-500/20 border-indigo-500/30",
 };
 
-/* Accent ring/glow color per category (for icon badge + winner avatar) */
 const categoryAccent: Record<string, { ring: string; glow: string; badge: string }> = {
-  CHAMPION: {
-    ring: "ring-yellow-500/40",
-    glow: "shadow-yellow-500/30",
-    badge: "bg-yellow-500/15 text-yellow-300 ring-yellow-500/30",
-  },
-  GOLDEN_BOOT: {
-    ring: "ring-orange-500/40",
-    glow: "shadow-orange-500/30",
-    badge: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
-  },
-  GOLDEN_GLOVE: {
-    ring: "ring-blue-500/40",
-    glow: "shadow-blue-500/30",
-    badge: "bg-blue-500/15 text-blue-300 ring-blue-500/30",
-  },
-  PLAYER_OF_THE_SEASON: {
-    ring: "ring-purple-500/40",
-    glow: "shadow-purple-500/30",
-    badge: "bg-purple-500/15 text-purple-300 ring-purple-500/30",
-  },
-  MOST_IMPROVED: {
-    ring: "ring-emerald-500/40",
-    glow: "shadow-emerald-500/30",
-    badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  },
-  BEST_NEWCOMER: {
-    ring: "ring-pink-500/40",
-    glow: "shadow-pink-500/30",
-    badge: "bg-pink-500/15 text-pink-300 ring-pink-500/30",
-  },
-  TOP_PLAYMAKER: {
-    ring: "ring-red-500/40",
-    glow: "shadow-red-500/30",
-    badge: "bg-red-500/15 text-red-300 ring-red-500/30",
-  },
-  MOST_CONSISTENT: {
-    ring: "ring-indigo-500/40",
-    glow: "shadow-indigo-500/30",
-    badge: "bg-indigo-500/15 text-indigo-300 ring-indigo-500/30",
-  },
+  CHAMPION: { ring: "ring-yellow-500/40", glow: "shadow-yellow-500/30", badge: "bg-yellow-500/15 text-yellow-300 ring-yellow-500/30" },
+  GOLDEN_BOOT: { ring: "ring-orange-500/40", glow: "shadow-orange-500/30", badge: "bg-orange-500/15 text-orange-300 ring-orange-500/30" },
+  GOLDEN_GLOVE: { ring: "ring-blue-500/40", glow: "shadow-blue-500/30", badge: "bg-blue-500/15 text-blue-300 ring-blue-500/30" },
+  PLAYER_OF_THE_SEASON: { ring: "ring-purple-500/40", glow: "shadow-purple-500/30", badge: "bg-purple-500/15 text-purple-300 ring-purple-500/30" },
+  MOST_IMPROVED: { ring: "ring-emerald-500/40", glow: "shadow-emerald-500/30", badge: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" },
+  BEST_NEWCOMER: { ring: "ring-pink-500/40", glow: "shadow-pink-500/30", badge: "bg-pink-500/15 text-pink-300 ring-pink-500/30" },
+  TOP_PLAYMAKER: { ring: "ring-red-500/40", glow: "shadow-red-500/30", badge: "bg-red-500/15 text-red-300 ring-red-500/30" },
+  MOST_CONSISTENT: { ring: "ring-indigo-500/40", glow: "shadow-indigo-500/30", badge: "bg-indigo-500/15 text-indigo-300 ring-indigo-500/30" },
 };
 
-const defaultAccent = {
-  ring: "ring-gray-500/40",
-  glow: "shadow-gray-500/20",
-  badge: "bg-gray-500/15 text-gray-300 ring-gray-500/30",
-};
+const defaultAccent = { ring: "ring-gray-500/40", glow: "shadow-gray-500/20", badge: "bg-gray-500/15 text-gray-300 ring-gray-500/30" };
 
-/* Pretty-print category key e.g. "PLAYER_OF_THE_SEASON" -> "Player Of The Season" */
 function prettyCategory(category: string): string {
   if (!category) return "Award";
   return category
@@ -123,7 +87,6 @@ function prettyCategory(category: string): string {
     .join(" ");
 }
 
-/* Medal for the top 3 placements within a season group */
 const placementMedal = ["🥇", "🥈", "🥉"];
 
 function getInitials(name: string): string {
@@ -144,25 +107,171 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.07, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
+
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const SummaryCard = memo(({ icon: Icon, label, value, gradient, glow }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  gradient: string;
+  glow: string;
+}) => (
+  <motion.div
+    variants={statCardVariants}
+    initial="hidden"
+    animate="visible"
+    whileHover="hover"
+    className="will-change-transform"
+  >
+    <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
+      <div className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${gradient} opacity-20 blur-2xl transition-opacity duration-500 group-hover:opacity-40`} />
+      <div className="relative flex items-center gap-4">
+        <span className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg ${glow}`}>
+          <Icon className="h-6 w-6 text-white" />
+        </span>
+        <div>
+          <p className="text-2xl font-extrabold text-white">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+        </div>
+      </div>
+    </div>
+  </motion.div>
+));
+
+SummaryCard.displayName = "SummaryCard";
+
+const AwardRow = memo(({ award, index }: { award: Award; index: number }) => {
+  const winnerName = award.winner.profile?.username || award.winner.name;
+  const Icon = awardIcons[award.icon] || <AwardIcon className="h-8 w-8 text-gray-400" />;
+  const colorClass = categoryColors[award.category] || "from-gray-500/20 to-gray-600/20 border-gray-500/30";
+  const accent = categoryAccent[award.category] || defaultAccent;
+  const medal = placementMedal[index];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.04 * index }}
+      whileHover={{ x: 4 }}
+      className={`flex items-center gap-4 border-l-4 bg-gradient-to-r p-4 transition-colors hover:bg-white/5 ${colorClass}`}
+    >
+      <div className={`relative flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-900/60 ring-1 shadow-lg ${accent.ring} ${accent.glow}`}>
+        {Icon}
+        {medal && <span className="absolute -right-1 -top-1 text-lg drop-shadow">{medal}</span>}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-semibold text-white">{award.name}</h3>
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${accent.badge}`}>
+            {prettyCategory(award.category)}
+          </span>
+        </div>
+
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px] font-bold text-white ring-2 ring-white/10">
+            {getInitials(winnerName)}
+          </span>
+          <p className="text-sm text-gray-300">
+            <span className="text-gray-500">Winner:</span>{" "}
+            <span className="font-medium text-white">{winnerName}</span>
+          </p>
+        </div>
+
+        {award.description && (
+          <p className="mt-1 text-xs text-gray-500">{award.description}</p>
+        )}
+
+        {award.isAutoGenerated && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/30">
+              <Sparkles className="h-3 w-3" />
+              Auto-generated
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="hidden flex-shrink-0 text-right sm:block">
+        <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 ring-1 ring-white/10">
+          <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+          <p className="text-xs font-medium text-indigo-300">
+            {new Date(award.awardedAt).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+AwardRow.displayName = "AwardRow";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-yellow-600/10 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-indigo-600/15 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function AwardsPage() {
   const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Local UI-only season filter (derived from fetched awards — does not touch
-  // the awards/loading state shape or any API call).
   const [seasonFilter, setSeasonFilter] = useState<string>("all");
 
   useEffect(() => {
@@ -176,7 +285,6 @@ export default function AwardsPage() {
     setLoading(false);
   }
 
-  // Unique season list for the filter dropdown
   const seasonOptions = useMemo(() => {
     const names = new Set<string>();
     awards.forEach((a) => {
@@ -185,13 +293,11 @@ export default function AwardsPage() {
     return Array.from(names);
   }, [awards]);
 
-  // Apply the local season filter
   const visibleAwards = useMemo(() => {
     if (seasonFilter === "all") return awards;
     return awards.filter((a) => a?.season?.name === seasonFilter);
   }, [awards, seasonFilter]);
 
-  // Summary stats
   const totalAwards = visibleAwards.length;
   const uniqueCategories = useMemo(
     () => new Set(visibleAwards.map((a) => a.category)).size,
@@ -202,41 +308,45 @@ export default function AwardsPage() {
     [visibleAwards]
   );
 
+  const groupedAwards = useMemo(() => {
+    return visibleAwards.reduce((acc, award) => {
+      const season = award.season.name;
+      if (!acc[season]) acc[season] = [];
+      acc[season].push(award);
+      return acc;
+    }, {} as Record<string, Award[]>);
+  }, [visibleAwards]);
+
   if (loading) {
     return (
-      <div className="relative min-h-[60vh]">
+      <>
         <DecorBackground />
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="relative mx-auto mb-4 h-14 w-14">
-              <div className="absolute inset-0 rounded-full border-[3px] border-yellow-500/20" />
-              <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-yellow-500 border-t-transparent" />
-              <Trophy className="absolute inset-0 m-auto h-5 w-5 text-yellow-400" />
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-yellow-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-yellow-500 border-t-transparent" />
+              <Trophy className="absolute inset-0 m-auto h-6 w-6 text-yellow-400" />
             </div>
-            <div className="text-gray-400">Loading awards...</div>
+            <p className="mt-2 font-medium text-gray-400">Loading awards...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Fetching your trophies</span>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
-
-  // Group the (filtered) awards by season name — preserves original logic
-  const groupedAwards = visibleAwards.reduce((acc, award) => {
-    const season = award.season.name;
-    if (!acc[season]) acc[season] = [];
-    acc[season].push(award);
-    return acc;
-  }, {} as Record<string, Award[]>);
 
   return (
     <div className="relative">
       <DecorBackground />
-
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-8"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div variants={itemVariants}>
@@ -246,29 +356,22 @@ export default function AwardsPage() {
                 <Trophy className="h-6 w-6 text-white" />
               </span>
               <div>
-                <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                  Awards &amp; Trophies
-                </h1>
-                <p className="mt-1 text-gray-400">
-                  Celebrating the best players each season
-                </p>
+                <h1 className="text-2xl font-bold text-white sm:text-3xl">🏆 Awards & Trophies</h1>
+                <p className="mt-1 text-gray-400">Celebrating the best players each season</p>
               </div>
             </div>
             <Link
               href="/hall-of-fame"
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-white/10 bg-gray-800/40 px-4 py-2 text-sm text-indigo-400 backdrop-blur-xl transition-all hover:bg-white/10 hover:text-indigo-300"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-indigo-400 backdrop-blur-xl transition-all hover:bg-white/10 hover:text-indigo-300"
             >
-              View Hall of Fame →
+              View Hall of Fame <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
         </motion.div>
 
         {/* Stats Summary */}
         {awards.length > 0 && (
-          <motion.div
-            variants={itemVariants}
-            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
-          >
+          <motion.div variants={containerVariants} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <SummaryCard
               icon={Trophy}
               label="Total Awards"
@@ -297,23 +400,21 @@ export default function AwardsPage() {
         {seasonOptions.length > 0 && (
           <motion.div
             variants={itemVariants}
-            className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl"
+            className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl"
           >
             <label className="flex items-center gap-2 text-sm font-medium text-gray-400">
               <Calendar className="h-4 w-4" />
               Season:
             </label>
-            <div className="relative">
+            <div className="relative flex-1 min-w-[140px] sm:flex-none">
               <select
                 value={seasonFilter}
                 onChange={(e) => setSeasonFilter(e.target.value)}
-                className="min-h-[44px] appearance-none rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2 pr-10 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2 pr-10 text-sm text-white transition focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               >
                 <option value="all">All Seasons</option>
                 {seasonOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
+                  <option key={name} value={name}>{name}</option>
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -348,9 +449,8 @@ export default function AwardsPage() {
                 initial="hidden"
                 animate="visible"
                 exit={{ opacity: 0, y: -10 }}
-                className="overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
+                className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl"
               >
-                {/* Season header banner */}
                 <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
                   <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
                   <div className="relative flex items-center justify-between">
@@ -359,172 +459,21 @@ export default function AwardsPage() {
                       {seasonName}
                     </h2>
                     <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
-                      {seasonAwards.length}{" "}
-                      {seasonAwards.length === 1 ? "award" : "awards"}
+                      {seasonAwards.length} {seasonAwards.length === 1 ? "award" : "awards"}
                     </span>
                   </div>
                 </div>
 
-                {/* Award rows */}
                 <div className="divide-y divide-white/5">
-                  {seasonAwards.map((award, index) => {
-                    const winnerName =
-                      award.winner.profile?.username || award.winner.name;
-                    const Icon = awardIcons[award.icon] || (
-                      <AwardIcon className="h-8 w-8 text-gray-400" />
-                    );
-                    const colorClass =
-                      categoryColors[award.category] ||
-                      "from-gray-500/20 to-gray-600/20 border-gray-500/30";
-                    const accent =
-                      categoryAccent[award.category] || defaultAccent;
-                    const medal = placementMedal[index];
-
-                    return (
-                      <motion.div
-                        key={award.id}
-                        initial={{ opacity: 0, x: -12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.04 * index }}
-                        whileHover={{ x: 4 }}
-                        className={`flex items-center gap-4 border-l-4 bg-gradient-to-r p-4 transition-colors hover:bg-white/[0.03] ${colorClass}`}
-                      >
-                        {/* Icon badge with glow */}
-                        <div
-                          className={`relative flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-900/60 ring-1 shadow-lg ${accent.ring} ${accent.glow}`}
-                        >
-                          {Icon}
-                          {medal && (
-                            <span className="absolute -right-1 -top-1 text-lg drop-shadow">
-                              {medal}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Award info */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-white">
-                              {award.name}
-                            </h3>
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${accent.badge}`}
-                            >
-                              {prettyCategory(award.category)}
-                            </span>
-                          </div>
-
-                          {/* Winner with avatar */}
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[10px] font-bold text-white ring-2 ring-white/10">
-                              {getInitials(winnerName)}
-                            </span>
-                            <p className="text-sm text-gray-300">
-                              <span className="text-gray-500">Winner:</span>{" "}
-                              <span className="font-medium text-white">
-                                {winnerName}
-                              </span>
-                            </p>
-                          </div>
-
-                          {award.description && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {award.description}
-                            </p>
-                          )}
-
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {award.isAutoGenerated && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/30">
-                                <Sparkles className="h-3 w-3" />
-                                Auto-generated
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Date */}
-                        <div className="hidden flex-shrink-0 text-right sm:block">
-                          <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 ring-1 ring-white/10">
-                            <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                            <p className="text-xs font-medium text-indigo-300">
-                              {new Date(
-                                award.awardedAt
-                              ).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                  {seasonAwards.map((award, index) => (
+                    <AwardRow key={award.id} award={award} index={index} />
+                  ))}
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
         )}
       </motion.div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                       Reusable presentational bits                          */
-/* -------------------------------------------------------------------------- */
-
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  gradient,
-  glow,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  gradient: string;
-  glow: string;
-}) {
-  return (
-    <motion.div
-      whileHover={{ y: -4, scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl"
-    >
-      <div
-        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${gradient} opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-40`}
-      />
-      <div className="relative flex items-center gap-4">
-        <span
-          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg ${glow}`}
-        >
-          <Icon className="h-6 w-6 text-white" />
-        </span>
-        <div>
-          <p className="text-2xl font-extrabold text-white">{value}</p>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-            {label}
-          </p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/* Decorative animated gradient background with blur orbs + grid overlay */
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-yellow-600/10 blur-[120px]" />
-      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-indigo-600/15 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
     </div>
   );
 }

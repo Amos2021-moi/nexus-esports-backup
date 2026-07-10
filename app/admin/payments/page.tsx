@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, type Variants } from "framer-motion";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { motion, type Variants, AnimatePresence } from "framer-motion";
 import {
   Users,
   DollarSign,
@@ -21,11 +21,16 @@ import {
   Sparkles,
   FileText,
   FileSpreadsheet,
+  ChevronRight,
+  Loader2,
+  Zap,
+  Calendar,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { generatePDFReport, generateExcelReport } from "@/lib/utils/exportPayments";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // Types
 interface PaymentStats {
@@ -88,25 +93,25 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
-const cardVariants: Variants = {
+const statCardVariants: Variants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { duration: 0.35, ease: "easeOut" },
   },
   hover: {
     y: -4,
@@ -119,36 +124,36 @@ const cardVariants: Variants = {
 // Decor Background
 // ----------------------------------------------------------------------------
 
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
-      <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
-      />
-      <motion.div
-        animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
-      />
-      <motion.div
-        animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
-      />
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
-    </div>
-  );
-}
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.03]"
+      style={{
+        backgroundImage:
+          "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
 
 // ----------------------------------------------------------------------------
 // Format Currency
@@ -177,11 +182,226 @@ function smoothLinePath(pts: { x: number; y: number }[]): string {
   }
   return d;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const StatCard = memo(({ stat }: { stat: any }) => {
+  const Icon = stat.icon;
+  const isPositive = stat.change && stat.change > 0;
+  const isNegative = stat.change && stat.change < 0;
+
+  return (
+    <motion.div
+      variants={statCardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      className="will-change-transform"
+    >
+      <div className="group relative h-full min-h-[80px] overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/50">
+        <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-2xl transition-opacity duration-500 group-hover:opacity-40" />
+        <div className="relative flex h-full flex-col justify-between">
+          <div className="mb-2 flex items-center justify-between">
+            <div className={`rounded-lg ${stat.bg} p-2`}>
+              <Icon className={`h-4 w-4 ${stat.accent}`} />
+            </div>
+            {stat.change !== 0 && (
+              <span
+                className={`flex items-center gap-0.5 text-xs font-medium ${
+                  isPositive
+                    ? "text-emerald-400"
+                    : isNegative
+                    ? "text-red-400"
+                    : "text-gray-500"
+                }`}
+              >
+                {isPositive ? (
+                  <ArrowUpRight className="h-3 w-3" />
+                ) : isNegative ? (
+                  <ArrowDownRight className="h-3 w-3" />
+                ) : null}
+                {Math.abs(stat.change)}%
+              </span>
+            )}
+          </div>
+          <div>
+            <p className="truncate text-xl font-bold text-white">{stat.value}</p>
+            <p className="mt-0.5 truncate text-xs text-gray-400">{stat.label}</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+StatCard.displayName = "StatCard";
+
+const StatusBar = memo(({ item }: { item: StatusDistribution }) => (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-gray-300">{item.status}</span>
+      <span className="font-medium text-white">{item.count}</span>
+    </div>
+    <div className="h-2 overflow-hidden rounded-full bg-gray-700">
+      <motion.div
+        className={`h-full rounded-full ${getStatusColor(item.color)}`}
+        initial={{ width: 0 }}
+        animate={{ width: `${item.percentage}%` }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      />
+    </div>
+    <div className="text-right text-xs text-gray-500">{item.percentage}%</div>
+  </div>
+));
+
+StatusBar.displayName = "StatusBar";
+
+const PaymentRow = memo(({ payment }: { payment: Payment }) => {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "ACTIVE":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-400">
+            <CheckCircle className="h-3 w-3" />
+            Paid
+          </span>
+        );
+      case "PAYMENT_PENDING":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
+            <Clock className="h-3 w-3" />
+            Pending
+          </span>
+        );
+      case "NOT_ENROLLED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-400">
+            <XCircle className="h-3 w-3" />
+            Failed
+          </span>
+        );
+      case "REFUNDED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-medium text-gray-400">
+            Refunded
+          </span>
+        );
+      default:
+        return (
+          <span className="rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs text-gray-400">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  return (
+    <tr className="transition-colors hover:bg-white/5">
+      <td className="py-2.5 pr-2 font-medium text-white">{payment.playerName}</td>
+      <td className="py-2.5 pr-2 text-emerald-400">{formatCurrency(payment.amount)}</td>
+      <td className="py-2.5 pr-2">{getStatusBadge(payment.status)}</td>
+      <td className="py-2.5 pr-2 text-gray-300">{payment.method}</td>
+      <td className="py-2.5 pr-2 text-gray-400">{payment.seasonName}</td>
+      <td className="py-2.5 text-gray-500">
+        {payment.paidAt
+          ? new Date(payment.paidAt).toLocaleDateString()
+          : new Date(payment.createdAt).toLocaleDateString()}
+      </td>
+    </tr>
+  );
+});
+
+PaymentRow.displayName = "PaymentRow";
+
+const PaymentCard = memo(({ payment }: { payment: Payment }) => {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "ACTIVE":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-400">
+            <CheckCircle className="h-3 w-3" />
+            Paid
+          </span>
+        );
+      case "PAYMENT_PENDING":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
+            <Clock className="h-3 w-3" />
+            Pending
+          </span>
+        );
+      case "NOT_ENROLLED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-400">
+            <XCircle className="h-3 w-3" />
+            Failed
+          </span>
+        );
+      default:
+        return (
+          <span className="rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs text-gray-400">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-white">{payment.playerName}</p>
+          <p className="truncate text-xs text-gray-500">{payment.seasonName}</p>
+        </div>
+        <span className="flex-shrink-0 font-bold text-emerald-400">
+          {formatCurrency(payment.amount)}
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {getStatusBadge(payment.status)}
+          <span className="text-xs text-gray-400">{payment.method}</span>
+        </div>
+        <span className="text-xs text-gray-500">
+          {payment.paidAt
+            ? new Date(payment.paidAt).toLocaleDateString()
+            : new Date(payment.createdAt).toLocaleDateString()}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+PaymentCard.displayName = "PaymentCard";
+
+// Helper function for status color
+function getStatusColor(color: string) {
+  switch (color) {
+    case "emerald":
+      return "bg-emerald-500";
+    case "yellow":
+      return "bg-yellow-500";
+    case "red":
+      return "bg-red-500";
+    case "gray":
+      return "bg-gray-500";
+    default:
+      return "bg-indigo-500";
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function PaymentAnalyticsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<PaymentStats | null>(null);
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -198,7 +418,6 @@ export default function PaymentAnalyticsPage() {
   const [revenueDays, setRevenueDays] = useState(30);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
-  // ✅ Auth check
   useEffect(() => {
     if (status === "loading") return;
     if (!session || session.user?.role !== "ADMIN") {
@@ -206,14 +425,12 @@ export default function PaymentAnalyticsPage() {
     }
   }, [session, status, router]);
 
-  // ✅ Fetch data
   useEffect(() => {
     if (session?.user?.role === "ADMIN") {
       fetchAllData();
     }
   }, [session, revenueDays]);
 
-  // ✅ Fetch payments when search/filter changes
   useEffect(() => {
     if (session?.user?.role === "ADMIN") {
       fetchPayments();
@@ -222,6 +439,7 @@ export default function PaymentAnalyticsPage() {
 
   async function fetchAllData() {
     setLoading(true);
+    setRefreshing(true);
     try {
       await Promise.all([
         fetchStats(),
@@ -235,6 +453,7 @@ export default function PaymentAnalyticsPage() {
       toast.error("Failed to load payment data");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -286,8 +505,7 @@ export default function PaymentAnalyticsPage() {
     }
   }
 
-  // ✅ Export Functions
-  const handleExportPDF = async () => {
+  const handleExportPDF = useCallback(async () => {
     if (!stats || payments.length === 0) {
       toast.error("No data to export");
       return;
@@ -323,9 +541,9 @@ export default function PaymentAnalyticsPage() {
       toast.error("Failed to export PDF");
     }
     setIsExportOpen(false);
-  };
+  }, [stats, payments, revenueDays]);
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = useCallback(async () => {
     if (!stats || payments.length === 0) {
       toast.error("No data to export");
       return;
@@ -361,115 +579,58 @@ export default function PaymentAnalyticsPage() {
       toast.error("Failed to export Excel");
     }
     setIsExportOpen(false);
-  };
+  }, [stats, payments, revenueDays]);
 
-  // ✅ Status badge
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-400">
-            <CheckCircle className="h-3 w-3" />
-            Paid
-          </span>
-        );
-      case "PAYMENT_PENDING":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
-            <Clock className="h-3 w-3" />
-            Pending
-          </span>
-        );
-      case "NOT_ENROLLED":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-400">
-            <XCircle className="h-3 w-3" />
-            Failed
-          </span>
-        );
-      case "REFUNDED":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-medium text-gray-400">
-            Refunded
-          </span>
-        );
-      default:
-        return (
-          <span className="rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs text-gray-400">
-            {status}
-          </span>
-        );
-    }
-  };
-
-  // ✅ Get color class for status distribution
-  const getStatusColor = (color: string) => {
-    switch (color) {
-      case "emerald":
-        return "bg-emerald-500";
-      case "yellow":
-        return "bg-yellow-500";
-      case "red":
-        return "bg-red-500";
-      case "gray":
-        return "bg-gray-500";
-      default:
-        return "bg-indigo-500";
-    }
-  };
-
-  const statCards = stats
-    ? [
-        {
-          label: "Total Revenue",
-          value: formatCurrency(stats.totalRevenue),
-          icon: DollarSign,
-          accent: "text-emerald-400",
-          bg: "bg-emerald-500/10",
-          change: stats.revenueChange,
-        },
-        {
-          label: "Total Payments",
-          value: stats.totalPayments,
-          icon: CreditCard,
-          accent: "text-blue-400",
-          bg: "bg-blue-500/10",
-          change: stats.paymentChange,
-        },
-        {
-          label: "Success Rate",
-          value: `${stats.successRate.toFixed(1)}%`,
-          icon: CheckCircle,
-          accent: "text-green-400",
-          bg: "bg-green-500/10",
-          change: 0,
-        },
-        {
-          label: "Avg Entry Fee",
-          value: formatCurrency(stats.averageFee),
-          icon: Wallet,
-          accent: "text-purple-400",
-          bg: "bg-purple-500/10",
-          change: 0,
-        },
-        {
-          label: "Active Payers",
-          value: stats.activePayers,
-          icon: Users,
-          accent: "text-cyan-400",
-          bg: "bg-cyan-500/10",
-          change: 0,
-        },
-        {
-          label: "Pending",
-          value: stats.pendingCount,
-          icon: Clock,
-          accent: "text-yellow-400",
-          bg: "bg-yellow-500/10",
-          change: 0,
-        },
-      ]
-    : [];
+  const statCards = useMemo(() => stats ? [
+    {
+      label: "Total Revenue",
+      value: formatCurrency(stats.totalRevenue),
+      icon: DollarSign,
+      accent: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+      change: stats.revenueChange,
+    },
+    {
+      label: "Total Payments",
+      value: stats.totalPayments,
+      icon: CreditCard,
+      accent: "text-blue-400",
+      bg: "bg-blue-500/10",
+      change: stats.paymentChange,
+    },
+    {
+      label: "Success Rate",
+      value: `${stats.successRate.toFixed(1)}%`,
+      icon: CheckCircle,
+      accent: "text-green-400",
+      bg: "bg-green-500/10",
+      change: 0,
+    },
+    {
+      label: "Avg Entry Fee",
+      value: formatCurrency(stats.averageFee),
+      icon: Wallet,
+      accent: "text-purple-400",
+      bg: "bg-purple-500/10",
+      change: 0,
+    },
+    {
+      label: "Active Payers",
+      value: stats.activePayers,
+      icon: Users,
+      accent: "text-cyan-400",
+      bg: "bg-cyan-500/10",
+      change: 0,
+    },
+    {
+      label: "Pending",
+      value: stats.pendingCount,
+      icon: Clock,
+      accent: "text-yellow-400",
+      bg: "bg-yellow-500/10",
+      change: 0,
+    },
+  ] : [], [stats]);
 
   if (status === "loading" || loading) {
     return (
@@ -482,7 +643,7 @@ export default function PaymentAnalyticsPage() {
               <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
               <BarChart3 className="absolute inset-0 m-auto h-7 w-7 text-indigo-400" />
             </div>
-            <p className="text-sm font-medium text-gray-400">Loading payment analytics...</p>
+            <p className="mt-2 font-medium text-gray-400">Loading payment analytics...</p>
             <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
               <Sparkles className="h-3 w-3 text-yellow-400" />
               <span>Fetching your data</span>
@@ -496,6 +657,7 @@ export default function PaymentAnalyticsPage() {
   if (session?.user?.role !== "ADMIN") {
     return null;
   }
+
   return (
     <>
       <DecorBackground />
@@ -503,7 +665,7 @@ export default function PaymentAnalyticsPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-5 sm:space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -539,9 +701,10 @@ export default function PaymentAnalyticsPage() {
               </div>
               <button
                 onClick={fetchAllData}
-                className="flex min-h-[44px] items-center gap-1.5 rounded-lg bg-gray-700/50 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-600/50 hover:text-white"
+                disabled={refreshing}
+                className="flex min-h-[44px] items-center gap-1.5 rounded-lg bg-gray-700/50 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-600/50 hover:text-white disabled:opacity-50"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </button>
               {/* Export Dropdown */}
@@ -581,62 +744,18 @@ export default function PaymentAnalyticsPage() {
         </motion.div>
 
         {/* Stats Grid */}
-        <motion.div
-          variants={containerVariants}
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6"
-        >
-          {statCards.map((stat) => {
-            const Icon = stat.icon;
-            const isPositive = stat.change && stat.change > 0;
-            const isNegative = stat.change && stat.change < 0;
-
-            return (
-              <motion.div
-                key={stat.label}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                whileHover="hover"
-                className="group relative min-h-[44px] overflow-hidden rounded-xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/50"
-              >
-                <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-2xl transition-opacity group-hover:opacity-40" />
-                <div className="relative">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className={`rounded-lg ${stat.bg} p-2`}>
-                      <Icon className={`h-4 w-4 ${stat.accent}`} />
-                    </div>
-                    {stat.change !== 0 && (
-                      <span
-                        className={`flex items-center gap-0.5 text-xs font-medium ${
-                          isPositive
-                            ? "text-emerald-400"
-                            : isNegative
-                            ? "text-red-400"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {isPositive ? (
-                          <ArrowUpRight className="h-3 w-3" />
-                        ) : isNegative ? (
-                          <ArrowDownRight className="h-3 w-3" />
-                        ) : null}
-                        {Math.abs(stat.change)}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="truncate text-xl font-bold text-white">{stat.value}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-400">{stat.label}</p>
-                </div>
-              </motion.div>
-            );
-          })}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {statCards.map((stat) => (
+            <StatCard key={stat.label} stat={stat} />
+          ))}
         </motion.div>
+
         {/* Charts Section */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6">
-          {/* Revenue Chart - Premium SVG area chart */}
+          {/* Revenue Chart */}
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 sm:p-6 lg:col-span-2"
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 sm:p-6 lg:col-span-2"
           >
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -661,9 +780,7 @@ export default function PaymentAnalyticsPage() {
                 <div className="text-center">
                   <BarChart3 className="mx-auto h-12 w-12 text-gray-600" />
                   <p className="mt-3 text-sm font-medium text-gray-400">No revenue data yet</p>
-                  <p className="text-xs text-gray-500">
-                    Revenue will appear here once payments are made
-                  </p>
+                  <p className="text-xs text-gray-500">Revenue will appear here once payments are made</p>
                 </div>
               </div>
             ) : (
@@ -730,10 +847,7 @@ export default function PaymentAnalyticsPage() {
                       {(() => {
                         const maxValue = Math.max(...revenueData.map((d) => d.amount), 1);
                         const pts = revenueData.map((d, i) => {
-                          const x =
-                            revenueData.length === 1
-                              ? 50
-                              : (i / (revenueData.length - 1)) * 100;
+                          const x = revenueData.length === 1 ? 50 : (i / (revenueData.length - 1)) * 100;
                           const y = 100 - (d.amount / maxValue) * 85 - 10;
                           return { x, y };
                         });
@@ -746,38 +860,14 @@ export default function PaymentAnalyticsPage() {
                         return (
                           <>
                             <path d={areaPath} fill="url(#areaGradient)" />
-                            <path
-                              d={linePath}
-                              fill="none"
-                              stroke="url(#lineGradient)"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              vectorEffect="non-scaling-stroke"
-                              filter="url(#lineGlow)"
-                            />
+                            <path d={linePath} fill="none" stroke="url(#lineGradient)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" filter="url(#lineGlow)" />
                             {pts.map((p, i) => {
                               const amount = revenueData[i]?.amount || 0;
                               if (amount <= 0) return null;
                               return (
                                 <g key={i}>
-                                  <circle
-                                    cx={p.x}
-                                    cy={p.y}
-                                    r="6"
-                                    fill="#818cf8"
-                                    opacity="0.18"
-                                    vectorEffect="non-scaling-stroke"
-                                  />
-                                  <circle
-                                    cx={p.x}
-                                    cy={p.y}
-                                    r="2.4"
-                                    fill="#c7d2fe"
-                                    stroke="#4f46e5"
-                                    strokeWidth="1"
-                                    vectorEffect="non-scaling-stroke"
-                                  />
+                                  <circle cx={p.x} cy={p.y} r="6" fill="#818cf8" opacity="0.18" vectorEffect="non-scaling-stroke" />
+                                  <circle cx={p.x} cy={p.y} r="2.4" fill="#c7d2fe" stroke="#4f46e5" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                                 </g>
                               );
                             })}
@@ -789,20 +879,13 @@ export default function PaymentAnalyticsPage() {
                     <div className="mt-1 flex justify-between text-[10px] text-gray-500">
                       {revenueData.map((item, index) => {
                         const day = new Date(item.date).getDate();
-                        const isToday =
-                          item.date === new Date().toISOString().split("T")[0];
-                        // Thin out labels so they never overlap on long ranges.
+                        const isToday = item.date === new Date().toISOString().split("T")[0];
                         const showEvery = Math.ceil(revenueData.length / 12);
                         if (index % showEvery !== 0 && index !== revenueData.length - 1) {
                           return <span key={index} className="w-0" />;
                         }
                         return (
-                          <span
-                            key={index}
-                            className={`text-center ${
-                              isToday ? "font-bold text-indigo-400" : ""
-                            }`}
-                          >
+                          <span key={index} className={`text-center ${isToday ? "font-bold text-indigo-400" : ""}`}>
                             {day}
                           </span>
                         );
@@ -812,19 +895,9 @@ export default function PaymentAnalyticsPage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/5 pt-2 text-[10px] text-gray-500">
-                  <span>
-                    Total: {formatCurrency(revenueData.reduce((sum, d) => sum + d.amount, 0))}
-                  </span>
-                  <span>
-                    {revenueData.filter((d) => d.amount > 0).length} days with payments
-                  </span>
-                  <span>
-                    Avg:{" "}
-                    {formatCurrency(
-                      revenueData.reduce((sum, d) => sum + d.amount, 0) /
-                        (revenueData.filter((d) => d.amount > 0).length || 1)
-                    )}
-                  </span>
+                  <span>Total: {formatCurrency(revenueData.reduce((sum, d) => sum + d.amount, 0))}</span>
+                  <span>{revenueData.filter((d) => d.amount > 0).length} days with payments</span>
+                  <span>Avg: {formatCurrency(revenueData.reduce((sum, d) => sum + d.amount, 0) / (revenueData.filter((d) => d.amount > 0).length || 1))}</span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-2 w-4 rounded bg-gradient-to-r from-indigo-500 to-purple-500" />
                     Revenue
@@ -837,7 +910,7 @@ export default function PaymentAnalyticsPage() {
           {/* Status Distribution */}
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-purple-500/40 sm:p-6"
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-purple-500/40 sm:p-6"
           >
             <div className="mb-4 flex items-center gap-2">
               <div className="rounded-lg bg-purple-500/10 p-2">
@@ -855,32 +928,19 @@ export default function PaymentAnalyticsPage() {
             ) : (
               <div className="space-y-4">
                 {statusDist.map((item) => (
-                  <div key={item.status} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-300">{item.status}</span>
-                      <span className="font-medium text-white">{item.count}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-gray-700">
-                      <motion.div
-                        className={`h-full rounded-full ${getStatusColor(item.color)}`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${item.percentage}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                      />
-                    </div>
-                    <div className="text-right text-xs text-gray-500">{item.percentage}%</div>
-                  </div>
+                  <StatusBar key={item.status} item={item} />
                 ))}
               </div>
             )}
           </motion.div>
         </div>
+
         {/* Payment Methods & Recent Payments */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-4 lg:gap-6">
           {/* Payment Methods */}
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-cyan-500/40 sm:p-6 lg:col-span-1"
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-cyan-500/40 sm:p-6 lg:col-span-1"
           >
             <div className="mb-4 flex items-center gap-2">
               <div className="rounded-lg bg-cyan-500/10 p-2">
@@ -911,7 +971,7 @@ export default function PaymentAnalyticsPage() {
           {/* Recent Payments */}
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 sm:p-6 lg:col-span-3"
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 sm:p-6 lg:col-span-3"
           >
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
@@ -967,22 +1027,7 @@ export default function PaymentAnalyticsPage() {
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {payments.map((payment) => (
-                        <tr key={payment.id} className="transition-colors hover:bg-white/5">
-                          <td className="py-2.5 pr-2 font-medium text-white">
-                            {payment.playerName}
-                          </td>
-                          <td className="py-2.5 pr-2 text-emerald-400">
-                            {formatCurrency(payment.amount)}
-                          </td>
-                          <td className="py-2.5 pr-2">{getStatusBadge(payment.status)}</td>
-                          <td className="py-2.5 pr-2 text-gray-300">{payment.method}</td>
-                          <td className="py-2.5 pr-2 text-gray-400">{payment.seasonName}</td>
-                          <td className="py-2.5 text-gray-500">
-                            {payment.paidAt
-                              ? new Date(payment.paidAt).toLocaleDateString()
-                              : new Date(payment.createdAt).toLocaleDateString()}
-                          </td>
-                        </tr>
+                        <PaymentRow key={payment.id} payment={payment} />
                       ))}
                     </tbody>
                   </table>
@@ -991,31 +1036,7 @@ export default function PaymentAnalyticsPage() {
                 {/* Mobile card list */}
                 <div className="space-y-3 md:hidden">
                   {payments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="rounded-xl border border-white/5 bg-gray-900/40 p-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-white">{payment.playerName}</p>
-                          <p className="truncate text-xs text-gray-500">{payment.seasonName}</p>
-                        </div>
-                        <span className="flex-shrink-0 font-bold text-emerald-400">
-                          {formatCurrency(payment.amount)}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(payment.status)}
-                          <span className="text-xs text-gray-400">{payment.method}</span>
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {payment.paidAt
-                            ? new Date(payment.paidAt).toLocaleDateString()
-                            : new Date(payment.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
+                    <PaymentCard key={payment.id} payment={payment} />
                   ))}
                 </div>
               </>
@@ -1026,23 +1047,18 @@ export default function PaymentAnalyticsPage() {
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
                 <span>
                   Showing {(pagination.page - 1) * pagination.limit + 1} -{" "}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                  {pagination.total}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                 </span>
                 <div className="flex gap-1">
                   <button
-                    onClick={() =>
-                      setPagination({ ...pagination, page: pagination.page - 1 })
-                    }
+                    onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
                     disabled={pagination.page <= 1}
                     className="min-h-[40px] rounded-lg border border-white/10 px-3 py-1 transition-colors hover:bg-white/5 disabled:opacity-50"
                   >
                     Previous
                   </button>
                   <button
-                    onClick={() =>
-                      setPagination({ ...pagination, page: pagination.page + 1 })
-                    }
+                    onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
                     disabled={pagination.page >= pagination.pages}
                     className="min-h-[40px] rounded-lg border border-white/10 px-3 py-1 transition-colors hover:bg-white/5 disabled:opacity-50"
                   >

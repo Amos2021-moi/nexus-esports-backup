@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, memo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion, type Variants } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Trophy,
   Calendar,
@@ -23,6 +23,17 @@ import {
   Lightbulb,
   AlertCircle,
   Info,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  ChevronRight,
+  BarChart3,
+  PieChart,
+  ArrowUpRight,
+  Target,
+  Flame,
+  Star,
+  Medal,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -41,6 +52,7 @@ import {
 } from "chart.js";
 import { Line, Doughnut } from "react-chartjs-2";
 import toast from "react-hot-toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 ChartJS.register(
   CategoryScale,
@@ -95,7 +107,6 @@ interface AnalyticsData {
     draws: number;
     losses: number;
   }[];
-  // ✅ Advanced Analytics Data
   revenueData: { date: string; amount: number; count: number; forecast?: number }[];
   seasonPerformance: {
     seasonId: string;
@@ -118,40 +129,44 @@ interface AnalyticsData {
   }[];
 }
 
+/* -------------------------------------------------------------------------- */
+/*                            Animation Variants                              */
+/* -------------------------------------------------------------------------- */
+
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-cyan-500/10 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-    </div>
-  );
-}
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Helper Functions                                */
+/* -------------------------------------------------------------------------- */
 
 function rankMedal(index: number) {
   if (index === 0) return "🥇";
@@ -167,7 +182,7 @@ function formatCurrency(amount: number): string {
 function getInsightStyle(type: string) {
   switch (type) {
     case "positive":
-      return { icon: Lightbulb, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" };
+      return { icon: Lightbulb, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
     case "negative":
       return { icon: AlertCircle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
     case "warning":
@@ -182,7 +197,6 @@ function getInsightStyle(type: string) {
    Premium chart helpers
    ============================================================ */
 
-// Build a soft vertical gradient fill under a line series.
 function makeAreaGradient(
   ctx: ScriptableContext<"line">,
   hex: [number, number, number]
@@ -197,10 +211,9 @@ function makeAreaGradient(
   return g;
 }
 
-const GRID = "rgba(148,163,184,0.10)";
+const GRID = "rgba(148,163,184,0.08)";
 const AXIS = "#94a3b8";
 
-// Shared premium options for line charts.
 function buildLineOptions(opts?: {
   currency?: boolean;
   showLegend?: boolean;
@@ -226,7 +239,7 @@ function buildLineOptions(opts?: {
         },
       },
       tooltip: {
-        backgroundColor: "rgba(15,23,42,0.92)",
+        backgroundColor: "rgba(15,23,42,0.95)",
         titleColor: "#f8fafc",
         bodyColor: "#cbd5e1",
         borderColor: "rgba(129,140,248,0.35)",
@@ -301,7 +314,7 @@ const doughnutOptions: ChartOptions<"doughnut"> = {
       },
     },
     tooltip: {
-      backgroundColor: "rgba(15,23,42,0.92)",
+      backgroundColor: "rgba(15,23,42,0.95)",
       titleColor: "#f8fafc",
       bodyColor: "#cbd5e1",
       borderColor: "rgba(129,140,248,0.35)",
@@ -322,6 +335,192 @@ const doughnutOptions: ChartOptions<"doughnut"> = {
     },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const StatCard = memo(({ stat }: { stat: any }) => {
+  const Icon = stat.icon;
+  return (
+    <motion.div
+      variants={statCardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      className="will-change-transform"
+    >
+      <div className="group relative h-full min-h-[80px] overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40">
+        <div
+          className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.color} opacity-20 blur-2xl transition-opacity duration-500 group-hover:opacity-40`}
+        />
+        <div className="relative flex h-full flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className={`rounded-xl bg-gradient-to-r ${stat.color} p-2 shadow-lg`}>
+              <Icon className="h-4 w-4 text-white" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-2xl font-bold text-white">{stat.value}</p>
+            <p className="mt-0.5 text-xs text-gray-400">{stat.name}</p>
+            <p className="mt-0.5 text-[10px] text-gray-500">{stat.hint}</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+StatCard.displayName = "StatCard";
+
+const ActivityItem = memo(({ activity }: { activity: any }) => (
+  <motion.div
+    variants={itemVariants}
+    whileHover={{ x: 4 }}
+    className="will-change-transform rounded-xl border border-white/5 bg-gray-900/30 p-3 transition-colors hover:border-indigo-500/20 hover:bg-gray-900/60"
+  >
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300">
+          <Activity className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-gray-300">{activity.user?.name || "System"}</p>
+          <p className="truncate text-xs text-gray-500">
+            {activity.action.replace(/_/g, " ")} • {activity.targetType}
+          </p>
+        </div>
+      </div>
+      <span className="flex-shrink-0 text-xs text-gray-500 sm:text-right">
+        {new Date(activity.createdAt).toLocaleString()}
+      </span>
+    </div>
+  </motion.div>
+));
+
+ActivityItem.displayName = "ActivityItem";
+
+const MatchItem = memo(({ match }: { match: any }) => (
+  <motion.div
+    variants={itemVariants}
+    whileHover={{ x: 4 }}
+    className="will-change-transform rounded-xl border border-white/5 bg-gray-900/30 p-3 transition-colors hover:border-indigo-500/20 hover:bg-gray-900/60"
+  >
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="truncate text-sm font-medium text-white">{match.homePlayer}</span>
+        <span className="text-sm text-gray-500">vs</span>
+        <span className="truncate text-sm font-medium text-white">{match.awayPlayer}</span>
+        {match.score && (
+          <span className="rounded-lg bg-white/10 px-2 py-1 text-sm font-bold text-white">
+            {match.score}
+          </span>
+        )}
+      </div>
+      <span className="flex-shrink-0 text-xs text-gray-500">
+        {new Date(match.date).toLocaleDateString()}
+      </span>
+    </div>
+  </motion.div>
+));
+
+MatchItem.displayName = "MatchItem";
+
+const InsightCard = memo(({ insight }: { insight: any }) => {
+  const style = getInsightStyle(insight.type);
+  const Icon = style.icon;
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ y: -2 }}
+      className={`will-change-transform rounded-xl border p-4 ${style.border} ${style.bg} transition-colors hover:bg-opacity-20`}
+    >
+      <div className="flex items-start gap-3">
+        <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${style.color}`} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-white">{insight.title}</p>
+          <p className="mt-1 text-xs text-gray-400">{insight.description}</p>
+          {insight.action && insight.link && (
+            <a
+              href={insight.link}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-400 transition-colors hover:text-indigo-300"
+            >
+              {insight.action} <ChevronRight className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+InsightCard.displayName = "InsightCard";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Tab Button Component                            */
+/* -------------------------------------------------------------------------- */
+
+const TabButton = memo(({ tab, activeTab, setActiveTab }: { tab: string; activeTab: string; setActiveTab: (tab: any) => void }) => {
+  const labels: Record<string, string> = {
+    overview: "📊 Overview",
+    revenue: "💰 Revenue",
+    performance: "🏆 Performance",
+    insights: "🧠 Insights",
+  };
+  return (
+    <button
+      onClick={() => setActiveTab(tab as any)}
+      className={`min-h-[44px] flex-1 rounded-xl px-3 py-2 text-sm font-medium transition-all will-change-transform ${
+        activeTab === tab
+          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-900/30"
+          : "text-gray-400 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      {labels[tab] || tab}
+    </button>
+  );
+});
+
+TabButton.displayName = "TabButton";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function AdminAnalyticsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -334,12 +533,10 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     if (status === "loading") return;
-
     if (!session) {
       router.push("/auth/signin");
       return;
     }
-
     if (session.user?.role !== "ADMIN") {
       router.push("/dashboard");
       return;
@@ -366,44 +563,12 @@ export default function AdminAnalyticsPage() {
     }
   }
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAnalytics();
-  };
+  }, []);
 
-  if (status === "loading" || loading) {
-    return (
-      <>
-        <DecorBackground />
-        <div className="flex h-96 items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
-            <p className="text-gray-400">Loading analytics...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (session?.user?.role !== "ADMIN") {
-    return null;
-  }
-
-  if (!data) {
-    return (
-      <>
-        <DecorBackground />
-        <div className="flex h-96 items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
-            <p className="text-gray-400">Loading analytics data...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  const stats = [
+  const stats = useMemo(() => [
     {
       name: "Total Users",
       value: data?.overview?.totalUsers || 0,
@@ -468,13 +633,12 @@ export default function AdminAnalyticsPage() {
       accent: "text-rose-400",
       hint: "Total recognitions",
     },
-  ];
+  ], [data]);
 
   const growthData = {
-    labels:
-      data?.userGrowth?.map((item: any) =>
-        new Date(item.date).toLocaleDateString()
-      ) || [],
+    labels: data?.userGrowth?.map((item: any) =>
+      new Date(item.date).toLocaleDateString()
+    ) || [],
     datasets: [
       {
         label: "New Users",
@@ -522,12 +686,10 @@ export default function AdminAnalyticsPage() {
     ],
   };
 
-  // ✅ Revenue Chart Data
   const revenueChartData = {
-    labels:
-      data?.revenueData?.map((item) =>
-        new Date(item.date).toLocaleDateString()
-      ) || [],
+    labels: data?.revenueData?.map((item) =>
+      new Date(item.date).toLocaleDateString()
+    ) || [],
     datasets: [
       {
         label: "Revenue",
@@ -566,6 +728,51 @@ export default function AdminAnalyticsPage() {
 
   const lineOptions = buildLineOptions();
   const revenueOptions = buildLineOptions({ currency: true, showLegend: true });
+
+  if (status === "loading" || loading) {
+    return (
+      <>
+        <DecorBackground />
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <Brain className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading analytics...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Fetching your data</span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (session?.user?.role !== "ADMIN") {
+    return null;
+  }
+
+  if (!data) {
+    return (
+      <>
+        <DecorBackground />
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <Brain className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading analytics data...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <DecorBackground />
@@ -573,7 +780,7 @@ export default function AdminAnalyticsPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-5 sm:space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -611,52 +818,20 @@ export default function AdminAnalyticsPage() {
         {/* Tab Navigation */}
         <motion.div
           variants={itemVariants}
-          className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-gray-800/40 p-1 shadow-2xl backdrop-blur-xl"
+          className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl backdrop-blur-xl"
         >
           {(["overview", "revenue", "performance", "insights"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`min-h-[44px] flex-1 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === tab
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-900/30"
-                  : "text-gray-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              {tab === "overview" && "📊 Overview"}
-              {tab === "revenue" && "💰 Revenue"}
-              {tab === "performance" && "🏆 Performance"}
-              {tab === "insights" && "🧠 Insights"}
-            </button>
+            <TabButton key={tab} tab={tab} activeTab={activeTab} setActiveTab={setActiveTab} />
           ))}
         </motion.div>
 
         {/* Stats Grid - Always Visible */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {stats.map((stat) => (
-            <motion.div
-              key={stat.name}
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="group relative min-h-[44px] overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40"
-            >
-              <div
-                className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.color} opacity-20 blur-2xl transition-opacity group-hover:opacity-40`}
-              />
-              <div className="relative flex items-center justify-between gap-3">
-                <div className={`rounded-xl bg-gradient-to-r ${stat.color} p-2 shadow-lg`}>
-                  <stat.icon className="h-5 w-5 text-white" />
-                </div>
-                <span className="truncate text-xl font-bold text-white sm:text-2xl">
-                  {stat.value}
-                </span>
-              </div>
-              <p className="relative mt-3 truncate text-sm text-gray-400">{stat.name}</p>
-              <p className="relative mt-1 truncate text-[11px] text-gray-500">{stat.hint}</p>
-            </motion.div>
+            <StatCard key={stat.name} stat={stat} />
           ))}
         </motion.div>
+
         {/* ============================================================ */}
         {/* TAB: OVERVIEW */}
         {/* ============================================================ */}
@@ -670,7 +845,7 @@ export default function AdminAnalyticsPage() {
               {/* User Growth Chart */}
               <motion.div
                 variants={itemVariants}
-                className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
               >
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
                   <LineChart className="h-4 w-4 text-indigo-400" />
@@ -684,7 +859,7 @@ export default function AdminAnalyticsPage() {
               {/* Match Status Chart */}
               <motion.div
                 variants={itemVariants}
-                className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
               >
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
                   <Activity className="h-4 w-4 text-indigo-400" />
@@ -702,7 +877,7 @@ export default function AdminAnalyticsPage() {
             {data?.topPlayers && data.topPlayers.length > 0 && (
               <motion.div
                 variants={itemVariants}
-                className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
               >
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
                   <Crown className="h-4 w-4 text-yellow-400" />
@@ -746,35 +921,18 @@ export default function AdminAnalyticsPage() {
               {data?.recentActivity && data.recentActivity.length > 0 && (
                 <motion.div
                   variants={itemVariants}
-                  className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
                 >
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
                     <Zap className="h-4 w-4 text-yellow-400" />
                     Recent Activity
+                    <span className="rounded-full bg-gray-700/30 px-2 py-0.5 text-[10px] text-gray-400">
+                      {data.recentActivity.length}
+                    </span>
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 will-change-transform">
                     {data.recentActivity.slice(0, 10).map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex flex-col gap-2 rounded-xl border border-white/5 bg-gray-900/40 p-3 transition-colors hover:border-indigo-500/30 hover:bg-gray-900/70 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300">
-                            <Activity className="h-4 w-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-gray-300">
-                              {activity.user?.name || "System"}
-                            </p>
-                            <p className="truncate text-xs text-gray-500">
-                              {activity.action.replace(/_/g, " ")} • {activity.targetType}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="flex-shrink-0 text-xs text-gray-500 sm:text-right">
-                          {new Date(activity.createdAt).toLocaleString()}
-                        </span>
-                      </div>
+                      <ActivityItem key={activity.id} activity={activity} />
                     ))}
                   </div>
                 </motion.div>
@@ -783,34 +941,18 @@ export default function AdminAnalyticsPage() {
               {data?.recentMatches && data.recentMatches.length > 0 && (
                 <motion.div
                   variants={itemVariants}
-                  className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
                 >
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
                     <Calendar className="h-4 w-4 text-indigo-400" />
                     Recent Matches
+                    <span className="rounded-full bg-gray-700/30 px-2 py-0.5 text-[10px] text-gray-400">
+                      {data.recentMatches.length}
+                    </span>
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 will-change-transform">
                     {data.recentMatches.map((match) => (
-                      <div
-                        key={match.id}
-                        className="rounded-xl border border-white/5 bg-gray-900/40 p-3 transition-colors hover:border-indigo-500/30 hover:bg-gray-900/70"
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <span className="truncate text-sm text-white">{match.homePlayer}</span>
-                            <span className="text-sm text-gray-500">vs</span>
-                            <span className="truncate text-sm text-white">{match.awayPlayer}</span>
-                            {match.score && (
-                              <span className="rounded-lg bg-white/10 px-2 py-1 text-sm font-bold text-white">
-                                {match.score}
-                              </span>
-                            )}
-                          </div>
-                          <span className="flex-shrink-0 text-xs text-gray-500">
-                            {new Date(match.date).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
+                      <MatchItem key={match.id} match={match} />
                     ))}
                   </div>
                 </motion.div>
@@ -818,13 +960,17 @@ export default function AdminAnalyticsPage() {
             </div>
           </>
         )}
+
         {/* ============================================================ */}
         {/* TAB: REVENUE */}
         {/* ============================================================ */}
         {activeTab === "revenue" && (
-          <motion.div variants={itemVariants} className="space-y-5">
+          <motion.div variants={containerVariants} className="space-y-5">
             {/* Revenue Chart */}
-            <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6">
+            <motion.div
+              variants={itemVariants}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+            >
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
                   <DollarSign className="h-4 w-4 text-emerald-400" />
@@ -850,39 +996,57 @@ export default function AdminAnalyticsPage() {
                   Forecast
                 </span>
               </div>
-            </div>
+            </motion.div>
 
             {/* Revenue Stats */}
             {data?.revenueData && data.revenueData.length > 0 && (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                  <p className="text-xs text-gray-400">Total Revenue</p>
-                  <p className="text-xl font-bold text-emerald-400">
-                    {formatCurrency(data.revenueData.reduce((sum, d) => sum + d.amount, 0))}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                  <p className="text-xs text-gray-400">Total Payments</p>
-                  <p className="text-xl font-bold text-white">
-                    {data.revenueData.reduce((sum, d) => sum + d.count, 0)}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                  <p className="text-xs text-gray-400">Days with Revenue</p>
-                  <p className="text-xl font-bold text-white">
-                    {data.revenueData.filter((d) => d.amount > 0).length}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                  <p className="text-xs text-gray-400">Average Daily</p>
-                  <p className="text-xl font-bold text-indigo-400">
-                    {formatCurrency(
+              <motion.div
+                variants={containerVariants}
+                className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+              >
+                {[
+                  {
+                    label: "Total Revenue",
+                    value: formatCurrency(data.revenueData.reduce((sum, d) => sum + d.amount, 0)),
+                    icon: DollarSign,
+                    color: "text-emerald-400",
+                  },
+                  {
+                    label: "Total Payments",
+                    value: data.revenueData.reduce((sum, d) => sum + d.count, 0),
+                    icon: CheckCircle,
+                    color: "text-white",
+                  },
+                  {
+                    label: "Days with Revenue",
+                    value: data.revenueData.filter((d) => d.amount > 0).length,
+                    icon: Calendar,
+                    color: "text-white",
+                  },
+                  {
+                    label: "Average Daily",
+                    value: formatCurrency(
                       data.revenueData.reduce((sum, d) => sum + d.amount, 0) /
                         (data.revenueData.filter((d) => d.amount > 0).length || 1)
-                    )}
-                  </p>
-                </div>
-              </div>
+                    ),
+                    icon: TrendingUp,
+                    color: "text-indigo-400",
+                  },
+                ].map((item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.div
+                      key={item.label}
+                      variants={itemVariants}
+                      whileHover={{ y: -2 }}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-all hover:border-indigo-500/30"
+                    >
+                      <p className="text-xs text-gray-400">{item.label}</p>
+                      <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
             )}
           </motion.div>
         )}
@@ -893,11 +1057,14 @@ export default function AdminAnalyticsPage() {
         {activeTab === "performance" && (
           <motion.div
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
           >
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <Trophy className="h-4 w-4 text-yellow-400" />
               Season Performance
+              <span className="rounded-full bg-gray-700/30 px-2 py-0.5 text-[10px] text-gray-400">
+                {data?.seasonPerformance?.length || 0} seasons
+              </span>
             </h3>
             {data?.seasonPerformance && data.seasonPerformance.length > 0 ? (
               <div className="overflow-x-auto">
@@ -965,12 +1132,16 @@ export default function AdminAnalyticsPage() {
             )}
           </motion.div>
         )}
+
         {/* ============================================================ */}
         {/* TAB: INSIGHTS */}
         {/* ============================================================ */}
         {activeTab === "insights" && (
-          <motion.div variants={itemVariants} className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl sm:p-6">
+          <motion.div variants={containerVariants} className="space-y-4">
+            <motion.div
+              variants={itemVariants}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+            >
               <div className="mb-4 flex items-center gap-2">
                 <Brain className="h-5 w-5 text-amber-400" />
                 <h3 className="text-sm font-semibold text-white">
@@ -979,37 +1150,18 @@ export default function AdminAnalyticsPage() {
                 <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[8px] text-amber-300">
                   Live
                 </span>
+                {data?.insights && data.insights.length > 0 && (
+                  <span className="rounded-full bg-gray-700/30 px-2 py-0.5 text-[10px] text-gray-400">
+                    {data.insights.length}
+                  </span>
+                )}
               </div>
 
               {data?.insights && data.insights.length > 0 ? (
                 <div className="space-y-3">
-                  {data.insights.map((insight) => {
-                    const style = getInsightStyle(insight.type);
-                    const Icon = style.icon;
-
-                    return (
-                      <div
-                        key={insight.id}
-                        className={`rounded-xl border p-4 ${style.border} ${style.bg} transition-colors hover:bg-opacity-20`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${style.color}`} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-white">{insight.title}</p>
-                            <p className="mt-1 text-xs text-gray-400">{insight.description}</p>
-                            {insight.action && insight.link && (
-                              <a
-                                href={insight.link}
-                                className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-400 transition-colors hover:text-indigo-300"
-                              >
-                                {insight.action} →
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {data.insights.map((insight) => (
+                    <InsightCard key={insight.id} insight={insight} />
+                  ))}
                 </div>
               ) : (
                 <div className="py-8 text-center text-gray-500">
@@ -1018,42 +1170,57 @@ export default function AdminAnalyticsPage() {
                   <p className="text-xs text-gray-600">Insights will appear as data grows</p>
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* Quick Stats Summary */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                <p className="text-xs text-gray-400">Platform Health</p>
-                <p className="text-xl font-bold text-green-400">
-                  {data?.overview?.completionRate && data.overview.completionRate > 70
+            <motion.div
+              variants={containerVariants}
+              className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            >
+              {[
+                {
+                  label: "Platform Health",
+                  value: data?.overview?.completionRate && data.overview.completionRate > 70
                     ? "✅ Good"
-                    : "⚠️ Needs Attention"}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                <p className="text-xs text-gray-400">Engagement</p>
-                <p className="text-xl font-bold text-white">
-                  {data?.overview?.activeUsers && data.overview.totalUsers
-                    ? Math.round((data.overview.activeUsers / data.overview.totalUsers) * 100)
-                    : 0}
-                  %
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                <p className="text-xs text-gray-400">Total Revenue</p>
-                <p className="text-xl font-bold text-emerald-400">
-                  {formatCurrency(
+                    : "⚠️ Needs Attention",
+                  color: data?.overview?.completionRate && data.overview.completionRate > 70
+                    ? "text-green-400"
+                    : "text-yellow-400",
+                },
+                {
+                  label: "Engagement",
+                  value: data?.overview?.activeUsers && data.overview.totalUsers
+                    ? `${Math.round((data.overview.activeUsers / data.overview.totalUsers) * 100)}%`
+                    : "0%",
+                  color: "text-white",
+                },
+                {
+                  label: "Total Revenue",
+                  value: formatCurrency(
                     data?.revenueData?.reduce((sum, d) => sum + d.amount, 0) || 0
-                  )}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
-                <p className="text-xs text-gray-400">Active Seasons</p>
-                <p className="text-xl font-bold text-indigo-400">
-                  {data?.overview?.totalSeasons || 0}
-                </p>
-              </div>
-            </div>
+                  ),
+                  color: "text-emerald-400",
+                },
+                {
+                  label: "Active Seasons",
+                  value: data?.overview?.totalSeasons || 0,
+                  color: "text-indigo-400",
+                },
+              ].map((item, index) => {
+                const Icon = index === 0 ? Shield : index === 1 ? Users : index === 2 ? DollarSign : Trophy;
+                return (
+                  <motion.div
+                    key={item.label}
+                    variants={itemVariants}
+                    whileHover={{ y: -2 }}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl transition-all hover:border-indigo-500/30"
+                  >
+                    <p className="text-xs text-gray-400">{item.label}</p>
+                    <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           </motion.div>
         )}
       </motion.div>

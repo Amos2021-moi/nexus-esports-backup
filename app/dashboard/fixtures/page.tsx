@@ -20,6 +20,11 @@ import {
   X,
   Zap,
   Sparkles,
+  User,
+  Phone,
+  Shield,
+  Mail,
+  Star,
 } from "lucide-react";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
 import EvidenceViewer from "@/components/ui/EvidenceViewer";
@@ -765,71 +770,71 @@ export default function FixturesPage() {
                 </div>
 
                 {/* ✅ Match Prediction - Only show for SCHEDULED/LOCKED fixtures */}
-{isActionable && !hasResult && (
-  <div className="mt-4">
-    {predictionLoading[fixture.id] ? (
-      <div className="animate-pulse rounded-xl bg-gray-700/30 p-4">
-        <div className="h-4 w-32 rounded bg-gray-600/50" />
-        <div className="mt-2 h-2 w-full rounded bg-gray-600/50" />
-        <div className="mt-2 flex justify-between">
-          <div className="h-3 w-16 rounded bg-gray-600/50" />
-          <div className="h-3 w-16 rounded bg-gray-600/50" />
-        </div>
-      </div>
-    ) : prediction ? (
-      <div className="rounded-xl border border-white/5 bg-gray-900/30 p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-yellow-400" />
-          <span className="text-xs font-medium text-gray-400">
-            AI Prediction
-          </span>
-          <PredictionBadge
-            winner={prediction.predictedWinner.name}
-            confidence={prediction.confidence}
-            confidenceLabel={prediction.confidenceLabel}
-            compact={true}
-          />
-        </div>
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>🏠 {prediction.homeWinProbability}%</span>
-          <span>🤝 {prediction.drawProbability}%</span>
-          <span>✈️ {prediction.awayWinProbability}%</span>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-700">
-          <div className="flex h-full">
-            <div
-              className="h-full rounded-l-full bg-gradient-to-r from-indigo-500 to-purple-500"
-              style={{ width: `${prediction.homeWinProbability}%` }}
-            />
-            <div
-              className="h-full bg-yellow-500/50"
-              style={{ width: `${prediction.drawProbability}%` }}
-            />
-            <div
-              className="h-full rounded-r-full bg-gradient-to-r from-pink-500 to-rose-500"
-              style={{ width: `${prediction.awayWinProbability}%` }}
-            />
-          </div>
-        </div>
-        {prediction.keyInsights && prediction.keyInsights.length > 0 && (
-          <div className="mt-2 text-[10px] text-gray-500">
-            💡 {prediction.keyInsights[0]}
-          </div>
-        )}
-      </div>
-    ) : (
-      <div className="rounded-xl border border-white/5 bg-gray-900/30 p-3 text-center">
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-          <Zap className="h-4 w-4 text-gray-600" />
-          <span>Prediction unavailable</span>
-        </div>
-        <p className="mt-1 text-[10px] text-gray-600">
-          Need more match data for accurate predictions
-        </p>
-      </div>
-    )}
-  </div>
-)}
+                {isActionable && !hasResult && (
+                  <div className="mt-4">
+                    {predictionLoading[fixture.id] ? (
+                      <div className="animate-pulse rounded-xl bg-gray-700/30 p-4">
+                        <div className="h-4 w-32 rounded bg-gray-600/50" />
+                        <div className="mt-2 h-2 w-full rounded bg-gray-600/50" />
+                        <div className="mt-2 flex justify-between">
+                          <div className="h-3 w-16 rounded bg-gray-600/50" />
+                          <div className="h-3 w-16 rounded bg-gray-600/50" />
+                        </div>
+                      </div>
+                    ) : prediction ? (
+                      <div className="rounded-xl border border-white/5 bg-gray-900/30 p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-yellow-400" />
+                          <span className="text-xs font-medium text-gray-400">
+                            AI Prediction
+                          </span>
+                          <PredictionBadge
+                            winner={prediction.predictedWinner.name}
+                            confidence={prediction.confidence}
+                            confidenceLabel={prediction.confidenceLabel}
+                            compact={true}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <span>🏠 {prediction.homeWinProbability}%</span>
+                          <span>🤝 {prediction.drawProbability}%</span>
+                          <span>✈️ {prediction.awayWinProbability}%</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-700">
+                          <div className="flex h-full">
+                            <div
+                              className="h-full rounded-l-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                              style={{ width: `${prediction.homeWinProbability}%` }}
+                            />
+                            <div
+                              className="h-full bg-yellow-500/50"
+                              style={{ width: `${prediction.drawProbability}%` }}
+                            />
+                            <div
+                              className="h-full rounded-r-full bg-gradient-to-r from-pink-500 to-rose-500"
+                              style={{ width: `${prediction.awayWinProbability}%` }}
+                            />
+                          </div>
+                        </div>
+                        {prediction.keyInsights && prediction.keyInsights.length > 0 && (
+                          <div className="mt-2 text-[10px] text-gray-500">
+                            💡 {prediction.keyInsights[0]}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-white/5 bg-gray-900/30 p-3 text-center">
+                        <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                          <Zap className="h-4 w-4 text-gray-600" />
+                          <span>Prediction unavailable</span>
+                        </div>
+                        <p className="mt-1 text-[10px] text-gray-600">
+                          Need more match data for accurate predictions
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Date */}
                 <div className="mt-4 flex items-center justify-center gap-1.5 text-sm text-gray-400">
@@ -874,23 +879,37 @@ export default function FixturesPage() {
                 {/* Action Buttons - Show for SCHEDULED or LOCKED fixtures */}
                 {isActionable && !hasResult && (
                   <div className="mt-4 border-t border-white/10 pt-4">
+                    {/* WhatsApp Button - Organized as a dedicated card */}
                     {seasonDisplay.canWhatsApp &&
                       opponentWhatsAppVisible &&
                       opponentWhatsApp && (
                         <div className="mb-3">
-                          <WhatsAppButton
-                            opponentWhatsApp={opponentWhatsApp}
-                            opponentWhatsAppVisible={opponentWhatsAppVisible}
-                            opponentName={opponentName}
-                            fixtureId={fixture.id}
-                            seasonName={fixture.season?.name}
-                            deadline={fixture.season?.endDate}
-                            homePlayer={homeName}
-                            awayPlayer={awayName}
-                          />
+                          <div className="rounded-xl border border-white/10 bg-gradient-to-br from-green-500/5 to-emerald-500/5 p-3 backdrop-blur-sm">
+                            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-green-400">
+                              <MessageCircle size={14} />
+                              <span>Contact Opponent via WhatsApp</span>
+                            </div>
+                            <WhatsAppButton
+                              opponentWhatsApp={opponentWhatsApp}
+                              opponentWhatsAppVisible={opponentWhatsAppVisible}
+                              opponentName={opponentName}
+                              fixtureId={fixture.id}
+                              seasonName={fixture.season?.name}
+                              deadline={fixture.season?.endDate}
+                              homePlayer={homeName}
+                              awayPlayer={awayName}
+                            />
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-gray-500">
+                              <Shield size={10} className="text-green-500" />
+                              <span>End-to-end encrypted</span>
+                              <span className="mx-1">•</span>
+                              <span>Quick coordination</span>
+                            </div>
+                          </div>
                         </div>
                       )}
 
+                    {/* Suggest Time Button */}
                     {seasonDisplay.canSuggestTime && (
                       <button
                         onClick={() => setShowTimeModal(fixture.id)}
@@ -901,6 +920,7 @@ export default function FixturesPage() {
                       </button>
                     )}
 
+                    {/* Submit Result Button */}
                     {seasonDisplay.canSubmit && (
                       <Link
                         href={`/dashboard/results/submit/${fixture.id}`}

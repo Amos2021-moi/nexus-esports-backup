@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion, type Variants } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Save,
   Loader2,
@@ -14,6 +14,20 @@ import {
   Shield,
   UserPlus,
   Database,
+  RefreshCw,
+  Sparkles,
+  ChevronRight,
+  X,
+  CheckCircle,
+  Clock,
+  Zap,
+  Server,
+  HardDrive,
+  Globe,
+  Lock,
+  Key,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ClearDataModal from "@/components/ui/ClearDataModal";
@@ -34,49 +48,122 @@ const defaultSettings: SystemSettings = {
   archiveSeasons: false,
 };
 
+/* -------------------------------------------------------------------------- */
+/*                            Animation Variants                              */
+/* -------------------------------------------------------------------------- */
+
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
-function Toggle({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all ${
-        active ? "bg-indigo-600" : "bg-gray-700"
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const Toggle = memo(({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={label}
+    className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all ${
+      active ? "bg-indigo-600 shadow-lg shadow-indigo-500/30" : "bg-gray-700"
+    }`}
+  >
+    <motion.span
+      layout
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ${
+        active ? "translate-x-6" : "translate-x-1"
       }`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-all ${
-          active ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  );
-}
+    />
+  </button>
+));
+
+Toggle.displayName = "Toggle";
+
+const SettingRow = memo(({
+  icon: Icon,
+  title,
+  description,
+  active,
+  onToggle,
+  className = "",
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  active: boolean;
+  onToggle: () => void;
+  className?: string;
+}) => (
+  <motion.div
+    variants={itemVariants}
+    whileHover={{ scale: 1.01 }}
+    className={`flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-all hover:border-indigo-500/40 ${className}`}
+  >
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 flex-shrink-0 text-indigo-400" />
+        <p className="font-medium text-white">{title}</p>
+      </div>
+      <p className="mt-0.5 text-xs text-gray-400">{description}</p>
+    </div>
+    <Toggle active={active} onClick={onToggle} label={`Toggle ${title}`} />
+  </motion.div>
+));
+
+SettingRow.displayName = "SettingRow";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function AdminSystemSettingsPage() {
   const { data: session, status } = useSession();
@@ -86,7 +173,6 @@ export default function AdminSystemSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
 
-  // ✅ Maintenance states
   const [maintenanceActive, setMaintenanceActive] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceEndTime, setMaintenanceEndTime] = useState<string | null>(null);
@@ -95,15 +181,12 @@ export default function AdminSystemSettingsPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
 
-  // Role check - redirect if not admin
   useEffect(() => {
     if (status === "loading") return;
-
     if (!session) {
       router.push("/auth/signin");
       return;
     }
-
     if (session.user?.role !== "ADMIN") {
       router.push("/dashboard");
       return;
@@ -116,7 +199,6 @@ export default function AdminSystemSettingsPage() {
     }
   }, [session]);
 
-  // ✅ Check maintenance status
   useEffect(() => {
     fetchMaintenanceStatus();
   }, []);
@@ -127,26 +209,11 @@ export default function AdminSystemSettingsPage() {
       if (res.ok) {
         const data = await res.json();
         setSettings({
-          registrationOpen:
-            data.registrationOpen !== undefined
-              ? data.registrationOpen
-              : defaultSettings.registrationOpen,
-          maintenanceMode:
-            data.maintenanceMode !== undefined
-              ? data.maintenanceMode
-              : defaultSettings.maintenanceMode,
-          uploadsEnabled:
-            data.uploadsEnabled !== undefined
-              ? data.uploadsEnabled
-              : defaultSettings.uploadsEnabled,
-          maxUploadSize:
-            data.maxUploadSize !== undefined
-              ? data.maxUploadSize
-              : defaultSettings.maxUploadSize,
-          archiveSeasons:
-            data.archiveSeasons !== undefined
-              ? data.archiveSeasons
-              : defaultSettings.archiveSeasons,
+          registrationOpen: data.registrationOpen !== undefined ? data.registrationOpen : defaultSettings.registrationOpen,
+          maintenanceMode: data.maintenanceMode !== undefined ? data.maintenanceMode : defaultSettings.maintenanceMode,
+          uploadsEnabled: data.uploadsEnabled !== undefined ? data.uploadsEnabled : defaultSettings.uploadsEnabled,
+          maxUploadSize: data.maxUploadSize !== undefined ? data.maxUploadSize : defaultSettings.maxUploadSize,
+          archiveSeasons: data.archiveSeasons !== undefined ? data.archiveSeasons : defaultSettings.archiveSeasons,
         });
       }
     } catch (error) {
@@ -204,7 +271,6 @@ export default function AdminSystemSettingsPage() {
     setSettings({ ...settings, [key]: value });
   };
 
-  // ✅ Start maintenance with end time
   async function handleStartMaintenance() {
     if (!endTimeInput) {
       toast.error("Please select an end time");
@@ -217,7 +283,7 @@ export default function AdminSystemSettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scheduledEnd: endTimeInput, // ✅ Use scheduledEnd
+          scheduledEnd: endTimeInput,
           message: messageInput || "We're currently performing scheduled maintenance.",
         }),
       });
@@ -238,7 +304,6 @@ export default function AdminSystemSettingsPage() {
     }
   }
 
-  // ✅ End maintenance
   async function handleEndMaintenance() {
     setIsEnding(true);
     try {
@@ -262,12 +327,23 @@ export default function AdminSystemSettingsPage() {
 
   if (status === "loading" || loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-[3px] border-indigo-500/30 border-t-indigo-500" />
-          <p className="text-sm text-gray-400">Loading settings...</p>
+      <>
+        <DecorBackground />
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <Settings className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading settings...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Preparing your configuration</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -277,53 +353,49 @@ export default function AdminSystemSettingsPage() {
 
   return (
     <div className="max-w-3xl">
+      <DecorBackground />
       <motion.form
         onSubmit={handleSubmit}
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-6 sm:space-y-8"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div variants={itemVariants}>
           <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
               <Settings className="h-5 w-5 text-white" />
             </span>
-            <h2 className="text-xl font-semibold text-white sm:text-2xl">System Settings</h2>
+            <div>
+              <h2 className="text-xl font-bold text-white sm:text-2xl">⚙️ System Settings</h2>
+              <p className="text-sm text-gray-400">Control platform-wide system behavior</p>
+            </div>
           </div>
-          <p className="text-sm text-gray-400">Control platform-wide system behavior</p>
         </motion.div>
 
         {/* Registration */}
-        <motion.div
-          variants={itemVariants}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl"
-        >
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 font-medium text-white">
-              <UserPlus className="h-4 w-4 flex-shrink-0 text-green-400" />
-              Registration Open
-            </p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Allow new players to register on the platform
-            </p>
-          </div>
-          <Toggle
-            active={settings.registrationOpen}
-            onClick={() => handleChange("registrationOpen", !settings.registrationOpen)}
-            label="Toggle registration"
-          />
-        </motion.div>
+        <SettingRow
+          icon={UserPlus}
+          title="Registration Open"
+          description="Allow new players to register on the platform"
+          active={settings.registrationOpen}
+          onToggle={() => handleChange("registrationOpen", !settings.registrationOpen)}
+        />
 
         {/* Quick Maintenance */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl sm:p-6"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl sm:p-6"
         >
           <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
             <Shield className="h-5 w-5 text-yellow-400" />
             Maintenance Mode
+            {maintenanceActive && (
+              <span className="ml-2 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-400">
+                Active
+              </span>
+            )}
           </h3>
 
           {maintenanceActive ? (
@@ -355,9 +427,16 @@ export default function AdminSystemSettingsPage() {
                   type="button"
                   onClick={handleEndMaintenance}
                   disabled={isEnding}
-                  className="flex min-h-[44px] flex-shrink-0 items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm text-white transition-all hover:bg-green-700 disabled:opacity-50"
+                  className="flex min-h-[44px] flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
                 >
-                  {isEnding ? "Turning Off..." : "Turn Off Maintenance"}
+                  {isEnding ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Turning Off...
+                    </>
+                  ) : (
+                    "Turn Off Maintenance"
+                  )}
                 </button>
               </div>
             </div>
@@ -372,7 +451,7 @@ export default function AdminSystemSettingsPage() {
                     type="datetime-local"
                     value={endTimeInput}
                     onChange={(e) => setEndTimeInput(e.target.value)}
-                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                     min={new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16)}
                   />
                   <p className="mt-1 text-xs text-gray-500">
@@ -388,7 +467,7 @@ export default function AdminSystemSettingsPage() {
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     placeholder="e.g., We're upgrading the database..."
-                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   />
                 </div>
               </div>
@@ -396,9 +475,16 @@ export default function AdminSystemSettingsPage() {
                 type="button"
                 onClick={handleStartMaintenance}
                 disabled={isStarting}
-                className="min-h-[44px] w-full rounded-xl bg-red-600 px-6 py-2.5 font-semibold text-white transition-all hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                className="min-h-[44px] w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-red-900/30 transition-all hover:from-red-700 hover:to-rose-700 disabled:opacity-50 sm:w-auto"
               >
-                {isStarting ? "Starting..." : "🚀 Turn On Maintenance"}
+                {isStarting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  "🚀 Turn On Maintenance"
+                )}
               </button>
               <p className="text-xs text-gray-500">
                 ⚠️ Players will see the overlay immediately. Admins will not be affected.
@@ -408,38 +494,26 @@ export default function AdminSystemSettingsPage() {
         </motion.div>
 
         {/* Uploads Enabled */}
-        <motion.div
-          variants={itemVariants}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl"
-        >
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 font-medium text-white">
-              <Upload className="h-4 w-4 flex-shrink-0 text-blue-400" />
-              Uploads Enabled
-            </p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Allow players to upload images (profile pictures, squad screenshots)
-            </p>
-          </div>
-          <Toggle
-            active={settings.uploadsEnabled}
-            onClick={() => handleChange("uploadsEnabled", !settings.uploadsEnabled)}
-            label="Toggle uploads"
-          />
-        </motion.div>
+        <SettingRow
+          icon={Upload}
+          title="Uploads Enabled"
+          description="Allow players to upload images (profile pictures, squad screenshots)"
+          active={settings.uploadsEnabled}
+          onToggle={() => handleChange("uploadsEnabled", !settings.uploadsEnabled)}
+        />
 
         {/* Max Upload Size */}
         <motion.div variants={itemVariants}>
           <label className="mb-2 block text-sm font-medium text-gray-300">
             <span className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
+              <Database className="h-4 w-4 text-indigo-400" />
               Max Upload Size (MB)
             </span>
           </label>
           <select
             value={settings.maxUploadSize}
             onChange={(e) => handleChange("maxUploadSize", parseInt(e.target.value))}
-            className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-white transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
           >
             <option value={2}>2 MB</option>
             <option value={5}>5 MB</option>
@@ -451,44 +525,38 @@ export default function AdminSystemSettingsPage() {
         </motion.div>
 
         {/* Archive Seasons */}
-        <motion.div
-          variants={itemVariants}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl"
-        >
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 font-medium text-white">
-              <Archive className="h-4 w-4 flex-shrink-0 text-yellow-400" />
-              Auto-Archive Seasons
-            </p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Automatically archive completed seasons after 30 days
-            </p>
-          </div>
-          <Toggle
-            active={settings.archiveSeasons}
-            onClick={() => handleChange("archiveSeasons", !settings.archiveSeasons)}
-            label="Toggle auto-archive"
-          />
-        </motion.div>
+        <SettingRow
+          icon={Archive}
+          title="Auto-Archive Seasons"
+          description="Automatically archive completed seasons after 30 days"
+          active={settings.archiveSeasons}
+          onToggle={() => handleChange("archiveSeasons", !settings.archiveSeasons)}
+        />
 
-        {!settings.registrationOpen && (
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4"
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-400" />
-              <div>
-                <p className="text-sm font-medium text-yellow-300">Registration Closed</p>
-                <p className="mt-1 text-xs text-gray-400">
-                  New player registration is currently disabled. Existing players can still log in.
-                </p>
+        {/* Registration Closed Warning */}
+        <AnimatePresence>
+          {!settings.registrationOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              variants={itemVariants}
+              className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-400" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-300">Registration Closed</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    New player registration is currently disabled. Existing players can still log in.
+                  </p>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Danger Zone - Clear All Data */}
+        {/* Danger Zone */}
         <motion.div variants={itemVariants} className="border-t border-red-500/20 pt-6">
           <div className="mb-2 flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-400" />
@@ -509,8 +577,9 @@ export default function AdminSystemSettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowClearModal(true)}
-                className="min-h-[44px] w-full flex-shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-all hover:bg-red-700 sm:w-auto"
+                className="min-h-[44px] w-full flex-shrink-0 whitespace-nowrap rounded-lg bg-gradient-to-r from-red-600 to-rose-600 px-4 py-2 font-semibold text-white shadow-lg shadow-red-900/30 transition-all hover:from-red-700 hover:to-rose-700 sm:w-auto"
               >
+                <Trash2 className="mr-2 inline h-4 w-4" />
                 Clear All Data
               </button>
             </div>

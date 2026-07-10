@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback,memo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -27,10 +27,14 @@ import {
   Sparkles,
   Check,
   BadgeCheck,
+  ChevronRight,
+  X,
+  ArrowRight,
 } from "lucide-react";
 import ImageUpload from "@/components/dashboard/ImageUpload";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface ProfileData {
   username: string;
@@ -60,18 +64,127 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const SectionTitle = memo(({ icon: Icon, title, accent = "text-indigo-400" }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  accent?: string;
+}) => (
+  <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
+      <Icon className={`h-4 w-4 ${accent}`} />
+    </span>
+    <h3 className="text-base font-semibold text-white">{title}</h3>
+  </div>
+));
+
+SectionTitle.displayName = "SectionTitle";
+
+const SettingCard = memo(({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <motion.div
+    variants={itemVariants}
+    className={`rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10 ${className}`}
+  >
+    {children}
+  </motion.div>
+));
+
+SettingCard.displayName = "SettingCard";
+
+const ToggleSwitch = memo(({
+  checked,
+  onChange,
+  disabled = false,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  label: string;
+  description?: string;
+}) => (
+  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-gray-900/40 p-4">
+    <div>
+      <p className="font-medium text-white">{label}</p>
+      {description && <p className="text-sm text-gray-400">{description}</p>}
+    </div>
+    <label className={`relative inline-flex cursor-pointer items-center ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        className="peer sr-only"
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <div className={`h-6 w-11 rounded-full bg-gray-600 transition-all peer-checked:bg-indigo-600 ${disabled ? "" : ""}`}>
+        <div className={`m-1 h-4 w-4 rounded-full bg-white transition-all ${checked ? "translate-x-5" : ""}`} />
+      </div>
+    </label>
+  </div>
+));
+
+ToggleSwitch.displayName = "ToggleSwitch";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function AccountSettingsPage() {
   const { data: session, update } = useSession();
@@ -95,7 +208,6 @@ export default function AccountSettingsPage() {
     whatsappVisible: true,
   });
 
-  // Email settings state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({
     verified: false,
     notificationsEnabled: false,
@@ -105,23 +217,7 @@ export default function AccountSettingsPage() {
   const [emailMessage, setEmailMessage] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  useEffect(() => {
-    fetchProfile();
-    fetchEmailStatus();
-  }, []);
-
-  // Countdown timer for resend
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(
-        () => setResendCooldown(resendCooldown - 1),
-        1000
-      );
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
-
-  async function fetchProfile() {
+  const fetchProfile = useCallback(async () => {
     try {
       const res = await fetch("/api/profile");
       const data = await res.json();
@@ -136,8 +232,7 @@ export default function AccountSettingsPage() {
         profilePicture: data.profilePicture || "",
         bannerImage: data.bannerImage || "",
         whatsappNumber: data.whatsappNumber || "",
-        whatsappVisible:
-          data.whatsappVisible !== undefined ? data.whatsappVisible : true,
+        whatsappVisible: data.whatsappVisible !== undefined ? data.whatsappVisible : true,
       });
       setProfilePicture(data.profilePicture || "");
       setBannerImage(data.bannerImage || "");
@@ -147,9 +242,9 @@ export default function AccountSettingsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function fetchEmailStatus() {
+  const fetchEmailStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/user/email/preferences");
       const data = await res.json();
@@ -161,22 +256,32 @@ export default function AccountSettingsPage() {
     } catch (error) {
       console.error("Error fetching email status:", error);
     }
-  }
+  }, []);
 
-  async function handleSendVerification() {
+  useEffect(() => {
+    fetchProfile();
+    fetchEmailStatus();
+  }, [fetchProfile, fetchEmailStatus]);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  const handleSendVerification = useCallback(async () => {
     setEmailLoading(true);
     setEmailMessage("");
 
     try {
-      const res = await fetch("/api/user/email/verify", {
-        method: "POST",
-      });
+      const res = await fetch("/api/user/email/verify", { method: "POST" });
       const data = await res.json();
 
       if (res.ok) {
         setEmailMessage("✅ Verification email sent! Check your inbox.");
         toast.success("Verification email sent!");
-        setResendCooldown(30); // 30 second cooldown
+        setResendCooldown(30);
       } else {
         setEmailMessage(`❌ ${data.error || "Failed to send verification"}`);
         toast.error(data.error || "Failed to send verification");
@@ -187,24 +292,22 @@ export default function AccountSettingsPage() {
     } finally {
       setEmailLoading(false);
     }
-  }
+  }, []);
 
-  async function handleResendVerification() {
+  const handleResendVerification = useCallback(async () => {
     if (resendCooldown > 0) return;
 
     setResendLoading(true);
     setEmailMessage("");
 
     try {
-      const res = await fetch("/api/user/email/resend", {
-        method: "POST",
-      });
+      const res = await fetch("/api/user/email/resend", { method: "POST" });
       const data = await res.json();
 
       if (res.ok) {
         setEmailMessage("✅ Verification email resent! Check your inbox.");
         toast.success("Verification email resent!");
-        setResendCooldown(30); // 30 second cooldown
+        setResendCooldown(30);
       } else {
         setEmailMessage(`❌ ${data.error || "Failed to resend verification"}`);
         toast.error(data.error || "Failed to resend verification");
@@ -215,9 +318,9 @@ export default function AccountSettingsPage() {
     } finally {
       setResendLoading(false);
     }
-  }
+  }, [resendCooldown]);
 
-  async function handleNotificationToggle(enabled: boolean) {
+  const handleNotificationToggle = useCallback(async (enabled: boolean) => {
     try {
       const res = await fetch("/api/user/email/preferences", {
         method: "PUT",
@@ -227,11 +330,7 @@ export default function AccountSettingsPage() {
 
       if (res.ok) {
         setEmailStatus((prev) => ({ ...prev, notificationsEnabled: enabled }));
-        toast.success(
-          enabled
-            ? "Email notifications enabled"
-            : "Email notifications disabled"
-        );
+        toast.success(enabled ? "Email notifications enabled" : "Email notifications disabled");
       } else {
         const data = await res.json();
         toast.error(data.error || "Failed to update preference");
@@ -240,9 +339,9 @@ export default function AccountSettingsPage() {
       console.error("Error updating notification preference:", error);
       toast.error("Failed to update preference");
     }
-  }
+  }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
@@ -273,33 +372,33 @@ export default function AccountSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [formData, profilePicture, bannerImage, router, update]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const target = e.target as HTMLInputElement;
     const value = target.type === "checkbox" ? target.checked : target.value;
-    setFormData({
-      ...formData,
-      [e.target.name]: value,
-    });
-  };
+    setFormData({ ...formData, [e.target.name]: value });
+  }, [formData]);
 
   if (loading) {
     return (
-      <div className="relative flex h-64 items-center justify-center">
+      <>
         <DecorBackground />
-        <div className="text-center">
-          <div className="relative mx-auto mb-3 h-10 w-10">
-            <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20" />
-            <div className="absolute inset-0 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <SettingsIcon className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading settings...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Preparing your account</span>
+            </div>
           </div>
-          <p className="text-sm text-gray-400">Loading settings...</p>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -311,10 +410,10 @@ export default function AccountSettingsPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="max-w-3xl"
+        className="max-w-3xl mx-auto space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
-        <motion.div variants={itemVariants} className="mb-6 flex items-center gap-3">
+        <motion.div variants={itemVariants} className="flex items-center gap-3">
           <span className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
             <SettingsIcon className="h-6 w-6 text-white" />
             <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-gray-900 bg-emerald-500">
@@ -322,28 +421,22 @@ export default function AccountSettingsPage() {
             </span>
           </span>
           <div>
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">
-              👤 Account Settings
-            </h1>
-            <p className="mt-1 text-gray-400">
-              Manage your profile, images, and account preferences
-            </p>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">👤 Account Settings</h1>
+            <p className="mt-1 text-gray-400">Manage your profile, images, and account preferences</p>
           </div>
         </motion.div>
 
         {/* Account Summary Card */}
         <motion.div
           variants={itemVariants}
-          className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
+          className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl"
         >
-          {/* gradient banner strip */}
           <div className="relative h-20 bg-gradient-to-r from-indigo-600/40 via-purple-600/30 to-pink-600/30">
             <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-indigo-500/30 blur-2xl" />
             <div
               className="absolute inset-0 opacity-20"
               style={{
-                backgroundImage:
-                  "radial-gradient(rgba(255,255,255,0.25) 1px, transparent 1px)",
+                backgroundImage: "radial-gradient(rgba(255,255,255,0.25) 1px, transparent 1px)",
                 backgroundSize: "16px 16px",
               }}
             />
@@ -351,21 +444,13 @@ export default function AccountSettingsPage() {
 
           <div className="-mt-10 flex flex-col gap-4 px-5 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
-              {/* Avatar */}
               <div className="relative h-20 w-20 flex-shrink-0">
                 <div className="h-20 w-20 overflow-hidden rounded-2xl border-4 border-gray-900 bg-gradient-to-br from-indigo-500 to-purple-600 shadow-xl">
                   {profilePicture ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={profilePicture}
-                      alt="Profile"
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={profilePicture} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white">
-                      {(formData.name || formData.username || "U")
-                        .charAt(0)
-                        .toUpperCase()}
+                      {(formData.name || formData.username || "U").charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
@@ -377,22 +462,17 @@ export default function AccountSettingsPage() {
               </div>
 
               <div className="pb-1">
-                <h2 className="text-lg font-bold text-white">
-                  {formData.name || formData.username || "Your Account"}
-                </h2>
+                <h2 className="text-lg font-bold text-white">{formData.name || formData.username || "Your Account"}</h2>
                 <p className="flex items-center gap-1.5 text-sm text-gray-400">
                   <Mail className="h-3.5 w-3.5" />
                   {session?.user?.email || "—"}
                 </p>
                 {formData.username && (
-                  <p className="mt-0.5 text-xs text-indigo-300">
-                    @{formData.username}
-                  </p>
+                  <p className="mt-0.5 text-xs text-indigo-300">@{formData.username}</p>
                 )}
               </div>
             </div>
 
-            {/* Status badges */}
             <div className="flex flex-wrap gap-2 pb-1">
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
                 <span className="relative flex h-2 w-2">
@@ -416,82 +496,47 @@ export default function AccountSettingsPage() {
           </div>
         </motion.div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Profile Images Card */}
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
-          >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Profile Images */}
+          <SettingCard>
             <SectionTitle icon={ImageIcon} title="Profile Images" />
-
             <div className="mt-4 space-y-6">
-              {/* Profile Picture */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-300">
-                  Profile Picture
-                </label>
-                <div className="flex items-center gap-4">
-                  <ImageUpload
-                    type="profile"
-                    currentImage={profilePicture}
-                    onUpload={(url) => setProfilePicture(url)}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Recommended: Square image, max 2MB
-                  </p>
+                <label className="mb-2 block text-sm font-medium text-gray-300">Profile Picture</label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <ImageUpload type="profile" currentImage={profilePicture} onUpload={(url) => setProfilePicture(url)} />
+                  <p className="text-xs text-gray-500">Recommended: Square image, max 2MB</p>
                 </div>
               </div>
-
-              {/* Banner Image */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-300">
-                  Banner Image
-                </label>
-                <div className="flex items-center gap-4">
-                  <ImageUpload
-                    type="banner"
-                    currentImage={bannerImage}
-                    onUpload={(url) => setBannerImage(url)}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Recommended: 1200x300px, max 2MB
-                  </p>
+                <label className="mb-2 block text-sm font-medium text-gray-300">Banner Image</label>
+                <div className="flex flex-wrap items-center gap-4">
+                  <ImageUpload type="banner" currentImage={bannerImage} onUpload={(url) => setBannerImage(url)} />
+                  <p className="text-xs text-gray-500">Recommended: 1200x300px, max 2MB</p>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </SettingCard>
 
-          {/* Personal Info Card */}
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
-          >
+          {/* Personal Information */}
+          <SettingCard>
             <SectionTitle icon={User} title="Personal Information" />
-
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              {/* Display Name */}
-              <div className="sm:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-300">
-                  Display Name
-                </label>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-300">Display Name</label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   placeholder="Your display name"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  This is how others see you
-                </p>
+                <p className="mt-1 text-xs text-gray-500">This is how others see you</p>
               </div>
 
-              {/* Username */}
-              <div className="sm:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-300">
-                  Username
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-300">Username</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                   <input
@@ -500,25 +545,20 @@ export default function AccountSettingsPage() {
                     value={formData.username}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 pl-10 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 pl-10 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                     placeholder="Your unique username"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Unique identifier for your profile
-                </p>
+                <p className="mt-1 text-xs text-gray-500">Unique identifier for your profile</p>
               </div>
 
-              {/* Class */}
-              <div className="sm:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-300">
-                  Class
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-300">Class</label>
                 <select
                   name="class"
                   value={formData.class}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 >
                   <option value="">Select Class</option>
                   <option value="Grade 9">Grade 9</option>
@@ -528,8 +568,7 @@ export default function AccountSettingsPage() {
                 </select>
               </div>
 
-              {/* Favorite Club */}
-              <div className="sm:col-span-1">
+              <div>
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-300">
                   <Heart className="h-3.5 w-3.5 text-pink-400" />
                   Favorite Club
@@ -539,12 +578,11 @@ export default function AccountSettingsPage() {
                   name="favoriteClub"
                   value={formData.favoriteClub}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   placeholder="e.g., Real Madrid, Manchester City"
                 />
               </div>
 
-              {/* Bio */}
               <div className="sm:col-span-2">
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-300">
                   <FileText className="h-3.5 w-3.5 text-indigo-400" />
@@ -555,23 +593,18 @@ export default function AccountSettingsPage() {
                   value={formData.bio}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full resize-none rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   placeholder="Tell the community about yourself..."
                 />
                 <p className="mt-1 text-xs text-gray-500">Max 500 characters</p>
               </div>
             </div>
-          </motion.div>
+          </SettingCard>
 
-          {/* Gaming Preferences Card */}
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
-          >
+          {/* Gaming Preferences */}
+          <SettingCard>
             <SectionTitle icon={Gamepad2} title="Gaming Preferences" />
-
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              {/* Preferred Formation */}
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-300">
                   <LayoutGrid className="h-3.5 w-3.5 text-indigo-400" />
@@ -581,7 +614,7 @@ export default function AccountSettingsPage() {
                   name="preferredFormation"
                   value={formData.preferredFormation}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 >
                   <option value="">Select Formation</option>
                   <option value="4-3-3">4-3-3</option>
@@ -593,7 +626,6 @@ export default function AccountSettingsPage() {
                 </select>
               </div>
 
-              {/* Preferred Playstyle */}
               <div>
                 <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-300">
                   <Gamepad2 className="h-3.5 w-3.5 text-purple-400" />
@@ -603,7 +635,7 @@ export default function AccountSettingsPage() {
                   name="preferredPlaystyle"
                   value={formData.preferredPlaystyle}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 >
                   <option value="">Select Playstyle</option>
                   <option value="Possession">Possession</option>
@@ -615,15 +647,11 @@ export default function AccountSettingsPage() {
                 </select>
               </div>
             </div>
-          </motion.div>
+          </SettingCard>
 
-          {/* Match Communication Card */}
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
-          >
+          {/* Match Communication */}
+          <SettingCard>
             <SectionTitle icon={MessageCircle} title="Match Communication" />
-
             <div className="mt-4">
               <label className="mb-1 block text-sm font-medium text-gray-300">
                 WhatsApp Number (with country code)
@@ -634,27 +662,15 @@ export default function AccountSettingsPage() {
                 value={formData.whatsappNumber}
                 onChange={handleChange}
                 placeholder="+254712345678"
-                className="w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Include country code. Example: +254712345678 for Kenya
-              </p>
+              <p className="mt-1 text-xs text-gray-500">Include country code. Example: +254712345678 for Kenya</p>
             </div>
 
-            {/* WhatsApp visibility toggle (native checkbox preserved) */}
-            <label
-              htmlFor="whatsappVisible"
-              className="mt-4 flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-900/40 p-3"
-            >
+            <label htmlFor="whatsappVisible" className="mt-4 flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-900/40 p-3">
               <div className="flex items-center gap-2">
-                {formData.whatsappVisible ? (
-                  <Eye className="h-4 w-4 text-green-400" />
-                ) : (
-                  <EyeOff className="h-4 w-4 text-gray-500" />
-                )}
-                <span className="text-sm text-gray-300">
-                  Allow match opponents to see my WhatsApp number
-                </span>
+                {formData.whatsappVisible ? <Eye className="h-4 w-4 text-green-400" /> : <EyeOff className="h-4 w-4 text-gray-500" />}
+                <span className="text-sm text-gray-300">Allow match opponents to see my WhatsApp number</span>
               </div>
               <div className="relative inline-flex flex-shrink-0 items-center">
                 <input
@@ -666,25 +682,16 @@ export default function AccountSettingsPage() {
                   className="peer sr-only"
                 />
                 <div className="h-6 w-11 rounded-full bg-gray-600 transition-all peer-checked:bg-indigo-600">
-                  <div
-                    className={`m-1 h-4 w-4 rounded-full bg-white transition-all ${
-                      formData.whatsappVisible ? "translate-x-5" : ""
-                    }`}
-                  />
+                  <div className={`m-1 h-4 w-4 rounded-full bg-white transition-all ${formData.whatsappVisible ? "translate-x-5" : ""}`} />
                 </div>
               </div>
             </label>
-          </motion.div>
+          </SettingCard>
 
-          {/* Email Settings Card */}
-          <motion.div
-            variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/10"
-          >
+          {/* Email Settings */}
+          <SettingCard>
             <SectionTitle icon={Mail} title="Email Settings" accent="text-indigo-400" />
-
             <div className="mt-4 space-y-4">
-              {/* Verification Status */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-gray-900/40 p-4">
                 <div>
                   <p className="font-medium text-white">Email Verification</p>
@@ -692,11 +699,7 @@ export default function AccountSettingsPage() {
                     {emailStatus.verified ? (
                       <span className="flex items-center gap-1 text-green-400">
                         <CheckCircle size={14} /> Verified{" "}
-                        {emailStatus.verifiedAt
-                          ? `at ${new Date(
-                              emailStatus.verifiedAt
-                            ).toLocaleDateString()}`
-                          : ""}
+                        {emailStatus.verifiedAt ? `at ${new Date(emailStatus.verifiedAt).toLocaleDateString()}` : ""}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-yellow-400">
@@ -713,11 +716,7 @@ export default function AccountSettingsPage() {
                       disabled={emailLoading}
                       className="flex min-h-[44px] items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm text-white shadow-lg shadow-indigo-500/30 transition-all hover:shadow-indigo-500/50 disabled:opacity-50"
                     >
-                      {emailLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send size={14} />
-                      )}
+                      {emailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send size={14} />}
                       Verify Email
                     </button>
                     <button
@@ -726,63 +725,27 @@ export default function AccountSettingsPage() {
                       disabled={resendLoading || resendCooldown > 0}
                       className="flex min-h-[44px] items-center gap-2 rounded-lg border border-white/10 bg-gray-700/40 px-4 py-2 text-sm text-white transition-all hover:bg-gray-600/40 disabled:opacity-50"
                     >
-                      {resendLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw size={14} />
-                      )}
+                      {resendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw size={14} />}
                       {resendCooldown > 0 ? `${resendCooldown}s` : "Resend"}
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Message display */}
               {emailMessage && (
-                <div
-                  className={`rounded-xl p-3 text-sm ${
-                    emailMessage.includes("✅")
-                      ? "bg-green-500/20 text-green-400"
-                      : "bg-red-500/20 text-red-400"
-                  }`}
-                >
+                <div className={`rounded-xl p-3 text-sm ${emailMessage.includes("✅") ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
                   {emailMessage}
                 </div>
               )}
 
-              {/* Email Notification Toggle */}
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-gray-900/40 p-4">
-                <div>
-                  <p className="font-medium text-white">Email Notifications</p>
-                  <p className="text-sm text-gray-400">
-                    Receive match reminders and important updates
-                  </p>
-                </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={emailStatus.notificationsEnabled}
-                    disabled={!emailStatus.verified}
-                    className="peer sr-only"
-                    onChange={(e) => handleNotificationToggle(e.target.checked)}
-                  />
-                  <div
-                    className={`h-6 w-11 rounded-full bg-gray-600 transition-all peer-checked:bg-indigo-600 ${
-                      !emailStatus.verified
-                        ? "cursor-not-allowed opacity-50"
-                        : ""
-                    }`}
-                  >
-                    <div
-                      className={`m-1 h-4 w-4 rounded-full bg-white transition-all ${
-                        emailStatus.notificationsEnabled ? "translate-x-5" : ""
-                      }`}
-                    />
-                  </div>
-                </label>
-              </div>
+              <ToggleSwitch
+                checked={emailStatus.notificationsEnabled}
+                onChange={handleNotificationToggle}
+                disabled={!emailStatus.verified}
+                label="Email Notifications"
+                description="Receive match reminders and important updates"
+              />
 
-              {/* Info message if not verified */}
               {!emailStatus.verified && (
                 <p className="flex items-center gap-1 text-sm text-yellow-400/80">
                   <AlertCircle size={14} />
@@ -790,9 +753,9 @@ export default function AccountSettingsPage() {
                 </p>
               )}
             </div>
-          </motion.div>
+          </SettingCard>
 
-          {/* Account Security Tip */}
+          {/* Security Tip */}
           <motion.div
             variants={itemVariants}
             className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 p-5 backdrop-blur-xl"
@@ -825,9 +788,7 @@ export default function AccountSettingsPage() {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-gray-900/80 backdrop-blur-xl"
       >
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
-          <p className="hidden text-xs text-gray-500 sm:block">
-            Changes are saved to your profile
-          </p>
+          <p className="hidden text-xs text-gray-500 sm:block">Changes are saved to your profile</p>
           <div className="flex w-full gap-3 sm:w-auto">
             <button
               type="button"
@@ -849,35 +810,17 @@ export default function AccountSettingsPage() {
             >
               <AnimatePresence mode="wait" initial={false}>
                 {saving ? (
-                  <motion.span
-                    key="saving"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
+                  <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Saving...
                   </motion.span>
                 ) : saveSuccess ? (
-                  <motion.span
-                    key="saved"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
+                  <motion.span key="saved" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                     <Check className="h-4 w-4" />
                     Saved!
                   </motion.span>
                 ) : (
-                  <motion.span
-                    key="save"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
-                  >
+                  <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                     <Save className="h-4 w-4" />
                     Save Changes
                   </motion.span>
@@ -887,48 +830,6 @@ export default function AccountSettingsPage() {
           </div>
         </div>
       </motion.div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                       Reusable presentational bits                          */
-/* -------------------------------------------------------------------------- */
-
-function SectionTitle({
-  icon: Icon,
-  title,
-  accent = "text-indigo-400",
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  accent?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
-        <Icon className={`h-4 w-4 ${accent}`} />
-      </span>
-      <h3 className="text-base font-semibold text-white">{title}</h3>
-    </div>
-  );
-}
-
-/* Decorative animated gradient background with blur orbs + grid overlay */
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
     </div>
   );
 }

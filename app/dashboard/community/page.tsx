@@ -2,7 +2,7 @@
 
 import EmptyState from "@/components/ui/EmptyState";
 import Image from "next/image";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback,memo } from "react";
 import { useSession } from "next-auth/react";
 import {
   Heart,
@@ -22,14 +22,12 @@ import {
   Sparkles,
   Users,
   MessageSquare,
+  Loader2,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { SkeletonCommunityPost, Skeleton } from "@/components/ui/Skeleton";
-import {
-  motion,
-  AnimatePresence,
-  type Variants,
-} from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 interface Post {
   id: string;
@@ -65,16 +63,16 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.07, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
@@ -125,6 +123,91 @@ function relativeTime(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const StatChip = memo(({ icon: Icon, label, value, accent }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  accent: string;
+}) => (
+  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-xl">
+    <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${accent}`}>
+      <Icon className="h-5 w-5" />
+    </span>
+    <div>
+      <p className="text-lg font-bold text-white">{value}</p>
+      <p className="text-[11px] text-gray-400">{label}</p>
+    </div>
+  </div>
+));
+
+StatChip.displayName = "StatChip";
+
+const CommentItem = memo(({ comment }: { comment: Comment }) => {
+  const username = comment.user.profile?.username || comment.user.name || "Player";
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex gap-2"
+    >
+      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-600 to-gray-700 text-xs font-bold text-white ring-1 ring-white/10">
+        {username.charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/5">
+        <p className="text-sm">
+          <span className="font-semibold text-white">{username}</span>
+          <span className="ml-2 text-gray-300">{comment.content}</span>
+        </p>
+        <p className="mt-1 text-xs text-gray-500">{relativeTime(comment.createdAt)}</p>
+      </div>
+    </motion.div>
+  );
+});
+
+CommentItem.displayName = "CommentItem";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function CommunityPage() {
   const { data: session } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -142,8 +225,6 @@ export default function CommunityPage() {
   const [privacySettings, setPrivacySettings] = useState<{
     allowComments: boolean;
   }>({ allowComments: true });
-
-  // UI-only lightbox state (does not alter any data/state shape or API)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,8 +245,7 @@ export default function CommunityPage() {
       if (res.ok) {
         const data = await res.json();
         setPrivacySettings({
-          allowComments:
-            data.allowComments !== undefined ? data.allowComments : true,
+          allowComments: data.allowComments !== undefined ? data.allowComments : true,
         });
       }
     } catch (error) {
@@ -173,7 +253,7 @@ export default function CommunityPage() {
     }
   }
 
-  async function handleCreatePost(e: React.FormEvent) {
+  const handleCreatePost = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPost.trim()) {
       toast.error("Please enter some content");
@@ -201,9 +281,9 @@ export default function CommunityPage() {
       toast.error("Failed to post");
     }
     setPosting(false);
-  }
+  }, [newPost, newPostImage, newPostType]);
 
-  async function handleLike(postId: string) {
+  const handleLike = useCallback(async (postId: string) => {
     const res = await fetch("/api/community/like", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -223,10 +303,9 @@ export default function CommunityPage() {
       }
       fetchPosts();
     }
-  }
+  }, []);
 
-  // ✅ Phase 1: Check if commenting is allowed
-  async function handleComment(postId: string) {
+  const handleComment = useCallback(async (postId: string) => {
     if (!privacySettings.allowComments) {
       toast.error("Comments are disabled for this post");
       return;
@@ -254,9 +333,9 @@ export default function CommunityPage() {
     } else {
       toast.error("Failed to add comment");
     }
-  }
+  }, [commentText, privacySettings.allowComments]);
 
-  async function handleDeletePost(postId: string) {
+  const handleDeletePost = useCallback(async (postId: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
 
     try {
@@ -274,9 +353,9 @@ export default function CommunityPage() {
       console.error("Error deleting post:", error);
       toast.error("Failed to delete post");
     }
-  }
+  }, []);
 
-  async function handleEditPost(postId: string) {
+  const handleEditPost = useCallback(async (postId: string) => {
     if (!editContent.trim()) {
       toast.error("Please enter some content");
       return;
@@ -301,9 +380,9 @@ export default function CommunityPage() {
       console.error("Error editing post:", error);
       toast.error("Failed to update post");
     }
-  }
+  }, [editContent]);
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -317,18 +396,12 @@ export default function CommunityPage() {
       setNewPostImage(reader.result as string);
     };
     reader.readAsDataURL(file);
-  }
+  }, []);
 
-  // Filter posts by type
-  const filteredPosts =
-    filterType === "ALL"
-      ? posts
-      : posts.filter((post) => post.type === filterType);
+  const filteredPosts = useMemo(() => {
+    return filterType === "ALL" ? posts : posts.filter((post) => post.type === filterType);
+  }, [posts, filterType]);
 
-  // Check if user can comment on a post
-  const canComment = privacySettings.allowComments || false;
-
-  // Engagement stats (UI summary derived from posts — read-only)
   const totalPosts = posts.length;
   const totalComments = useMemo(
     () => posts.reduce((acc, p) => acc + (p._count?.comments || 0), 0),
@@ -339,16 +412,18 @@ export default function CommunityPage() {
     [posts, session?.user?.id]
   );
 
+  const canComment = privacySettings.allowComments || false;
+
   if (loading) {
     return (
-      <div className="relative">
+      <>
         <DecorBackground />
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
           <div>
             <Skeleton variant="text" className="h-8 w-48" />
             <Skeleton variant="text" className="mt-1 h-4 w-64" />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 backdrop-blur-xl">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
             <Skeleton variant="text" className="h-20 w-full" />
             <div className="mt-3 flex items-center justify-between">
               <Skeleton variant="text" className="h-4 w-24" />
@@ -359,7 +434,7 @@ export default function CommunityPage() {
             <SkeletonCommunityPost key={i} />
           ))}
         </div>
-      </div>
+      </>
     );
   }
 
@@ -401,7 +476,7 @@ export default function CommunityPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="mx-auto max-w-3xl space-y-6"
+        className="mx-auto max-w-3xl space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div variants={itemVariants}>
@@ -410,42 +485,20 @@ export default function CommunityPage() {
               <Users className="h-6 w-6 text-white" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                Community Feed
-              </h1>
-              <p className="mt-1 text-gray-400">
-                Share updates, celebrate achievements, and connect with players
-              </p>
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">💬 Community Feed</h1>
+              <p className="mt-1 text-gray-400">Share updates, celebrate achievements, and connect with players</p>
             </div>
           </div>
         </motion.div>
 
         {/* Engagement Stats */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-3 gap-3"
-        >
-          <StatChip
-            icon={MessageSquare}
-            label="Posts"
-            value={totalPosts}
-            accent="text-indigo-400"
-          />
-          <StatChip
-            icon={MessageCircle}
-            label="Comments"
-            value={totalComments}
-            accent="text-purple-400"
-          />
-          <StatChip
-            icon={Sparkles}
-            label="Your Posts"
-            value={myPosts}
-            accent="text-pink-400"
-          />
+        <motion.div variants={containerVariants} className="grid grid-cols-3 gap-3">
+          <StatChip icon={MessageSquare} label="Posts" value={totalPosts} accent="text-indigo-400" />
+          <StatChip icon={MessageCircle} label="Comments" value={totalComments} accent="text-purple-400" />
+          <StatChip icon={Sparkles} label="Your Posts" value={myPosts} accent="text-pink-400" />
         </motion.div>
 
-        {/* ✅ Privacy Warning - Show if comments are disabled */}
+        {/* Privacy Warning */}
         {!privacySettings.allowComments && (
           <motion.div
             variants={itemVariants}
@@ -454,9 +507,7 @@ export default function CommunityPage() {
             <div className="flex items-start gap-3">
               <EyeOff className="mt-0.5 h-5 w-5 text-yellow-400" />
               <div>
-                <h3 className="font-semibold text-yellow-400">
-                  Comments are Disabled
-                </h3>
+                <h3 className="font-semibold text-yellow-400">Comments are Disabled</h3>
                 <p className="text-sm text-gray-300">
                   Comments on your posts are currently disabled. You can change
                   this in your
@@ -476,14 +527,12 @@ export default function CommunityPage() {
         {/* Create Post */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
         >
           <form onSubmit={handleCreatePost} className="space-y-3">
             <div className="flex gap-3">
               <span className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-sm font-bold text-white sm:flex">
-                {(
-                  session?.user?.name?.charAt(0) || "Y"
-                ).toUpperCase()}
+                {(session?.user?.name?.charAt(0) || "Y").toUpperCase()}
               </span>
               <textarea
                 value={newPost}
@@ -503,7 +552,6 @@ export default function CommunityPage() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="relative inline-block"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={newPostImage}
                     alt="Preview"
@@ -542,7 +590,6 @@ export default function CommunityPage() {
                 <option value="ACHIEVEMENT">Achievement</option>
               </select>
 
-              {/* Character count */}
               <span className="text-xs text-gray-500">{newPost.length}/1000</span>
 
               <button
@@ -552,7 +599,7 @@ export default function CommunityPage() {
               >
                 {posting ? (
                   <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Posting...
                   </>
                 ) : (
@@ -575,7 +622,7 @@ export default function CommunityPage() {
               className={`min-h-[44px] rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
                 filterType === tab.key
                   ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30"
-                  : "border border-white/10 bg-gray-800/40 text-gray-400 backdrop-blur-xl hover:text-white"
+                  : "border border-white/10 bg-white/5 text-gray-400 backdrop-blur-xl hover:text-white"
               }`}
             >
               {tab.label}
@@ -597,16 +644,14 @@ export default function CommunityPage() {
         ) : (
           <AnimatePresence mode="popLayout">
             {filteredPosts.map((post) => {
-              const username =
-                post.user.profile?.username || post.user.name || "Player";
+              const username = post.user.profile?.username || post.user.name || "Player";
               const isLiked = likedPosts.has(post.id);
               const isOwnPost = post.userId === session?.user?.id;
-              const typeCfg =
-                postTypeConfig[post.type] || {
-                  label: post.type.replace("_", " "),
-                  badge: "bg-gray-500/15 text-gray-300 ring-gray-500/30",
-                  icon: MessageCircle,
-                };
+              const typeCfg = postTypeConfig[post.type] || {
+                label: post.type.replace("_", " "),
+                badge: "bg-gray-500/15 text-gray-300 ring-gray-500/30",
+                icon: MessageCircle,
+              };
               const TypeIcon = typeCfg.icon;
 
               return (
@@ -617,9 +662,8 @@ export default function CommunityPage() {
                   initial="hidden"
                   animate="visible"
                   exit={{ opacity: 0, y: -10 }}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl"
                 >
-                  {/* Post Header */}
                   <div className="border-b border-white/5 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -629,12 +673,8 @@ export default function CommunityPage() {
                         <div>
                           <p className="font-semibold text-white">{username}</p>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-xs text-gray-500">
-                              {relativeTime(post.createdAt)}
-                            </p>
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${typeCfg.badge}`}
-                            >
+                            <p className="text-xs text-gray-500">{relativeTime(post.createdAt)}</p>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${typeCfg.badge}`}>
                               <TypeIcon className="h-3 w-3" />
                               {typeCfg.label}
                             </span>
@@ -665,7 +705,6 @@ export default function CommunityPage() {
                     </div>
                   </div>
 
-                  {/* Post Content */}
                   <div className="p-4">
                     {editingPost === post.id ? (
                       <div className="space-y-2">
@@ -692,9 +731,7 @@ export default function CommunityPage() {
                       </div>
                     ) : (
                       <>
-                        <p className="whitespace-pre-wrap text-gray-200">
-                          {post.content}
-                        </p>
+                        <p className="whitespace-pre-wrap text-gray-200">{post.content}</p>
                         {post.image && (
                           <button
                             type="button"
@@ -715,44 +752,31 @@ export default function CommunityPage() {
                     )}
                   </div>
 
-                  {/* Post Actions */}
                   <div className="flex flex-wrap gap-2 border-b border-white/5 px-4 pb-3">
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       onClick={() => handleLike(post.id)}
                       className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm transition-colors ${
-                        isLiked
-                          ? "text-red-500"
-                          : "text-gray-400 hover:text-red-500"
+                        isLiked ? "text-red-500" : "text-gray-400 hover:text-red-500"
                       }`}
                     >
                       <motion.span
                         key={isLiked ? "liked" : "unliked"}
                         initial={{ scale: 0.6 }}
                         animate={{ scale: 1 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 15,
-                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 15 }}
                       >
-                        <Heart
-                          size={18}
-                          fill={isLiked ? "currentColor" : "none"}
-                        />
+                        <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
                       </motion.span>
                       <span>{post.likes} likes</span>
                     </motion.button>
                     <button
                       onClick={() => {
-                        // ✅ Only allow if comments are enabled
                         if (!privacySettings.allowComments) {
                           toast.error("Comments are disabled for this post");
                           return;
                         }
-                        setCommenting(
-                          commenting === post.id ? null : post.id
-                        );
+                        setCommenting(commenting === post.id ? null : post.id);
                       }}
                       className={`flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm transition-colors ${
                         privacySettings.allowComments
@@ -769,7 +793,6 @@ export default function CommunityPage() {
                     </button>
                   </div>
 
-                  {/* Comments Section - ✅ Only show if comments are allowed */}
                   <AnimatePresence>
                     {commenting === post.id && (
                       <motion.div
@@ -781,9 +804,7 @@ export default function CommunityPage() {
                         {canComment ? (
                           <div className="mb-3 flex gap-2">
                             <span className="hidden h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white sm:flex">
-                              {(
-                                session?.user?.name?.charAt(0) || "Y"
-                              ).toUpperCase()}
+                              {(session?.user?.name?.charAt(0) || "Y").toUpperCase()}
                             </span>
                             <input
                               type="text"
@@ -809,39 +830,10 @@ export default function CommunityPage() {
                     )}
                   </AnimatePresence>
 
-                  {/* Comments List - ✅ Only show if comments exist */}
                   {post.comments.length > 0 && (
                     <div className="space-y-3 bg-gray-900/20 p-4">
                       {post.comments.map((comment) => (
-                        <motion.div
-                          key={comment.id}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex gap-2"
-                        >
-                          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-600 to-gray-700 text-xs font-bold text-white ring-1 ring-white/10">
-                            {(
-                              comment.user.profile?.username?.charAt(0) ||
-                              comment.user.name?.charAt(0) ||
-                              "U"
-                            ).toUpperCase()}
-                          </div>
-                          <div className="min-w-0 flex-1 rounded-xl bg-white/[0.03] px-3 py-2 ring-1 ring-white/5">
-                            <p className="text-sm">
-                              <span className="font-semibold text-white">
-                                {comment.user.profile?.username ||
-                                  comment.user.name ||
-                                  "Player"}
-                              </span>
-                              <span className="ml-2 text-gray-300">
-                                {comment.content}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              {relativeTime(comment.createdAt)}
-                            </p>
-                          </div>
-                        </motion.div>
+                        <CommentItem key={comment.id} comment={comment} />
                       ))}
                     </div>
                   )}
@@ -851,53 +843,6 @@ export default function CommunityPage() {
           </AnimatePresence>
         )}
       </motion.div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*                       Reusable presentational bits                          */
-/* -------------------------------------------------------------------------- */
-
-function StatChip({
-  icon: Icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  accent: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-gray-800/40 p-3 backdrop-blur-xl">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${accent}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-lg font-bold text-white">{value}</p>
-        <p className="text-[11px] text-gray-400">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-/* Decorative animated gradient background with blur orbs + grid overlay */
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[120px]" />
-      <div className="absolute -right-32 top-1/3 h-72 w-72 rounded-full bg-purple-600/20 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-pink-600/10 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
     </div>
   );
 }

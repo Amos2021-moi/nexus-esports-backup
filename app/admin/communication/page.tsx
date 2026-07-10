@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
@@ -37,6 +37,7 @@ import {
   UserMinus,
   ArrowRight,
   Paperclip,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -105,16 +106,16 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, ease: "easeOut" },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
@@ -145,42 +146,42 @@ const statVariants: Variants = {
 /*                            Decor Background                                */
 /* -------------------------------------------------------------------------- */
 
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
-      <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
-      />
-      <motion.div
-        animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
-      />
-      <motion.div
-        animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
-      />
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
-    </div>
-  );
-}
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -right-32 top-1/3 h-96 w-96 rounded-full bg-purple-600/15 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.03]"
+      style={{
+        backgroundImage:
+          "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
 
 /* -------------------------------------------------------------------------- */
 /*                           Utility Components                               */
 /* -------------------------------------------------------------------------- */
 
-function StatusBadge({ status }: { status: string }) {
+const StatusBadge = memo(({ status }: { status: string }) => {
   const configs: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
     SENT: {
       label: "Sent",
@@ -222,9 +223,11 @@ function StatusBadge({ status }: { status: string }) {
       {config.label}
     </span>
   );
-}
+});
 
-function ChannelBadge({ channel }: { channel: string }) {
+StatusBadge.displayName = "StatusBadge";
+
+const ChannelBadge = memo(({ channel }: { channel: string }) => {
   const configs: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
     EMAIL: { label: "Email", icon: <Mail className="h-3.5 w-3.5" />, color: "text-blue-400 border-blue-500/20 bg-blue-500/10" },
     IN_APP: { label: "In-App", icon: <Bell className="h-3.5 w-3.5" />, color: "text-purple-400 border-purple-500/20 bg-purple-500/10" },
@@ -244,15 +247,17 @@ function ChannelBadge({ channel }: { channel: string }) {
       {config.label}
     </span>
   );
-}
+});
 
-function StatCard({
+ChannelBadge.displayName = "ChannelBadge";
+
+const StatCard = memo(({
   icon: Icon,
   label,
   value,
   subtitle,
   color,
-  delay,
+  delay = 0,
 }: {
   icon: React.ElementType;
   label: string;
@@ -260,37 +265,172 @@ function StatCard({
   subtitle?: string;
   color: string;
   delay?: number;
-}) {
-  return (
-    <motion.div
-      variants={statVariants}
-      initial="hidden"
-      animate="visible"
-      transition={{ delay: delay || 0 }}
-      whileHover={{ y: -4 }}
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-xl backdrop-blur-xl transition-all hover:border-indigo-500/40"
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40",
-          color
-        )}
-      />
-      <div className="relative">
-        <div className="mb-3 flex items-center justify-between">
-          <div className={cn("rounded-xl p-2.5", color)}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-          {subtitle && (
-            <span className="text-[10px] font-medium text-gray-500">{subtitle}</span>
-          )}
+}) => (
+  <motion.div
+    variants={statVariants}
+    initial="hidden"
+    animate="visible"
+    transition={{ delay }}
+    whileHover={{ y: -4 }}
+    className="will-change-transform group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-xl transition-all hover:border-indigo-500/40"
+  >
+    <div
+      className={cn(
+        "pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40",
+        color
+      )}
+    />
+    <div className="relative">
+      <div className="mb-3 flex items-center justify-between">
+        <div className={cn("rounded-xl p-2.5", color)}>
+          <Icon className="h-5 w-5 text-white" />
         </div>
-        <p className="text-2xl font-bold text-white">{value}</p>
-        <p className="mt-1 text-xs font-medium text-gray-400">{label}</p>
+        {subtitle && <span className="text-[10px] font-medium text-gray-500">{subtitle}</span>}
       </div>
-    </motion.div>
-  );
-}
+      <p className="text-2xl font-bold text-white">{value}</p>
+      <p className="mt-1 text-xs font-medium text-gray-400">{label}</p>
+    </div>
+  </motion.div>
+));
+
+StatCard.displayName = "StatCard";
+
+/* -------------------------------------------------------------------------- */
+/*                           Memoized Components                              */
+/* -------------------------------------------------------------------------- */
+
+const PlayerCheckbox = memo(({ player, isSelected, onToggle }: {
+  player: Player;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+}) => (
+  <label
+    className={cn(
+      "flex cursor-pointer items-center gap-3 rounded-lg p-2.5 transition-all hover:bg-gray-700/30",
+      isSelected && "bg-indigo-500/10 ring-1 ring-indigo-500/30"
+    )}
+  >
+    <input
+      type="checkbox"
+      checked={isSelected}
+      onChange={() => onToggle(player.id)}
+      className="h-4 w-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500"
+    />
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-white truncate">
+        {player.profile?.username || player.name || "Unknown"}
+      </p>
+      <p className="text-xs text-gray-500 truncate">{player.email}</p>
+    </div>
+    {player.isVerified && (
+      <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-green-400" />
+    )}
+  </label>
+));
+
+PlayerCheckbox.displayName = "PlayerCheckbox";
+
+const HistoryMessage = memo(({ log, isExpanded, onToggle, onDelete }: {
+  log: CommunicationLog;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onDelete: (id: string) => void;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="overflow-hidden rounded-xl border border-white/10 bg-gray-900/30 transition-all hover:border-indigo-500/20"
+  >
+    <div
+      className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-4 transition-colors hover:bg-white/5"
+      onClick={onToggle}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate font-medium text-white">{log.subject}</span>
+          <StatusBadge status={log.status} />
+          <ChannelBadge channel={log.channel} />
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {log.recipientType === "ALL" ? "All Players" : `${log.recipientCount} players`}
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {new Date(log.sentAt).toLocaleString()}
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <Shield className="h-3 w-3" />
+            {log.admin.name || log.admin.email}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(log.id);
+          }}
+          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+        {isExpanded ? (
+          <ChevronUp className="h-5 w-5 text-gray-400" />
+        ) : (
+          <ChevronDown className="h-5 w-5 text-gray-400" />
+        )}
+      </div>
+    </div>
+
+    <AnimatePresence>
+      {isExpanded && log.stats && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3 }}
+          className="border-t border-white/10 bg-gray-800/30 p-4"
+        >
+          <p className="mb-4 whitespace-pre-wrap text-sm text-gray-300">{log.message}</p>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { label: "Email Sent", value: log.stats.email.sent, color: "text-green-400" },
+              { label: "Email Delivered", value: log.stats.email.delivered, color: "text-blue-400" },
+              { label: "Email Read", value: log.stats.email.read, color: "text-purple-400" },
+              { label: "Email Failed", value: log.stats.email.failed, color: "text-red-400" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
+                <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                <p className="text-[10px] text-gray-500">{item.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { label: "In-App Sent", value: log.stats.inApp.sent, color: "text-green-400" },
+              { label: "In-App Delivered", value: log.stats.inApp.delivered, color: "text-blue-400" },
+              { label: "In-App Read", value: log.stats.inApp.read, color: "text-purple-400" },
+              { label: "In-App Failed", value: log.stats.inApp.failed, color: "text-red-400" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
+                <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                <p className="text-[10px] text-gray-500">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </motion.div>
+));
+
+HistoryMessage.displayName = "HistoryMessage";
 
 /* -------------------------------------------------------------------------- */
 /*                           Main Component                                  */
@@ -300,7 +440,6 @@ export default function CommunicationCenterPage() {
   const { data: session } = useSession();
   const router = useRouter();
 
-  // State
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -319,7 +458,6 @@ export default function CommunicationCenterPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isComposeExpanded, setIsComposeExpanded] = useState(true);
 
-  // Fetch Data
   const fetchPlayers = useCallback(async (search?: string) => {
     try {
       const url = `/api/admin/communication/recipients${search ? `?search=${search}` : ""}`;
@@ -337,11 +475,8 @@ export default function CommunicationCenterPage() {
       const params = new URLSearchParams();
       if (filterStatus) params.append("status", filterStatus);
       if (filterChannel) params.append("channel", filterChannel);
-      // Add a timestamp to prevent caching
       params.append("_t", Date.now().toString());
       const url = `/api/admin/communication/history?${params.toString()}`;
-
-      console.log("🔍 Fetching history:", url);
 
       const res = await fetch(url, {
         cache: "no-store",
@@ -352,7 +487,6 @@ export default function CommunicationCenterPage() {
       });
 
       const data = await res.json();
-      console.log("🔍 History data received:", data.logs?.length || 0, "messages");
 
       if (data.logs && Array.isArray(data.logs)) {
         setHistory(data.logs);
@@ -398,87 +532,84 @@ export default function CommunicationCenterPage() {
   }, [fetchPlayers, fetchHistory, fetchStats]);
 
   useEffect(() => {
-  const loadData = async () => {
-    console.log("🔄 [PROD] Loading data...");
-    setLoading(true);
+    const loadData = async () => {
+      console.log("🔄 [PROD] Loading data...");
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchPlayers(),
+          fetchHistory(),
+          fetchStats(),
+        ]);
+        console.log("🔄 [PROD] Data loaded successfully");
+      } catch (error) {
+        console.error("🔄 [PROD] Error loading data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleSend = async () => {
+    if (!subject.trim() || !message.trim()) {
+      toast.error("Subject and message are required");
+      return;
+    }
+
+    if (recipientType === "SPECIFIC" && selectedPlayers.length === 0) {
+      toast.error("Please select at least one player");
+      return;
+    }
+
+    const recipients = recipientType === "ALL" ? "all" : selectedPlayers;
+
+    setSending(true);
     try {
-      await Promise.all([
-        fetchPlayers(),
-        fetchHistory(),
-        fetchStats(),
-      ]);
-      console.log("🔄 [PROD] Data loaded successfully");
+      const res = await fetch("/api/admin/communication/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel,
+          recipients,
+          subject,
+          message,
+          attachments: attachments.map((a) => ({
+            fileName: a.fileName,
+            fileSize: a.fileSize,
+            fileType: a.fileType,
+            fileUrl: a.fileUrl,
+            mimeType: a.mimeType,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(data.message || "Message sent successfully!");
+        setSubject("");
+        setMessage("");
+        setSelectedPlayers([]);
+        setAttachments([]);
+        
+        setTimeout(async () => {
+          console.log("🔄 Refreshing history after send...");
+          await fetchHistory();
+          await fetchStats();
+          console.log("✅ History refreshed");
+        }, 1000);
+        
+      } else {
+        toast.error(data.error || "Failed to send message");
+      }
     } catch (error) {
-      console.error("🔄 [PROD] Error loading data:", error);
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
-  loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-  // Handlers
-  const handleSend = async () => {
-  if (!subject.trim() || !message.trim()) {
-    toast.error("Subject and message are required");
-    return;
-  }
-
-  if (recipientType === "SPECIFIC" && selectedPlayers.length === 0) {
-    toast.error("Please select at least one player");
-    return;
-  }
-
-  const recipients = recipientType === "ALL" ? "all" : selectedPlayers;
-
-  setSending(true);
-  try {
-    const res = await fetch("/api/admin/communication/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        channel,
-        recipients,
-        subject,
-        message,
-        attachments: attachments.map((a) => ({
-          fileName: a.fileName,
-          fileSize: a.fileSize,
-          fileType: a.fileType,
-          fileUrl: a.fileUrl,
-          mimeType: a.mimeType,
-        })),
-      }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      toast.success(data.message || "Message sent successfully!");
-      setSubject("");
-      setMessage("");
-      setSelectedPlayers([]);
-      setAttachments([]);
-      
-      // Force refresh history with a small delay
-      setTimeout(async () => {
-        console.log("🔄 Refreshing history after send...");
-        await fetchHistory();
-        await fetchStats();
-        console.log("✅ History refreshed");
-      }, 1000);
-      
-    } else {
-      toast.error(data.error || "Failed to send message");
-    }
-  } catch (error) {
-    console.error("Error sending message:", error);
-    toast.error("Failed to send message");
-  } finally {
-    setSending(false);
-  }
-};
 
   const handleDelete = async (logId: string) => {
     if (!confirm("Are you sure you want to delete this message log?")) return;
@@ -529,7 +660,6 @@ export default function CommunicationCenterPage() {
 
   const totalSelected = selectedPlayers.length;
 
-  // Loading State
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -556,7 +686,7 @@ export default function CommunicationCenterPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-6"
+        className="space-y-5 will-change-transform sm:space-y-6"
       >
         {/* Header */}
         <motion.div
@@ -602,10 +732,7 @@ export default function CommunicationCenterPage() {
         </motion.div>
 
         {/* Stats Cards */}
-        <motion.div
-          variants={containerVariants}
-          className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5"
-        >
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
           <StatCard
             icon={SendHorizontal}
             label="Total Messages"
@@ -645,11 +772,8 @@ export default function CommunicationCenterPage() {
         </motion.div>
 
         {/* Status & Channel Breakdown */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-1 gap-4 md:grid-cols-2"
-        >
-          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-3 text-sm font-semibold text-white">Status Breakdown</h3>
             <div className="flex flex-wrap gap-2">
               {stats?.statusBreakdown &&
@@ -664,7 +788,7 @@ export default function CommunicationCenterPage() {
                 ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-gray-800/40 p-5 shadow-2xl backdrop-blur-xl">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl">
             <h3 className="mb-3 text-sm font-semibold text-white">Channel Breakdown</h3>
             <div className="flex flex-wrap gap-2">
               {stats?.channelBreakdown &&
@@ -687,12 +811,11 @@ export default function CommunicationCenterPage() {
           initial="hidden"
           animate="visible"
           whileHover="hover"
-          className="relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
+          className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl"
         >
           <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-indigo-500/10 blur-2xl" />
 
           <div className="relative p-6">
-            {/* Compose Header */}
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
@@ -700,9 +823,7 @@ export default function CommunicationCenterPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">Compose Message</h2>
-                  <p className="text-xs text-gray-400">
-                    Send announcements, updates, or direct messages
-                  </p>
+                  <p className="text-xs text-gray-400">Send announcements, updates, or direct messages</p>
                 </div>
               </div>
               <button
@@ -724,9 +845,7 @@ export default function CommunicationCenterPage() {
                 >
                   {/* Channel Selection */}
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-300">
-                      Send via
-                    </label>
+                    <label className="mb-2 block text-sm font-medium text-gray-300">Send via</label>
                     <div className="flex flex-wrap gap-3">
                       {(["EMAIL", "IN_APP", "BOTH"] as const).map((option) => (
                         <button
@@ -750,9 +869,7 @@ export default function CommunicationCenterPage() {
 
                   {/* Recipient Selection */}
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-300">
-                      Recipients
-                    </label>
+                    <label className="mb-2 block text-sm font-medium text-gray-300">Recipients</label>
                     <div className="flex flex-wrap gap-3">
                       <button
                         onClick={() => setRecipientType("ALL")}
@@ -809,46 +926,22 @@ export default function CommunicationCenterPage() {
                               )}
                               {selectedPlayers.length === players.length ? "Deselect All" : "Select All"}
                             </button>
-                            <span className="text-xs text-gray-500">
-                              {totalSelected} selected
-                            </span>
+                            <span className="text-xs text-gray-500">{totalSelected} selected</span>
                           </div>
                         </div>
 
                         <div className="mt-3 max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/5 bg-gray-900/30 p-1">
                           {filteredPlayers.length === 0 ? (
-                            <div className="py-6 text-center text-sm text-gray-500">
-                              No players found
-                            </div>
+                            <div className="py-6 text-center text-sm text-gray-500">No players found</div>
                           ) : (
-                            filteredPlayers.map((player) => {
-                              const isSelected = selectedPlayers.includes(player.id);
-                              return (
-                                <label
-                                  key={player.id}
-                                  className={cn(
-                                    "flex cursor-pointer items-center gap-3 rounded-lg p-2.5 transition-all hover:bg-gray-700/30",
-                                    isSelected && "bg-indigo-500/10 ring-1 ring-indigo-500/30"
-                                  )}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => togglePlayerSelection(player.id)}
-                                    className="h-4 w-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">
-                                      {player.profile?.username || player.name || "Unknown"}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">{player.email}</p>
-                                  </div>
-                                  {player.isVerified && (
-                                    <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-green-400" />
-                                  )}
-                                </label>
-                              );
-                            })
+                            filteredPlayers.map((player) => (
+                              <PlayerCheckbox
+                                key={player.id}
+                                player={player}
+                                isSelected={selectedPlayers.includes(player.id)}
+                                onToggle={togglePlayerSelection}
+                              />
+                            ))
                           )}
                         </div>
                       </motion.div>
@@ -857,9 +950,7 @@ export default function CommunicationCenterPage() {
 
                   {/* Subject */}
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-gray-300">
-                      Subject
-                    </label>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-300">Subject</label>
                     <input
                       type="text"
                       value={subject}
@@ -886,9 +977,7 @@ export default function CommunicationCenterPage() {
 
                   {/* Attachments */}
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-300">
-                      Attachments (Optional)
-                    </label>
+                    <label className="mb-2 block text-sm font-medium text-gray-300">Attachments (Optional)</label>
                     <FileAttachment
                       onAttachmentsChange={setAttachments}
                       maxFiles={5}
@@ -929,7 +1018,7 @@ export default function CommunicationCenterPage() {
           initial="hidden"
           animate="visible"
           whileHover="hover"
-          className="rounded-2xl border border-white/10 bg-gray-800/40 shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl"
         >
           <div className="p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -939,9 +1028,7 @@ export default function CommunicationCenterPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">Message History</h2>
-                  <p className="text-xs text-gray-400">
-                    {history.length} messages sent
-                  </p>
+                  <p className="text-xs text-gray-400">{history.length} messages sent</p>
                 </div>
               </div>
 
@@ -988,114 +1075,15 @@ export default function CommunicationCenterPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {history.map((log) => {
-                  const isExpanded = expandedLog === log.id;
-                  return (
-                    <motion.div
-                      key={log.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="overflow-hidden rounded-xl border border-white/10 bg-gray-900/30 transition-all hover:border-indigo-500/20"
-                    >
-                      <div
-                        className="flex cursor-pointer flex-wrap items-center justify-between gap-2 p-4 transition-colors hover:bg-white/5"
-                        onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate font-medium text-white">{log.subject}</span>
-                            <StatusBadge status={log.status} />
-                            <ChannelBadge channel={log.channel} />
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {log.recipientType === "ALL" ? "All Players" : `${log.recipientCount} players`}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(log.sentAt).toLocaleString()}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Shield className="h-3 w-3" />
-                              {log.admin.name || log.admin.email}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(log.id);
-                            }}
-                            className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5 text-gray-400" />
-                          )}
-                        </div>
-                      </div>
-
-                      <AnimatePresence>
-                        {isExpanded && log.stats && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="border-t border-white/10 bg-gray-800/30 p-4"
-                          >
-                            <p className="mb-4 whitespace-pre-wrap text-sm text-gray-300">{log.message}</p>
-
-                            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-green-400">{log.stats.email.sent}</p>
-                                <p className="text-[10px] text-gray-500">Email Sent</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-blue-400">{log.stats.email.delivered}</p>
-                                <p className="text-[10px] text-gray-500">Email Delivered</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-purple-400">{log.stats.email.read}</p>
-                                <p className="text-[10px] text-gray-500">Email Read</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-red-400">{log.stats.email.failed}</p>
-                                <p className="text-[10px] text-gray-500">Email Failed</p>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-green-400">{log.stats.inApp.sent}</p>
-                                <p className="text-[10px] text-gray-500">In-App Sent</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-blue-400">{log.stats.inApp.delivered}</p>
-                                <p className="text-[10px] text-gray-500">In-App Delivered</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-purple-400">{log.stats.inApp.read}</p>
-                                <p className="text-[10px] text-gray-500">In-App Read</p>
-                              </div>
-                              <div className="rounded-xl border border-white/5 bg-gray-900/40 p-3 text-center">
-                                <p className="text-lg font-bold text-red-400">{log.stats.inApp.failed}</p>
-                                <p className="text-[10px] text-gray-500">In-App Failed</p>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  );
-                })}
+                {history.map((log) => (
+                  <HistoryMessage
+                    key={log.id}
+                    log={log}
+                    isExpanded={expandedLog === log.id}
+                    onToggle={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </div>
             )}
           </div>

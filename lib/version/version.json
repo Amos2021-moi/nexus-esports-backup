@@ -1,8 +1,13 @@
 {
-  "version": "0.1.1",
-  "build": 1783188453,
-  "hash": "344ba54",
+  "version": "0.1.10",
+  "major": 0,
+  "minor": 1,
+  "patch": 10,
+  "build": 1783718590,
+  "hash": "8e2d398",
   "environment": "development",
-  "date": "2026-07-04T18:07:33.204Z",
-  "incrementType": "patch"
+  "deploymentId": "local",
+  "date": "2026-07-10T21:23:10.015Z",
+  "incrementType": "auto",
+  "autoUpdate": true
 }

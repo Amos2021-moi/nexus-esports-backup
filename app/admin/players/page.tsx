@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useCallback, memo, type FormEvent } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Plus,
   Edit,
@@ -22,8 +22,15 @@ import {
   Clock,
   Lock,
   Trophy,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  Shield,
+  Star,
+  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface Season {
   id: string;
@@ -44,7 +51,7 @@ const statusOptions = [
   {
     value: "PRESEASON",
     label: "Preseason",
-    color: "bg-gray-500/20 text-gray-300 border-gray-400/20",
+    color: "bg-gray-500/15 text-gray-300 border-gray-400/20",
     accent: "text-gray-300",
     icon: Clock,
   },
@@ -85,41 +92,44 @@ const statusOptions = [
   },
 ];
 
-const containerVariants = {
+/* -------------------------------------------------------------------------- */
+/*                            Animation Variants                              */
+/* -------------------------------------------------------------------------- */
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+    transition: { staggerChildren: 0.05, delayChildren: 0.03 },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 18 },
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    // Keep transition simple to satisfy framer-motion's TypeScript types
-    transition: { duration: 0.45 },
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
-function DecorBackground() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
-      <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-emerald-600/20 blur-[120px]" />
-      <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-green-500/10 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-indigo-600/15 blur-[120px]" />
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-    </div>
-  );
-}
+const statCardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.35, ease: "easeOut" },
+  },
+  hover: {
+    y: -4,
+    scale: 1.02,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
+  },
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Helper Functions                                */
+/* -------------------------------------------------------------------------- */
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString(undefined, {
@@ -140,6 +150,184 @@ function getSeasonProgress(startDate: string, endDate: string) {
 
   return Math.round(((now - start) / (end - start)) * 100);
 }
+
+/* -------------------------------------------------------------------------- */
+/*                            Memoized Components                             */
+/* -------------------------------------------------------------------------- */
+
+const StatCard = memo(({ stat }: { stat: any }) => (
+  <motion.div
+    variants={statCardVariants}
+    initial="hidden"
+    animate="visible"
+    whileHover="hover"
+    className="will-change-transform"
+  >
+    <div className={`group relative h-full overflow-hidden rounded-2xl border bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 ${stat.ring}`}>
+      <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity duration-500 group-hover:opacity-70`} />
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
+        </div>
+        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
+          <stat.icon className="h-5 w-5" />
+        </span>
+      </div>
+      <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
+    </div>
+  </motion.div>
+));
+
+StatCard.displayName = "StatCard";
+
+const SeasonCard = memo(({ season, onEdit, onDelete, onStatusUpdate }: {
+  season: Season;
+  onEdit: (season: Season) => void;
+  onDelete: (id: string) => void;
+  onStatusUpdate: (id: string, status: string) => void;
+}) => {
+  const progress = getSeasonProgress(season.startDate, season.endDate);
+  const statusOption = statusOptions.find((s) => s.value === season.status) || statusOptions[0];
+  const StatusIcon = statusOption.icon;
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 sm:p-5"
+    >
+      <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-emerald-500/10 blur-3xl transition-opacity duration-500 group-hover:opacity-100" />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="min-w-0 truncate text-lg font-semibold text-white sm:text-xl">{season.name}</h2>
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${statusOption.color}`}>
+              <StatusIcon className="h-3 w-3" />
+              {statusOption.label}
+            </span>
+            {season.isActive && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-green-400/20 bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-300">
+                <CheckCircle size={12} />
+                Active
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-2 text-sm text-gray-400 sm:grid-cols-2">
+            <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
+              <Calendar size={14} className="text-emerald-400" />
+              Start: {formatDate(season.startDate)}
+            </span>
+            <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
+              <Calendar size={14} className="text-emerald-400" />
+              End: {formatDate(season.endDate)}
+            </span>
+            <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
+              <Users size={14} className="text-blue-400" />
+              Players: {season._count?.leagueEntries || 0}
+            </span>
+            <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
+              <Trophy size={14} className="text-yellow-400" />
+              Fixtures: {season._count?.fixtures || 0}
+            </span>
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-gray-500">Season timeline</span>
+              <span className="font-medium text-emerald-300">{progress}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-gray-900/70">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
+              />
+            </div>
+          </div>
+
+          {/* Status Update Buttons */}
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {statusOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onStatusUpdate(season.id, opt.value)}
+                disabled={season.status === opt.value}
+                className={`min-h-[32px] rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                  season.status === opt.value
+                    ? "cursor-not-allowed bg-gray-700/50 text-gray-500"
+                    : "bg-gray-900/60 text-gray-300 hover:bg-emerald-600 hover:text-white"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2 sm:flex-col">
+          <button
+            onClick={() => onEdit(season)}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300 transition-all hover:bg-blue-500/20"
+            aria-label="Edit season"
+          >
+            <Edit size={18} />
+          </button>
+          <button
+            onClick={() => onDelete(season.id)}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-red-400/20 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20"
+            aria-label="Delete season"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+SeasonCard.displayName = "SeasonCard";
+
+/* -------------------------------------------------------------------------- */
+/*                            Background Component                            */
+/* -------------------------------------------------------------------------- */
+
+const DecorBackground = memo(() => (
+  <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950">
+    <motion.div
+      animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-emerald-600/20 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3] }}
+      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-green-500/10 blur-3xl"
+    />
+    <motion.div
+      animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.4, 0.2] }}
+      transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+      className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-indigo-600/15 blur-3xl"
+    />
+    <div
+      className="absolute inset-0 opacity-[0.15]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}
+    />
+  </div>
+));
+
+DecorBackground.displayName = "DecorBackground";
+
+/* -------------------------------------------------------------------------- */
+/*                            Main Component                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function AdminSeasonsPage() {
   const { data: session, status } = useSession();
@@ -217,7 +405,7 @@ export default function AdminSeasonsPage() {
     setSubmitting(false);
   }
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure? This will delete all fixtures and results for this season.")) return;
 
     const res = await fetch(`/api/seasons/${id}`, {
@@ -231,18 +419,17 @@ export default function AdminSeasonsPage() {
     } else {
       toast.error("Failed to delete");
     }
-  }
+  }, []);
 
-  async function handleUpdateStatus(id: string, newStatus: string) {
-    // Confirm before changing to certain statuses
-    if (newStatus === "ARCHIVED") {
-      if (!confirm("Are you sure you want to archive this season? This will make it read-only.")) return;
-    }
-    if (newStatus === "ENDED") {
-      if (!confirm("Are you sure you want to end this season? No more results can be submitted.")) return;
-    }
-    if (newStatus === "LIVE") {
-      if (!confirm("Are you sure you want to start this season? Results can now be submitted.")) return;
+  const handleUpdateStatus = useCallback(async (id: string, newStatus: string) => {
+    const confirmMessages: Record<string, string> = {
+      ARCHIVED: "Are you sure you want to archive this season? This will make it read-only.",
+      ENDED: "Are you sure you want to end this season? No more results can be submitted.",
+      LIVE: "Are you sure you want to start this season? Results can now be submitted.",
+    };
+
+    if (confirmMessages[newStatus]) {
+      if (!confirm(confirmMessages[newStatus])) return;
     }
 
     const res = await fetch(`/api/seasons/${id}/status`, {
@@ -259,25 +446,7 @@ export default function AdminSeasonsPage() {
       const error = await res.json();
       toast.error(error.error || "Failed to update status");
     }
-  }
-
-  if (status === "loading" || loading) {
-    return (
-      <>
-        <DecorBackground />
-        <div className="flex h-64 items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-3 h-12 w-12 animate-spin rounded-full border-[3px] border-emerald-500 border-t-transparent" />
-            <div className="text-gray-400">Loading seasons...</div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (session?.user?.role !== "ADMIN") {
-    return null;
-  }
+  }, []);
 
   const getStatusBadge = (seasonStatus: string) => {
     const option = statusOptions.find((s) => s.value === seasonStatus) || statusOptions[0];
@@ -299,6 +468,7 @@ export default function AdminSeasonsPage() {
 
   const totalFixtures = seasons.reduce((sum, s) => sum + (s._count?.fixtures || 0), 0);
   const totalPlayers = seasons.reduce((sum, s) => sum + (s._count?.leagueEntries || 0), 0);
+
   const stats = useMemo(
     () => [
       {
@@ -341,10 +511,36 @@ export default function AdminSeasonsPage() {
     [seasons]
   );
 
+  if (status === "loading" || loading) {
+    return (
+      <>
+        <DecorBackground />
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+              <Calendar className="absolute inset-0 m-auto h-6 w-6 text-emerald-400" />
+            </div>
+            <p className="mt-2 font-medium text-gray-400">Loading seasons...</p>
+            <div className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
+              <Sparkles className="h-3 w-3 text-yellow-400" />
+              <span>Fetching your data</span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (session?.user?.role !== "ADMIN") {
+    return null;
+  }
+
   return (
     <>
       <DecorBackground />
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-5 sm:space-y-6">
+      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-5 will-change-transform sm:space-y-6">
         {/* Header */}
         <motion.div
           variants={itemVariants}
@@ -382,32 +578,14 @@ export default function AdminSeasonsPage() {
         </motion.div>
 
         {/* Stats */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {stats.map((stat) => (
-            <motion.div
-              key={stat.label}
-              variants={itemVariants}
-              whileHover={{ y: -4 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className={`group relative min-h-[44px] overflow-hidden rounded-2xl border bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 ${stat.ring}`}
-            >
-              <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity group-hover:opacity-70`} />
-              <div className="relative flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
-                </div>
-                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
-                  <stat.icon className="h-5 w-5" />
-                </span>
-              </div>
-              <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
-            </motion.div>
+            <StatCard key={stat.label} stat={stat} />
           ))}
         </motion.div>
 
         {/* Search / Filter */}
-        <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-2xl backdrop-blur-xl">
+        <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl">
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -443,121 +621,38 @@ export default function AdminSeasonsPage() {
 
         {/* Seasons */}
         {seasons.length === 0 ? (
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center shadow-2xl backdrop-blur-xl">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 py-12 text-center shadow-2xl backdrop-blur-xl">
             <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-600" />
             <h3 className="mb-2 text-xl font-semibold text-white">No Seasons Yet</h3>
             <p className="px-4 text-gray-400">Click "Create Season" to start your first league season.</p>
           </motion.div>
         ) : filteredSeasons.length === 0 ? (
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-gray-800/40 py-12 text-center shadow-2xl backdrop-blur-xl">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/10 bg-white/5 py-12 text-center shadow-2xl backdrop-blur-xl">
             <Search className="mx-auto mb-4 h-12 w-12 text-gray-600" />
             <h3 className="mb-2 text-xl font-semibold text-white">No Matching Seasons</h3>
             <p className="px-4 text-gray-400">Try a different search term or status filter.</p>
           </motion.div>
         ) : (
           <motion.div variants={containerVariants} className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {filteredSeasons.map((season) => {
-              const progress = getSeasonProgress(season.startDate, season.endDate);
-              return (
-                <motion.div
-                  key={season.id}
-                  variants={itemVariants}
-                  whileHover={{ y: -3 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 sm:p-5"
-                >
-                  <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-emerald-500/10 blur-3xl transition-opacity group-hover:opacity-100" />
-                  <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <h2 className="min-w-0 truncate text-lg font-semibold text-white sm:text-xl">{season.name}</h2>
-                        {getStatusBadge(season.status)}
-                        {season.isActive && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-green-400/20 bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-300">
-                            <CheckCircle size={12} />
-                            Active
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid gap-2 text-sm text-gray-400 sm:grid-cols-2">
-                        <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
-                          <Calendar size={14} className="text-emerald-400" />
-                          Start: {formatDate(season.startDate)}
-                        </span>
-                        <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
-                          <Calendar size={14} className="text-emerald-400" />
-                          End: {formatDate(season.endDate)}
-                        </span>
-                        <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
-                          <Users size={14} className="text-blue-400" />
-                          Players: {season._count?.leagueEntries || 0}
-                        </span>
-                        <span className="flex items-center gap-2 rounded-xl bg-gray-900/40 px-3 py-2">
-                          <Trophy size={14} className="text-yellow-400" />
-                          Fixtures: {season._count?.fixtures || 0}
-                        </span>
-                      </div>
-
-                      <div className="mt-4">
-                        <div className="mb-1 flex items-center justify-between text-xs">
-                          <span className="text-gray-500">Season timeline</span>
-                          <span className="font-medium text-emerald-300">{progress}%</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-gray-900/70">
-                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-400" style={{ width: `${progress}%` }} />
-                        </div>
-                      </div>
-
-                      {/* Status Update Buttons */}
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {statusOptions.map((opt) => (
-                          <button
-                            key={opt.value}
-                            onClick={() => handleUpdateStatus(season.id, opt.value)}
-                            disabled={season.status === opt.value}
-                            className={`min-h-[36px] rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                              season.status === opt.value
-                                ? "cursor-not-allowed bg-gray-700/70 text-gray-500"
-                                : "bg-gray-900/60 text-gray-300 hover:bg-emerald-600 hover:text-white"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 sm:flex-col">
-                      <button
-                        onClick={() => {
-                          setEditingSeason(season);
-                          setFormData({
-                            name: season.name,
-                            startDate: season.startDate.split("T")[0],
-                            endDate: season.endDate.split("T")[0],
-                            isActive: season.isActive,
-                            status: season.status,
-                          });
-                          setShowForm(true);
-                        }}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-300 transition-all hover:bg-blue-500/20"
-                        aria-label="Edit season"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(season.id)}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-red-400/20 bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20"
-                        aria-label="Delete season"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {filteredSeasons.map((season) => (
+              <SeasonCard
+                key={season.id}
+                season={season}
+                onEdit={(s: Season) => {
+                  setEditingSeason(s);
+                  setFormData({
+                    name: s.name,
+                    startDate: s.startDate.split("T")[0],
+                    endDate: s.endDate.split("T")[0],
+                    isActive: s.isActive,
+                    status: s.status,
+                  });
+                  setShowForm(true);
+                }}
+                onDelete={handleDelete}
+                onStatusUpdate={handleUpdateStatus}
+              />
+            ))}
           </motion.div>
         )}
 
@@ -569,16 +664,20 @@ export default function AdminSeasonsPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-4"
+              onClick={() => setShowForm(false)}
             >
               <motion.div
-                initial={{ opacity: 0, y: 28, scale: 0.98 }}
+                initial={{ opacity: 0, y: 28, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 28, scale: 0.98 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                exit={{ opacity: 0, y: 28, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-gray-800/95 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-white sm:text-xl">{editingSeason ? "Edit Season" : "Create New Season"}</h2>
+                  <h2 className="text-lg font-semibold text-white sm:text-xl">
+                    {editingSeason ? "✏️ Edit Season" : "📅 Create New Season"}
+                  </h2>
                   <button
                     onClick={() => setShowForm(false)}
                     className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
@@ -652,9 +751,18 @@ export default function AdminSeasonsPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 py-2 font-semibold text-white transition-all hover:from-emerald-700 hover:to-green-700 disabled:opacity-50"
+                      className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 py-2 font-semibold text-white shadow-lg shadow-emerald-900/30 transition-all hover:from-emerald-700 hover:to-green-700 disabled:opacity-50"
                     >
-                      {submitting ? "Saving..." : editingSeason ? "Update Season" : "Create Season"}
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : editingSeason ? (
+                        "Update Season"
+                      ) : (
+                        "Create Season"
+                      )}
                     </button>
                     <button
                       type="button"
