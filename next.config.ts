@@ -13,7 +13,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '200mb',
     },
-    // ✅ Optimized package imports (already good)
+    // ✅ Optimized package imports
     optimizePackageImports: [
       'lucide-react',
       'framer-motion',
@@ -23,7 +23,7 @@ const nextConfig = {
     ],
     clientRouterFilter: true,
     clientRouterFilterRedirects: false,
-    // ✅ NEW: Optimize CSS
+    // ✅ Optimize CSS
     optimizeCss: true,
   },
 
@@ -38,26 +38,23 @@ const nextConfig = {
         hostname: 'localhost',
       },
     ],
-    // ✅ Formats (already good)
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    // ✅ NEW: Cache images for 1 year for better performance
-    minimumCacheTTL: 31536000, // 1 year (was 60 seconds)
+    minimumCacheTTL: 31536000, // 1 year
   },
 
-  // ✅ Compression (already good)
+  // ✅ Compression
   compress: true,
 
   compiler: {
-    // ✅ Remove console in production (already good)
     removeConsole: process.env.NODE_ENV === 'production',
   },
 
-  // ✅ Source maps (already good)
+  // ✅ Source maps
   productionBrowserSourceMaps: false,
 
-  // ✅ Output file tracing (already good)
+  // ✅ Output file tracing
   outputFileTracingIncludes: {
     '**/*': [
       'node_modules/jszip/**/*',
@@ -65,40 +62,11 @@ const nextConfig = {
     ],
   },
 
-  // ✅ Empty array (already good)
+  // ✅ Empty array
   serverExternalPackages: [],
 
-  // ✅ NEW: Power optimizations
-  poweredByHeader: false, // Remove x-powered-by header
-
-  // ✅ NEW: On-demand entries for faster dev
-  onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
-  },
-
-  // ✅ NEW: Modularize imports for smaller bundles
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{member}}',
-    },
-    '@tanstack/react-query': {
-      transform: '@tanstack/react-query/build/modern/{{member}}',
-    },
-  },
-
-  // ✅ NEW: Optimize bundle size
-  swcMinify: false, // Not supported in Next.js 16, but keep false
-
-  // ✅ NEW: Traffic / routing
-  trailingSlash: false,
-
-  // ✅ NEW: Strict mode for better performance
-  reactStrictMode: true,
-
-  // ✅ NEW: Faster redirects
-  skipTrailingSlashRedirect: true,
-  skipMiddlewareUrlNormalize: true,
+  // ✅ Remove x-powered-by header
+  poweredByHeader: false,
 }
 
 module.exports = nextConfig

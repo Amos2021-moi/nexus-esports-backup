@@ -11,8 +11,8 @@ import { Analytics } from "@vercel/analytics/next";
 // ✅ Optimize font loading - no layout shift
 const inter = Inter({
   subsets: ["latin"],
-  display: "swap",
-  preload: true,
+  display: "fallback",
+  preload: false,
   fallback: ["system-ui", "sans-serif"],
 });
 
@@ -41,7 +41,6 @@ export const metadata: Metadata = {
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
   },
-  // ✅ Add Open Graph for better sharing
   openGraph: {
     title: "Nexus Esports League",
     description: "School Esports Platform for eFootball",
@@ -57,14 +56,12 @@ export const metadata: Metadata = {
     locale: "en_US",
     type: "website",
   },
-  // ✅ Add Twitter Card
   twitter: {
     card: "summary_large_image",
     title: "Nexus Esports League",
     description: "School Esports Platform for eFootball",
     images: ["/icons/icon-512.png"],
   },
-  // ✅ Robots for SEO
   robots: {
     index: true,
     follow: true,
@@ -76,18 +73,15 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  // ✅ Viewport - moved from head for better performance
   viewport: {
     width: "device-width",
     initialScale: 1,
     maximumScale: 1,
     userScalable: true,
   },
-  // ✅ Theme color for PWA
   themeColor: "#4F46E5",
-  // ✅ Verification
   verification: {
-    google: "your-google-verification-code", // Add your code
+    google: "your-google-verification-code",
   },
 };
 
@@ -97,7 +91,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.className}>
+    <html 
+      lang="en" 
+      className={inter.className}
+      style={{ 
+        height: "100%", 
+        backgroundColor: "#0f172a",
+        scrollBehavior: "smooth",
+      }}
+    >
       <head>
         {/* ✅ Preconnect to critical domains */}
         <link
@@ -108,11 +110,6 @@ export default function RootLayout({
         <link
           rel="preconnect"
           href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preconnect"
-          href="https://api.example.com"
           crossOrigin="anonymous"
         />
 
@@ -140,25 +137,52 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
-        {/* ✅ Microsoft Tile (optional) */}
+        {/* ✅ Microsoft Tile */}
         <meta name="msapplication-TileColor" content="#4F46E5" />
         <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
       </head>
-      <body>
-        <AuthProvider>
-          <MaintenanceOverlay>
-            <ClientProviders>
-              {children}
-              {/* ✅ Vercel Analytics (only in production) */}
-              {process.env.NODE_ENV === "production" && (
-                <>
-                  <SpeedInsights />
-                  <Analytics />
-                </>
-              )}
-            </ClientProviders>
-          </MaintenanceOverlay>
-        </AuthProvider>
+      <body
+        style={{
+          minHeight: "100dvh",
+          backgroundColor: "#0f172a",
+          margin: 0,
+          padding: 0,
+          position: "relative",
+          overflowX: "hidden",
+        }}
+      >
+        {/* ✅ Full background wrapper - covers everything */}
+        <div 
+          className="fixed inset-0 -z-20 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
+          style={{ 
+            minHeight: "100dvh",
+          }}
+        >
+          {/* Background orbs - fixed and always behind */}
+          <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-purple-600/20 blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-pink-500/10 blur-3xl" />
+          <div className="absolute top-1/4 -left-20 h-64 w-64 rounded-full bg-emerald-600/10 blur-3xl" />
+          <div className="absolute bottom-1/4 -right-20 h-64 w-64 rounded-full bg-blue-600/10 blur-3xl" />
+        </div>
+
+        {/* ✅ Content wrapper */}
+        <div className="relative z-0 min-h-dvh">
+          <AuthProvider>
+            <MaintenanceOverlay>
+              <ClientProviders>
+                {children}
+                {/* ✅ Vercel Analytics (only in production) */}
+                {process.env.NODE_ENV === "production" && (
+                  <>
+                    <SpeedInsights />
+                    <Analytics />
+                  </>
+                )}
+              </ClientProviders>
+            </MaintenanceOverlay>
+          </AuthProvider>
+        </div>
       </body>
     </html>
   );

@@ -122,18 +122,18 @@ const StatCard = memo(({ stat }: { stat: any }) => (
     whileHover="hover"
     className="will-change-transform"
   >
-    <div className={`group relative h-full overflow-hidden rounded-2xl border bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 ${stat.ring}`}>
+    <div className={`group relative h-full overflow-hidden rounded-2xl border bg-white/5 p-3 shadow-xl backdrop-blur-xl transition-colors hover:border-indigo-500/40 sm:p-4 ${stat.ring}`}>
       <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${stat.glow} to-transparent opacity-40 blur-2xl transition-opacity duration-500 group-hover:opacity-70`} />
       <div className="relative flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-400 sm:text-sm">{stat.label}</p>
+          <p className={`text-xl font-bold sm:text-2xl ${stat.accent}`}>{stat.value}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-400">{stat.label}</p>
         </div>
-        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 ${stat.accent}`}>
-          <stat.icon className="h-5 w-5" />
+        <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/5 sm:h-10 sm:w-10 ${stat.accent}`}>
+          <stat.icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </span>
       </div>
-      <p className="relative mt-2 truncate text-[11px] text-gray-500">{stat.hint}</p>
+      <p className="relative mt-1 truncate text-[10px] text-gray-500 sm:text-[11px]">{stat.hint}</p>
     </div>
   </motion.div>
 ));
@@ -156,7 +156,7 @@ const PlayerCheckbox = memo(({ player, isSelected, onToggle }: {
       type="checkbox"
       checked={isSelected}
       onChange={() => onToggle(player.id)}
-      className="h-4 w-4 accent-indigo-500"
+      className="h-4 w-4 flex-shrink-0 accent-indigo-500"
     />
     <span className="min-w-0 truncate text-sm text-white">
       {playerLabel(player)}
@@ -168,23 +168,25 @@ PlayerCheckbox.displayName = "PlayerCheckbox";
 
 const LeagueTableRow = memo(({ entry, index, onRemove }: { entry: LeagueEntry; index: number; onRemove: (entryId: string) => void }) => (
   <tr className="transition-colors hover:bg-white/5">
-    <td className="sticky left-0 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
-      {rankMedal(index)}
+    <td className="sticky left-0 z-10 bg-gray-800/95 px-2 py-2 text-white backdrop-blur-xl sm:px-4 sm:py-3">
+      <span className="text-sm sm:text-base">{rankMedal(index)}</span>
     </td>
-    <td className="sticky left-12 z-10 bg-gray-800/95 px-4 py-3 text-white backdrop-blur-xl">
+    <td className="sticky left-8 z-10 bg-gray-800/95 px-2 py-2 text-white backdrop-blur-xl sm:left-12 sm:px-4 sm:py-3">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white sm:h-8 sm:w-8">
           {playerLabel(entry.player).charAt(0).toUpperCase()}
         </span>
-        <span className="max-w-[160px] truncate">{playerLabel(entry.player)}</span>
+        <span className="max-w-[100px] truncate text-sm sm:max-w-[160px] sm:text-base">
+          {playerLabel(entry.player)}
+        </span>
       </div>
     </td>
-    <td className="px-4 py-3 text-center text-gray-300">{entry.played}</td>
-    <td className="px-4 py-3 text-center text-green-400">{entry.wins}</td>
-    <td className="px-4 py-3 text-center text-yellow-400">{entry.draws}</td>
-    <td className="px-4 py-3 text-center text-red-400">{entry.losses}</td>
-    <td className="px-4 py-3 text-center font-bold text-white">{entry.points}</td>
-    <td className="px-4 py-3 text-center">
+    <td className="px-2 py-2 text-center text-gray-300 sm:px-4 sm:py-3">{entry.played}</td>
+    <td className="px-2 py-2 text-center text-green-400 sm:px-4 sm:py-3">{entry.wins}</td>
+    <td className="px-2 py-2 text-center text-yellow-400 sm:px-4 sm:py-3">{entry.draws}</td>
+    <td className="px-2 py-2 text-center text-red-400 sm:px-4 sm:py-3">{entry.losses}</td>
+    <td className="px-2 py-2 text-center font-bold text-white sm:px-4 sm:py-3">{entry.points}</td>
+    <td className="px-2 py-2 text-center sm:px-4 sm:py-3">
       <button
         onClick={() => onRemove(entry.id)}
         className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
@@ -594,7 +596,7 @@ export default function AdminLeaguePage() {
     return (
       <>
         <DecorBackground />
-        <div className="flex h-64 items-center justify-center">
+        <div className="flex min-h-[50vh] items-center justify-center px-4">
           <div className="text-center">
             <div className="relative mx-auto mb-4 h-16 w-16">
               <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
@@ -623,7 +625,7 @@ export default function AdminLeaguePage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-5 will-change-transform sm:space-y-6"
+        className="space-y-4 px-3 pb-20 sm:space-y-6 sm:px-4 lg:px-6"
       >
         {/* Header */}
         <motion.div
@@ -631,16 +633,16 @@ export default function AdminLeaguePage() {
           className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 sm:h-12 sm:w-12">
                 <Trophy className="h-5 w-5 text-white sm:h-6 sm:w-6" />
               </span>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                <h1 className="truncate text-lg font-bold text-white sm:text-2xl">
                   🏆 League Management
                 </h1>
-                <p className="mt-0.5 text-xs text-gray-300 sm:text-sm">
+                <p className="mt-0.5 truncate text-xs text-gray-300 sm:text-sm">
                   Manage seasons, players, standings, and fixture generation
                 </p>
               </div>
@@ -680,7 +682,7 @@ export default function AdminLeaguePage() {
                   fetchEntries(e.target.value);
                   setSelectedPlayers([]);
                 }}
-                className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/50 p-3 pr-10 text-white transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/50 p-3 pr-10 text-sm text-white transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 sm:text-base"
               >
                 {seasons.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -693,8 +695,8 @@ export default function AdminLeaguePage() {
           )}
         </motion.div>
 
-        {/* Stats */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Stats - Mobile responsive grid */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {statCards.map((stat) => (
             <StatCard key={stat.label} stat={stat} />
           ))}
@@ -705,7 +707,7 @@ export default function AdminLeaguePage() {
           variants={itemVariants}
           className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
               <UserPlus className="h-5 w-5 text-indigo-400" />
               Add Players to Season
@@ -731,7 +733,7 @@ export default function AdminLeaguePage() {
                       value={playerSearch}
                       onChange={(e) => setPlayerSearch(e.target.value)}
                       placeholder="Search available players..."
-                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                     />
                   </div>
                 </div>
@@ -756,7 +758,7 @@ export default function AdminLeaguePage() {
                   <button
                     onClick={addSelectedPlayers}
                     disabled={bulkAdding || selectedPlayers.length === 0}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-indigo-900/30 transition-all hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-900/30 transition-all hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 sm:px-6"
                   >
                     {bulkAdding ? (
                       <>
@@ -774,7 +776,7 @@ export default function AdminLeaguePage() {
                   <button
                     onClick={addAllPlayers}
                     disabled={addingAll || availablePlayers.length === 0}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-2.5 font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 sm:px-6"
                   >
                     {addingAll ? (
                       <>
@@ -846,17 +848,17 @@ export default function AdminLeaguePage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-white/10">
-              <table className="w-full min-w-[720px]">
+              <table className="w-full min-w-[600px] sm:min-w-[720px]">
                 <thead className="bg-gray-900/60">
                   <tr>
-                    <th className="sticky left-0 z-10 bg-gray-900/95 px-4 py-3 text-left font-medium text-gray-400 backdrop-blur-xl">#</th>
-                    <th className="sticky left-12 z-10 bg-gray-900/95 px-4 py-3 text-left font-medium text-gray-400 backdrop-blur-xl">Player</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">P</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">W</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">D</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">L</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">Pts</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-400">Actions</th>
+                    <th className="sticky left-0 z-10 bg-gray-900/95 px-2 py-2 text-left font-medium text-gray-400 backdrop-blur-xl sm:px-4 sm:py-3">#</th>
+                    <th className="sticky left-8 z-10 bg-gray-900/95 px-2 py-2 text-left font-medium text-gray-400 backdrop-blur-xl sm:left-12 sm:px-4 sm:py-3">Player</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">P</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">W</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">D</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">L</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">Pts</th>
+                    <th className="px-2 py-2 text-center font-medium text-gray-400 sm:px-4 sm:py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -885,7 +887,7 @@ export default function AdminLeaguePage() {
           <button
             onClick={generateFixtures}
             disabled={generating || entries.length < 2}
-            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:from-green-700 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:from-green-700 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-base"
           >
             {generating ? (
               <>
@@ -901,16 +903,16 @@ export default function AdminLeaguePage() {
           </button>
         </motion.div>
 
-        {/* Help Section */}
+        {/* Help Section - Mobile responsive */}
         <motion.div
           variants={itemVariants}
           className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
-          <h3 className="mb-3 flex items-center gap-2 font-semibold text-blue-300">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-300 sm:text-base">
             <HelpCircle className="h-5 w-5" />
             How to manage your league:
           </h3>
-          <ol className="list-inside list-decimal space-y-1 text-sm text-gray-300">
+          <ol className="list-inside list-decimal space-y-1 text-xs text-gray-300 sm:text-sm">
             <li>Create a season first (if none exists)</li>
             <li>Add players to the season using the bulk selector above</li>
             <li>Once you have at least 2 players, click "Generate Fixtures"</li>
@@ -918,9 +920,9 @@ export default function AdminLeaguePage() {
             <li>Approve results from the Results page</li>
             <li>Standings will update automatically</li>
           </ol>
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-gray-900/30 p-3 text-xs text-gray-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-white/10 bg-gray-900/30 p-3 text-xs text-gray-400 sm:items-center">
             <ShieldCheck className="h-4 w-4 flex-shrink-0 text-blue-300" />
-            Points system shown above follows existing saved standings: P, W, D, L, and Pts.
+            <span>Points system shown above follows existing saved standings: P, W, D, L, and Pts.</span>
           </div>
         </motion.div>
       </motion.div>

@@ -523,7 +523,7 @@ export default function AdminSeasonsPage() {
     return (
       <>
         <DecorBackground />
-        <div className="flex h-64 items-center justify-center">
+        <div className="flex min-h-[50vh] items-center justify-center">
           <div className="text-center">
             <div className="relative mx-auto mb-4 h-16 w-16">
               <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20" />
@@ -552,7 +552,7 @@ export default function AdminSeasonsPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-5 will-change-transform sm:space-y-6"
+        className="space-y-4 px-3 pb-20 sm:space-y-6 sm:px-4 lg:px-6"
       >
         {/* Header */}
         <motion.div
@@ -560,16 +560,16 @@ export default function AdminSeasonsPage() {
           className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-emerald-600/20 via-green-600/20 to-teal-600/20 p-4 shadow-2xl backdrop-blur-xl sm:p-6"
         >
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/30 sm:h-12 sm:w-12">
                 <Calendar className="h-5 w-5 text-white sm:h-6 sm:w-6" />
               </span>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-bold text-white sm:text-2xl">
+                <h1 className="truncate text-lg font-bold text-white sm:text-2xl">
                   📅 Season Management
                 </h1>
-                <p className="mt-0.5 text-xs text-gray-300 sm:text-sm">
+                <p className="mt-0.5 truncate text-xs text-gray-300 sm:text-sm">
                   Create and manage league seasons with lifecycle tracking
                 </p>
               </div>
@@ -594,19 +594,19 @@ export default function AdminSeasonsPage() {
           </div>
         </motion.div>
 
-        {/* Stats */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Stats - Mobile responsive grid */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {stats.map((stat) => (
             <StatCard key={stat.label} stat={stat} />
           ))}
         </motion.div>
 
-        {/* Search & Filter */}
+        {/* Search & Filter - Fully mobile responsive */}
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-2xl backdrop-blur-xl sm:p-4"
         >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
               <input
@@ -614,16 +614,16 @@ export default function AdminSeasonsPage() {
                 placeholder="Search seasons..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 sm:w-48">
+              <div className="relative flex-1 min-w-[120px] md:w-48">
                 <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-8 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  className="min-h-[44px] w-full appearance-none rounded-xl border border-white/10 bg-gray-900/50 py-2 pl-10 pr-8 text-sm text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 >
                   {filterButtons.map((btn) => (
                     <option key={btn.value} value={btn.value}>
@@ -656,24 +656,24 @@ export default function AdminSeasonsPage() {
           </div>
         </motion.div>
 
-        {/* Seasons */}
+        {/* Seasons - Mobile responsive grid */}
         {filteredSeasons.length === 0 ? (
           <motion.div
             variants={itemVariants}
             className="rounded-2xl border border-white/10 bg-white/5 py-12 text-center shadow-2xl backdrop-blur-xl"
           >
             <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-600" />
-            <h3 className="mb-2 text-xl font-semibold text-white">
+            <h3 className="mb-2 text-lg font-semibold text-white sm:text-xl">
               {searchTerm || filterStatus !== "ALL" ? "No Matching Seasons" : "No Seasons Yet"}
             </h3>
-            <p className="px-4 text-gray-400">
+            <p className="px-4 text-sm text-gray-400 sm:text-base">
               {searchTerm || filterStatus !== "ALL"
                 ? "Try adjusting your search or filter."
                 : 'Click "Create Season" to start your first league season.'}
             </p>
           </motion.div>
         ) : viewMode === "grid" ? (
-          <motion.div variants={containerVariants} className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <motion.div variants={containerVariants} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {filteredSeasons.map((season) => (
               <SeasonCard
                 key={season.id}
@@ -704,7 +704,7 @@ export default function AdminSeasonsPage() {
                 variants={itemVariants}
                 className="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur-xl transition-colors hover:border-emerald-500/40 sm:p-5"
               >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate font-semibold text-white">{season.name}</h3>
@@ -758,7 +758,7 @@ export default function AdminSeasonsPage() {
         )}
       </motion.div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal - Mobile responsive */}
       <AnimatePresence>
         {showForm && (
           <motion.div
@@ -798,11 +798,11 @@ export default function AdminSeasonsPage() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                     placeholder="e.g., Spring 2025 Season"
-                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-sm text-white placeholder-gray-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-300">Start Date</label>
                     <input
@@ -810,7 +810,7 @@ export default function AdminSeasonsPage() {
                       value={formData.startDate}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                       required
-                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-sm text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                   </div>
                   <div>
@@ -820,7 +820,7 @@ export default function AdminSeasonsPage() {
                       value={formData.endDate}
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                       required
-                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-sm text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                   </div>
                 </div>
@@ -830,7 +830,7 @@ export default function AdminSeasonsPage() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-gray-900/60 px-4 py-2.5 text-sm text-white transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   >
                     {statusOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>

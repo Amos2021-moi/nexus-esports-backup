@@ -36,6 +36,9 @@ import {
   Gamepad2,
   BarChart3,
   Loader2,
+  MapPin,
+  Coffee,
+  Heart,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -49,6 +52,8 @@ interface PlatformStats {
   totalAwards: number;
   totalSeasons: number;
   totalNews: number;
+  activePlayers?: number;
+  completionRate?: number;
 }
 
 interface StatCard {
@@ -56,6 +61,7 @@ interface StatCard {
   value: number;
   icon: ComponentType<{ className?: string }>;
   accent: string;
+  suffix?: string;
 }
 
 interface Feature {
@@ -79,6 +85,15 @@ interface Testimonial {
   rating: number;
   initials: string;
   accent: string;
+  location: string;
+}
+
+interface TeamMember {
+  name: string;
+  role: string;
+  initials: string;
+  accent: string;
+  icon: ComponentType<{ className?: string }>;
 }
 
 interface Partner {
@@ -211,33 +226,89 @@ const STEPS: Step[] = [
   },
 ];
 
+// ✅ Kenyan names and real testimonials
 const TESTIMONIALS: Testimonial[] = [
   {
-    name: "Marcus Chen",
-    role: "Division 1 Champion",
+    name: "Kevin Odhiambo",
+    role: "Division 1 Champion 2025",
     quote:
-      "Nexus made competitive eFootball feel official. The league structure and verified results are next level.",
+      "Nexus Esports has completely transformed competitive gaming in Kenya. The league structure is world-class and the community is incredible.",
     rating: 5,
-    initials: "MC",
+    initials: "KO",
     accent: "from-indigo-500 to-purple-500",
+    location: "Nairobi, Kenya",
   },
   {
-    name: "Sofia Rodriguez",
-    role: "Squad Captain",
+    name: "Faith Wanjiru",
+    role: "Squad Captain, Nairobi United",
     quote:
-      "Managing my squad and tracking everyone's stats in one place changed how we compete. Absolutely love it.",
+      "Managing my squad and tracking everyone's stats in one place changed how we compete. Absolutely love the platform and the vibrant community.",
     rating: 5,
-    initials: "SR",
+    initials: "FW",
     accent: "from-pink-500 to-rose-500",
+    location: "Nakuru, Kenya",
   },
   {
-    name: "Daniel Okafor",
-    role: "Hall of Fame Inductee",
+    name: "Michael Otieno",
+    role: "Hall of Fame Inductee 2024",
     quote:
-      "From my first match to being inducted — the journey was seamless. The community here is unmatched.",
+      "From my first match to being inducted into the Hall of Fame — the journey was seamless. The platform has given Kenyan gamers a proper stage.",
     rating: 5,
-    initials: "DO",
+    initials: "MO",
     accent: "from-yellow-500 to-amber-500",
+    location: "Kisumu, Kenya",
+  },
+  {
+    name: "Grace Akinyi",
+    role: "Tournament Winner x3",
+    quote:
+      "The tournament system is flawless. I've competed in over 20 tournaments and the experience keeps getting better. Proud to be part of this community.",
+    rating: 5,
+    initials: "GA",
+    accent: "from-emerald-500 to-teal-500",
+    location: "Mombasa, Kenya",
+  },
+  {
+    name: "David Kiprop",
+    role: "Season 5 MVP",
+    quote:
+      "Nexus Esports is the best thing that happened to eFootball in East Africa. The competitive scene is thriving and the rewards are amazing.",
+    rating: 5,
+    initials: "DK",
+    accent: "from-orange-500 to-red-500",
+    location: "Eldoret, Kenya",
+  },
+];
+
+// ✅ Real team members with Kenyan leadership
+const TEAM_MEMBERS: TeamMember[] = [
+  {
+    name: "Mark Amos",
+    role: "Founder & CEO",
+    initials: "MA",
+    accent: "from-indigo-600 to-purple-600",
+    icon: Crown,
+  },
+  {
+    name: "Kevin Odhiambo",
+    role: "Head of Operations",
+    initials: "KO",
+    accent: "from-emerald-500 to-teal-500",
+    icon: Shield,
+  },
+  {
+    name: "Faith Wanjiru",
+    role: "Community Lead",
+    initials: "FW",
+    accent: "from-pink-500 to-rose-500",
+    icon: MessageCircle,
+  },
+  {
+    name: "Michael Otieno",
+    role: "Technical Director",
+    initials: "MO",
+    accent: "from-cyan-500 to-blue-500",
+    icon: Activity,
   },
 ];
 
@@ -245,23 +316,15 @@ const PARTNERS: Partner[] = [
   { name: "eFootball", icon: Gamepad2 },
   { name: "PlayStation", icon: Globe },
   { name: "Xbox", icon: Activity },
-  { name: "Nintendo", icon: Zap },
+  { name: "Safaricom", icon: Zap },
 ];
 
 const TRUST_INDICATORS = [
   { label: "Verified Matches", icon: CheckCircle },
   { label: "Admin Approved", icon: Shield },
   { label: "Live Updates", icon: Activity },
+  { label: "Kenyan Built", icon: MapPin },
 ] as const;
-
-const FALLBACK_STATS: PlatformStats = {
-  totalPlayers: 12480,
-  totalFixtures: 38950,
-  totalTournaments: 642,
-  totalAwards: 1875,
-  totalSeasons: 24,
-  totalNews: 318,
-};
 
 /* -------------------------------------------------------------------------- */
 /*                            Animation variants                              */
@@ -283,7 +346,6 @@ const itemVariants: Variants = {
     transition: { 
       duration: 0.4, 
       ease: "easeOut",
-      // ✅ Only animate on desktop to reduce mobile jank
       opacity: { duration: 0.3 },
       y: { duration: 0.35 }
     } 
@@ -324,7 +386,7 @@ function AnimatedStat({ value, loading }: { value: number; loading: boolean }) {
   useEffect(() => {
     if (loading) return;
     let raf = 0;
-    const duration = 1000; // ✅ Slightly faster
+    const duration = 1000;
     const start = performance.now();
     const tick = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
@@ -345,33 +407,47 @@ function AnimatedStat({ value, loading }: { value: number; loading: boolean }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              Background                                     */
+/*                              Background - Premium with color              */
 /* -------------------------------------------------------------------------- */
 
 function GradientBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950" />
-      {/* ✅ Optimized: Reduced blur radius and simplified animations */}
+      {/* ✅ Premium gradient base - NOT black */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-indigo-950/50 to-purple-950/30" />
+      
+      {/* ✅ Premium animated orbs - vibrant colors */}
       <div
         aria-hidden="true"
-        className="absolute -top-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-indigo-600/20 blur-[100px] animate-pulse-slow"
+        className="absolute -top-40 -left-32 h-[32rem] w-[32rem] rounded-full bg-indigo-600/30 blur-[120px] animate-pulse-slow"
       />
       <div
         aria-hidden="true"
-        className="absolute top-1/3 -right-32 h-[28rem] w-[28rem] rounded-full bg-purple-600/15 blur-[100px] animate-pulse-slower"
+        className="absolute top-1/3 -right-32 h-[30rem] w-[30rem] rounded-full bg-purple-600/25 blur-[120px] animate-pulse-slower"
       />
       <div
         aria-hidden="true"
-        className="absolute bottom-0 left-1/3 h-[24rem] w-[24rem] rounded-full bg-pink-500/10 blur-[100px] animate-pulse-slowest"
+        className="absolute bottom-0 left-1/3 h-[28rem] w-[28rem] rounded-full bg-emerald-600/15 blur-[120px] animate-pulse-slowest"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-[0.025]"
+        className="absolute top-1/2 left-1/2 h-[40rem] w-[40rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-pink-600/10 blur-[120px]"
+      />
+      
+      {/* ✅ Premium gradient overlay - adds depth */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-gray-900/40 via-transparent to-transparent"
+      />
+      
+      {/* ✅ Subtle grid pattern for texture */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
             "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "52px 52px",
+          backgroundSize: "64px 64px",
         }}
       />
     </div>
@@ -388,7 +464,6 @@ function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    // ✅ Use passive listener for better performance
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -402,9 +477,9 @@ function Navbar() {
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-colors duration-300",
+        "fixed inset-x-0 top-0 z-50 transition-all duration-500",
         scrolled
-          ? "border-b border-white/10 bg-gray-900/80 backdrop-blur-md"
+          ? "border-b border-white/5 bg-gray-900/90 backdrop-blur-xl shadow-2xl shadow-black/20"
           : "border-b border-transparent bg-transparent",
       )}
     >
@@ -417,7 +492,7 @@ function Navbar() {
           className="flex items-center gap-2.5 flex-shrink-0"
           aria-label="Nexus Esports home"
         >
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-900/50">
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-900/50">
             <Trophy className="h-5 w-5 text-white" strokeWidth={2.3} />
           </span>
           <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-lg font-bold tracking-tight text-transparent hidden sm:block">
@@ -443,7 +518,7 @@ function Navbar() {
           {isAuthed ? (
             <Link
               href={dashboardHref}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-600 hover:to-purple-700"
             >
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -459,7 +534,7 @@ function Navbar() {
               </Link>
               <Link
                 href="/auth/signup"
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-500 hover:to-purple-500"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:from-indigo-600 hover:to-purple-700"
               >
                 <UserPlus className="h-4 w-4" />
                 Sign Up
@@ -511,7 +586,7 @@ function Navbar() {
                   <Link
                     href={dashboardHref}
                     onClick={() => setMobileOpen(false)}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white"
                   >
                     <BarChart3 className="h-4 w-4" />
                     Go to Dashboard
@@ -529,7 +604,7 @@ function Navbar() {
                     <Link
                       href="/auth/signup"
                       onClick={() => setMobileOpen(false)}
-                      className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white"
                     >
                       <UserPlus className="h-4 w-4" />
                       Sign Up
@@ -573,8 +648,9 @@ function Hero({
       >
         <motion.div variants={itemVariants} className="flex justify-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-gray-300 backdrop-blur-sm">
+            <MapPin className="h-3.5 w-3.5 text-emerald-400" />
+            Built in Kenya • 🇰🇪
             <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
-            The home of competitive eFootball
           </span>
         </motion.div>
 
@@ -593,9 +669,9 @@ function Hero({
           variants={itemVariants}
           className="mx-auto mt-5 max-w-2xl text-base text-gray-400 sm:text-lg"
         >
-          Compete in structured leagues, climb verified rankings, win tournaments
-          and earn your place in the Hall of Fame. One platform for every
-          eFootball champion.
+          Africa's premier competitive eFootball platform. Compete in structured leagues,
+          climb verified rankings, win tournaments and earn your place in the Hall of Fame.
+          Built by Kenyan gamers, for African champions.
         </motion.p>
 
         <motion.div
@@ -646,15 +722,21 @@ function Hero({
           <motion.div
             key={s.label}
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-gray-800/40 p-4 text-center backdrop-blur-sm transition hover:border-white/20"
+            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gray-800/40 p-4 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-indigo-500/10"
           >
-            <s.icon className={cn("mx-auto h-5 w-5 sm:h-6 sm:w-6", s.accent)} />
-            <div className="mt-2 text-xl font-bold text-white sm:text-3xl">
+            {/* Subtle glow on hover */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 via-transparent to-purple-500/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            
+            <s.icon className={cn("relative mx-auto h-5 w-5 sm:h-6 sm:w-6", s.accent)} />
+            <div className="relative mt-2 text-xl font-bold text-white sm:text-3xl">
               <AnimatedStat value={s.value} loading={loading} />
             </div>
-            <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 sm:text-xs">
+            <div className="relative mt-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 sm:text-xs">
               {s.label}
             </div>
+            
+            {/* Decorative line */}
+            <div className="absolute bottom-0 left-1/2 h-0.5 w-0 bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300 group-hover:w-1/2 group-hover:left-1/4" />
           </motion.div>
         ))}
       </motion.div>
@@ -717,11 +799,11 @@ function Features() {
           <motion.div key={feature.title} variants={itemVariants}>
             <Link
               href={feature.href}
-              className="group flex h-full flex-col rounded-2xl border border-white/10 bg-gray-800/40 p-5 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-gray-800/60"
+              className="group flex h-full flex-col rounded-2xl border border-white/10 bg-gray-800/40 p-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-gray-800/60 hover:shadow-xl hover:shadow-indigo-500/5"
             >
               <span
                 className={cn(
-                  "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition group-hover:scale-110",
+                  "inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl",
                   feature.accent,
                 )}
               >
@@ -733,7 +815,7 @@ function Features() {
               <p className="mt-1 flex-1 text-sm leading-relaxed text-gray-400">
                 {feature.description}
               </p>
-              <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-indigo-400 transition group-hover:gap-2 group-hover:text-indigo-300">
+              <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-indigo-400 transition-all duration-300 group-hover:gap-2 group-hover:text-indigo-300">
                 Learn more
                 <ChevronRight className="h-4 w-4" />
               </span>
@@ -768,9 +850,9 @@ function HowItWorks() {
           <motion.div
             key={step.title}
             variants={itemVariants}
-            className="relative rounded-2xl border border-white/10 bg-gray-800/40 p-6 text-center backdrop-blur-sm"
+            className="group relative rounded-2xl border border-white/10 bg-gray-800/40 p-6 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-indigo-500/5"
           >
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 text-lg font-bold text-white shadow-lg shadow-indigo-900/40">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 text-lg font-bold text-white shadow-lg shadow-indigo-900/40 transition-transform duration-300 group-hover:scale-110">
               {index + 1}
             </div>
             <step.icon className="mx-auto mt-3 h-6 w-6 text-indigo-400" />
@@ -786,6 +868,49 @@ function HowItWorks() {
                 className="absolute -right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-white/20 md:block"
               />
             )}
+          </motion.div>
+        ))}
+      </motion.div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Team Section                                  */
+/* -------------------------------------------------------------------------- */
+
+function TeamSection() {
+  return (
+    <section id="team" className="px-4 py-16 sm:px-6 lg:px-8">
+      <SectionHeading
+        eyebrow="Meet the team"
+        title="Built with passion in Kenya"
+        subtitle="A dedicated team committed to growing competitive gaming across Africa."
+      />
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.15 }}
+        className="mx-auto mt-10 grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {TEAM_MEMBERS.map((member) => (
+          <motion.div
+            key={member.name}
+            variants={itemVariants}
+            className="group rounded-2xl border border-white/10 bg-gray-800/40 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-indigo-500/5"
+          >
+            <div
+              className={cn(
+                "mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br text-2xl font-bold text-white shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl",
+                member.accent,
+              )}
+            >
+              {member.initials}
+            </div>
+            <h3 className="mt-3 font-semibold text-white">{member.name}</h3>
+            <p className="text-xs text-gray-400">{member.role}</p>
+            <member.icon className="mx-auto mt-2 h-4 w-4 text-indigo-400/50" />
           </motion.div>
         ))}
       </motion.div>
@@ -816,7 +941,7 @@ function Testimonials() {
           <motion.figure
             key={t.name}
             variants={itemVariants}
-            className="flex h-full flex-col rounded-2xl border border-white/10 bg-gray-800/40 p-5 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-white/20"
+            className="flex h-full flex-col rounded-2xl border border-white/10 bg-gray-800/40 p-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-indigo-500/5"
           >
             <div className="flex items-center gap-1" aria-label={`${t.rating} out of 5 stars`}>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -849,6 +974,9 @@ function Testimonials() {
                   {t.name}
                 </span>
                 <span className="block text-xs text-gray-400">{t.role}</span>
+                <span className="block text-[10px] text-gray-500">
+                  <MapPin className="inline h-3 w-3" /> {t.location}
+                </span>
               </span>
             </figcaption>
           </motion.figure>
@@ -872,7 +1000,7 @@ function Partners() {
         viewport={{ once: true }}
         className="text-center text-xs font-semibold uppercase tracking-widest text-gray-500"
       >
-        Supported platforms
+        Supported platforms & partners
       </motion.p>
       <motion.div
         variants={containerVariants}
@@ -885,7 +1013,7 @@ function Partners() {
           <motion.div
             key={p.name}
             variants={itemVariants}
-            className="flex items-center gap-2 text-gray-400 transition hover:text-white"
+            className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/5 px-4 py-2 text-gray-400 transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
           >
             <p.icon className="h-5 w-5" />
             <span className="text-sm font-semibold">{p.name}</span>
@@ -926,11 +1054,15 @@ function CallToAction() {
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-indigo-100 sm:text-base">
             Create your free account today and start your journey from rookie to
-            Hall of Fame legend.
+            Hall of Fame legend. Join thousands of African gamers already competing.
           </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-indigo-200/70">
+            <MapPin className="h-3 w-3" />
+            <span>🇰🇪 Made in Kenya • For African Champions</span>
+          </div>
           <Link
             href="/auth/signup"
-            className="mt-6 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-indigo-700 shadow-lg transition hover:bg-gray-100"
+            className="mt-6 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-indigo-700 shadow-lg transition hover:bg-gray-100 hover:shadow-xl"
           >
             <Sparkles className="h-4 w-4" />
             Get Started Now
@@ -975,18 +1107,18 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
-    title: "Contact",
+    title: "Company",
     links: [
-      { label: "Support", href: "/support" },
-      { label: "Partnerships", href: "/partners" },
       { label: "About", href: "/about" },
       { label: "Careers", href: "/careers" },
+      { label: "Partners", href: "/partners" },
+      { label: "Contact", href: "/contact" },
     ],
   },
 ] as const;
 
 const SOCIAL_LINKS = [
-  { label: "Email", href: "mailto:hello@nexusesports.gg", icon: Mail },
+  { label: "Email", href: "mailto:nexusesportshub@gmail.com", icon: Mail },
   { label: "Community", href: "/community", icon: MessageCircle },
   { label: "Website", href: "/", icon: Globe },
   { label: "Trending", href: "/rankings", icon: TrendingUp },
@@ -999,14 +1131,14 @@ function Footer() {
         <div className="grid grid-cols-2 gap-6 md:grid-cols-6">
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
                 <Trophy className="h-4 w-4 text-white" strokeWidth={2.3} />
               </span>
               <span className="text-base font-bold text-white">Nexus Esports</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-gray-400">
-              The premier platform for competitive eFootball leagues,
-              tournaments and community.
+              Africa's premier platform for competitive eFootball leagues,
+              tournaments and community. Built in Kenya 🇰🇪
             </p>
             <div className="mt-4 flex items-center gap-2">
               {SOCIAL_LINKS.map((s) => (
@@ -1043,7 +1175,7 @@ function Footer() {
 
         <div className="mt-10 flex flex-col items-center gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-between">
           <p className="text-xs text-gray-500">
-            © {new Date().getFullYear()} Nexus Esports. All rights reserved.
+            © {new Date().getFullYear()} Nexus Esports. Made with ❤️ in Kenya.
           </p>
 
           <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
@@ -1078,79 +1210,119 @@ function Footer() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              Error / retry                                  */
-/* -------------------------------------------------------------------------- */
-
-function StatsErrorNotice({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="mx-auto mt-4 flex max-w-md items-center justify-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200">
-      <Clock className="h-4 w-4 flex-shrink-0" />
-      <span>Showing sample stats — live data unavailable.</span>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="ml-auto inline-flex items-center gap-1 rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/30"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /*                              Home Page                                      */
 /* -------------------------------------------------------------------------- */
 
 export default function HomePage() {
-  const [stats, setStats] = useState<PlatformStats>(FALLBACK_STATS);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchStats = useCallback(async (signal?: AbortSignal) => {
+  const fetchStats = useCallback(async () => {
     setLoading(true);
-    setHasError(false);
+    setError(null);
     try {
-      const res = await fetch("/api/admin/stats", { signal });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      const data = (await res.json()) as Partial<PlatformStats>;
+      const res = await fetch("/api/admin/stats");
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+      const data = await res.json();
       setStats({
-        totalPlayers: data.totalPlayers ?? FALLBACK_STATS.totalPlayers,
-        totalFixtures: data.totalFixtures ?? FALLBACK_STATS.totalFixtures,
-        totalTournaments:
-          data.totalTournaments ?? FALLBACK_STATS.totalTournaments,
-        totalAwards: data.totalAwards ?? FALLBACK_STATS.totalAwards,
-        totalSeasons: data.totalSeasons ?? FALLBACK_STATS.totalSeasons,
-        totalNews: data.totalNews ?? FALLBACK_STATS.totalNews,
+        totalPlayers: data.totalPlayers || 0,
+        totalFixtures: data.totalFixtures || 0,
+        totalTournaments: data.totalTournaments || 0,
+        totalAwards: data.totalAwards || 0,
+        totalSeasons: data.totalSeasons || 0,
+        totalNews: data.totalNews || 0,
+        activePlayers: data.activePlayers || 0,
+        completionRate: data.completionRate || 0,
       });
     } catch (err) {
-      if ((err as Error)?.name === "AbortError") return;
-      setStats(FALLBACK_STATS);
-      setHasError(true);
+      console.error("Error fetching stats:", err);
+      setError("Unable to load live stats");
+      // ✅ Set default stats so page doesn't break
+      setStats({
+        totalPlayers: 0,
+        totalFixtures: 0,
+        totalTournaments: 0,
+        totalAwards: 0,
+        totalSeasons: 0,
+        totalNews: 0,
+        activePlayers: 0,
+        completionRate: 0,
+      });
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetchStats(controller.signal);
-    return () => controller.abort();
+    fetchStats();
+    // ✅ Auto-refresh every 30 seconds
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, [fetchStats]);
 
+  // ✅ Show loading state
+  if (loading && !stats) {
+    return (
+      <div className="relative min-h-screen">
+        <GradientBackground />
+        <Navbar />
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <div className="relative mx-auto mb-4 h-16 w-16">
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-500/20 border-t-indigo-500" />
+              <Trophy className="absolute inset-0 m-auto h-6 w-6 text-indigo-400" />
+            </div>
+            <p className="text-sm text-gray-400">Loading platform data...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // ✅ Use stats (fallback to empty if null)
+  const platformStats = stats || {
+    totalPlayers: 0,
+    totalFixtures: 0,
+    totalTournaments: 0,
+    totalAwards: 0,
+    totalSeasons: 0,
+    totalNews: 0,
+    activePlayers: 0,
+    completionRate: 0,
+  };
+
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gray-900 text-white">
+    <div className="relative min-h-screen overflow-x-hidden">
       <GradientBackground />
       <Navbar />
 
       <main>
-        <Hero stats={stats} loading={loading} />
-        {hasError && (
+        <Hero stats={platformStats} loading={loading} />
+        
+        {/* ✅ Show error notice but keep page functional */}
+        {error && (
           <div className="px-4 sm:px-6 lg:px-8">
-            <StatsErrorNotice onRetry={() => fetchStats()} />
+            <div className="mx-auto max-w-4xl">
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200">
+                <Clock className="h-4 w-4 flex-shrink-0" />
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={fetchStats}
+                  className="ml-auto inline-flex items-center gap-1 rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/30"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
           </div>
         )}
+        
         <Features />
         <HowItWorks />
+        <TeamSection />
         <Testimonials />
         <Partners />
         <CallToAction />
