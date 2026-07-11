@@ -272,21 +272,34 @@ export default function AdminLeaguePage() {
     }
   }, [session]);
 
+  // ✅ FIXED: Handle paginated response from /api/players
   async function fetchData() {
+    setLoading(true);
     try {
       const [seasonsRes, playersRes] = await Promise.all([
         fetch("/api/seasons", { credentials: "include" }),
         fetch("/api/players", { credentials: "include" }),
       ]);
+      
       const seasonsData = await seasonsRes.json();
       const playersData = await playersRes.json();
 
       setSeasons(Array.isArray(seasonsData) ? seasonsData : []);
-      setPlayers(Array.isArray(playersData) ? playersData : []);
+      
+      // ✅ Extract players from paginated response
+      let playersArray: Player[] = [];
+      if (playersData?.data && Array.isArray(playersData.data)) {
+        // ✅ Paginated response from your API
+        playersArray = playersData.data;
+      } else if (Array.isArray(playersData)) {
+        // ✅ Flat array (fallback)
+        playersArray = playersData;
+      }
+      setPlayers(playersArray);
 
       if (seasonsData.length > 0) {
         setSelectedSeason(seasonsData[0].id);
-        fetchEntries(seasonsData[0].id);
+        await fetchEntries(seasonsData[0].id);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -297,14 +310,19 @@ export default function AdminLeaguePage() {
   }
 
   async function fetchEntries(seasonId: string) {
-    const res = await fetch(`/api/league/entries?seasonId=${seasonId}`, {
-      credentials: "include",
-    });
-    const data = await res.json();
-    setEntries(Array.isArray(data) ? data : []);
+    try {
+      const res = await fetch(`/api/league/entries?seasonId=${seasonId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      setEntries(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching entries:", error);
+      toast.error("Failed to load season entries");
+    }
   }
 
-  // Bulk add selected players
+  // ✅ Bulk add selected players
   async function addSelectedPlayers() {
     if (!selectedSeason) {
       toast.error("Select a season first");
@@ -344,6 +362,8 @@ export default function AdminLeaguePage() {
           });
         } else {
           failCount++;
+          const error = await response.json();
+          console.error("Failed to add player:", error);
         }
       } catch (error) {
         failCount++;
@@ -353,14 +373,14 @@ export default function AdminLeaguePage() {
 
     setBulkAdding(false);
     setSelectedPlayers([]);
-    fetchEntries(selectedSeason);
+    await fetchEntries(selectedSeason);
 
     toast.success(
       `Added ${successCount} players${failCount > 0 ? `, ${failCount} failed` : ""}`
     );
   }
 
-  // Add ALL players to season
+  // ✅ Add ALL players to season
   async function addAllPlayers() {
     if (!selectedSeason) {
       toast.error("Select a season first");
@@ -416,13 +436,13 @@ export default function AdminLeaguePage() {
     }
 
     setAddingAll(false);
-    fetchEntries(selectedSeason);
+    await fetchEntries(selectedSeason);
     toast.success(
       `Added ${successCount} players${failCount > 0 ? `, ${failCount} failed` : ""}`
     );
   }
 
-  // Toggle player selection
+  // ✅ Toggle player selection
   function togglePlayer(playerId: string) {
     setSelectedPlayers((prev) =>
       prev.includes(playerId)
@@ -431,7 +451,7 @@ export default function AdminLeaguePage() {
     );
   }
 
-  // Select/Deselect all players
+  // ✅ Select/Deselect all players
   function toggleAllPlayers() {
     const availablePlayers = players.filter(
       (p) => p.role === "PLAYER" && !entries.some((e) => e.playerId === p.id)
@@ -473,7 +493,7 @@ export default function AdminLeaguePage() {
         }),
       });
       setSinglePlayerId("");
-      fetchEntries(selectedSeason);
+      await fetchEntries(selectedSeason);
     } else {
       const error = await response.json();
       toast.error(error.error || "Failed to add player");
@@ -493,7 +513,7 @@ export default function AdminLeaguePage() {
 
       if (response.ok) {
         toast.success("Player removed from season");
-        fetchEntries(selectedSeason);
+        await fetchEntries(selectedSeason);
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to remove player");
