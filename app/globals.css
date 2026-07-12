@@ -32,17 +32,18 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 html {
   font-size: 16px;
   scroll-behavior: smooth;
   height: 100%;
-  background-color: #0f172a; /* ✅ Dark fallback */
+  background-color: #0f172a;
 }
 
 body {
-  background-color: #0f172a; /* ✅ Dark fallback */
+  background-color: #0f172a;
   color: var(--text-color);
   transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
   overflow-x: hidden;
@@ -396,7 +397,7 @@ textarea {
 /* ============================================ */
 
 @media (max-width: 768px) {
-  /* Reduce motion on mobile for battery life */
+  /* ✅ Reduce motion on mobile for battery life */
   .animate-spin,
   .animate-pulse,
   .animate-bounce {
@@ -413,7 +414,7 @@ textarea {
   
   .shadow-2xl,
   .shadow-xl {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
   }
   
   .overflow-y-auto,
@@ -637,4 +638,76 @@ textarea {
     color: #000 !important;
     box-shadow: none !important;
   }
+}
+
+/* ============================================ */
+/* ✅ MOBILE PERFORMANCE - CRITICAL FIXES       */
+/* ============================================ */
+
+/* ✅ Reduce heavy effects on mobile */
+@media (max-width: 768px) {
+  /* ✅ Lower blur for performance */
+  .backdrop-blur-xl,
+  .backdrop-blur-lg,
+  .backdrop-blur-md {
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+  
+  /* ✅ Lighter shadows */
+  .shadow-2xl,
+  .shadow-xl {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  /* ✅ Reduce animation intensity */
+  .animate-pulse-slow,
+  .animate-pulse-slower,
+  .animate-pulse-slowest {
+    animation: none !important;
+  }
+  
+  /* ✅ Touch-friendly */
+  * {
+    touch-action: manipulation;
+  }
+  
+  /* ✅ No zoom on inputs (prevents iOS zoom) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  /* ✅ GPU acceleration for scroll containers */
+  .overflow-y-auto,
+  .overflow-x-auto {
+    transform: translateZ(0);
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* ✅ Disable hover effects on touch devices */
+  .hover\:scale-105,
+  .group-hover\:scale-110,
+  .hover\:-translate-y-1 {
+    transform: none !important;
+  }
+}
+
+/* ✅ Touch feedback for buttons */
+@media (hover: none) {
+  button:active,
+  a:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.05s;
+  }
+}
+
+/* ✅ Prevent 300ms tap delay */
+a, button, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* ✅ Disable pull-to-refresh on mobile */
+body {
+  overscroll-behavior: none;
 }
